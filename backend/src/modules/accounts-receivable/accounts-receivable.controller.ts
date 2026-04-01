@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AccountsReceivableService } from './accounts-receivable.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -30,7 +30,16 @@ export class AccountsReceivableController {
 
   @Post(':id/payments')
   @ApiOperation({ summary: 'Registrar pago a cuenta' })
-  addPayment(@Param('id') id: string, @Body() dto: { amount: number; paymentMethod?: string; notes?: string; collectedBy?: string }) {
-    return this.service.addPayment(id, dto);
+  addPayment(
+    @Param('id') id: string,
+    @Body() dto: { amount: number; paymentMethod?: string; notes?: string; collectedBy?: string; vendorId?: string; vendorName?: string },
+    @Req() req: any,
+  ) {
+    return this.service.addPayment(id, {
+      amount: dto.amount,
+      paymentMethod: dto.paymentMethod,
+      notes: dto.notes || dto.vendorName || null,
+      collectedBy: dto.collectedBy || dto.vendorId || req.user?.sub,
+    });
   }
 }

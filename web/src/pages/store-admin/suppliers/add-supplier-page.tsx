@@ -18,14 +18,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useAuth } from '@/contexts/auth-context';
 import apiClient from '@/services/api-client';
 import { toast } from '@/lib/swalert';
 
 export default function AddSupplierPage() {
   const { storeId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -38,16 +36,19 @@ export default function AddSupplierPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.chainId) return;
+    if (!storeId) {
+      toast.error('Error', 'No se pudo identificar la tienda.');
+      return;
+    }
     
     setLoading(true);
     try {
       await apiClient.post('/suppliers', {
         ...formData,
-        chainId: user.chainId
+        storeId,
       });
       toast.success('Guardado', 'Proveedor registrado satisfactoriamente.');
-      navigate(`/store-admin/${storeId}/suppliers`);
+      navigate(`/store/${storeId}/suppliers`);
     } catch (error: any) {
       const msg = error.response?.data?.message || 'Error al guardar el proveedor.';
       toast.error('Error', msg);
@@ -60,7 +61,7 @@ export default function AddSupplierPage() {
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <Button variant="ghost" className="rounded-xl font-bold h-12 text-slate-400 hover:text-primary transition-colors" asChild>
-          <Link to={`/store-admin/${storeId}/suppliers`}>
+          <Link to={`/store/${storeId}/suppliers`}>
             <ArrowLeft className="mr-2 h-5 w-5" />
             VOLVER AL DIRECTORIO
           </Link>

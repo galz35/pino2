@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Lock } from 'lucide-react';
 import { useParams } from 'react-router-dom';
-import apiClient from '@/services/api-client';
+import axios from 'axios';
+import { API_BASE_URL } from '@/lib/runtime-config';
+import { normalizeUserRole } from '@/lib/user-role';
+import { useAuth } from '@/contexts/auth-context';
 
 interface AdminAuthDialogProps {
     isOpen: boolean;
@@ -23,6 +26,9 @@ export function AdminAuthDialog({
     title = "Autorización Requerida",
     description = "Esta acción requiere permisos de administrador. Por favor ingrese su clave.",
 }: AdminAuthDialogProps) {
+    const { user } = useAuth();
+    const isCurrentUserPrivileged = ['store-admin', 'master-admin', 'owner'].includes(normalizeUserRole(user?.role));
+    const [adminEmail, setAdminEmail] = useState(user?.email || '');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -39,20 +45,32 @@ export function AdminAuthDialog({
                 return;
             }
 
-            // En MultiTienda v2, validamos el PIN contra el backend NestJS
-            const response = await apiClient.post(`/stores/${storeId}/validate-pin`, { pin: password });
+            const response = await axios.post(`${API_BASE_URL}/auth/login`, {
+                email: adminEmail.trim(),
+                password,
+            });
 
-            if (response.data.valid) {
-                onConfirm();
-                onClose();
-                setPassword('');
-            } else {
-                setError('PIN incorrecto');
+            const authorizedRole = normalizeUserRole(response.data?.user?.role);
+            const authorized =
+                requiredRole === 'owner'
+                    ? authorizedRole === 'owner' || authorizedRole === 'master-admin'
+                    : ['store-admin', 'master-admin', 'owner'].includes(authorizedRole);
+
+            if (!authorized) {
+                setError('Las credenciales no corresponden a un usuario autorizado.');
+                return;
+            }
+
+            onConfirm();
+            onClose();
+            setPassword('');
+            if (isCurrentUserPrivileged) {
+                setAdminEmail(user?.email || '');
             }
 
         } catch (err: any) {
             console.error("Auth error:", err);
-            setError(err.response?.data?.message || 'Error de validación');
+            setError(err.response?.data?.message || 'Credenciales inválidas.');
         } finally {
             setIsLoading(false);
         }
@@ -79,17 +97,30 @@ export function AdminAuthDialog({
 
                 <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="admin-password">Contraseña de Administrador (PIN)</Label>
+                        <Label htmlFor="admin-email">Correo del administrador</Label>
+                        <Input
+                            id="admin-email"
+                            type="email"
+                            value={adminEmail}
+                            onChange={(e) => setAdminEmail(e.target.value)}
+                            placeholder="admin@multitienda.com"
+                            autoFocus
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="admin-password">Contraseña del administrador</Label>
                         <Input
                             id="admin-password"
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder="Ingrese PIN..."
-                            autoFocus
+                            placeholder="Ingrese contraseña..."
                         />
                         {error && <p className="text-sm text-red-500 font-medium">{error}</p>}
+                        <p className="text-xs text-muted-foreground">
+                            Se valida contra el login real del sistema sin reemplazar la sesión actual.
+                        </p>
                     </div>
                 </div>
 
@@ -106,7 +137,7 @@ export function AdminAuthDialog({
                         type="button"
                         className="flex-1 bg-red-600 hover:bg-red-700 text-white shadow-lg"
                         onClick={handleConfirm}
-                        disabled={isLoading || !password}
+                        disabled={isLoading || !password || !adminEmail.trim()}
                     >
                         {isLoading ? 'Verificando...' : 'Autorizar'}
                     </Button>

@@ -139,7 +139,7 @@ export default function SuppliersPage() {
                     <Button asChild variant="outline" size="sm">
                       <Link to={`/store/${storeId}/suppliers/invoice?supplierId=${supplier.id}`}>
                         <FileText className="mr-2 h-4 w-4" />
-                        Ver Facturas
+                        Facturas y CxP
                       </Link>
                     </Button>
                     <AlertDialog>

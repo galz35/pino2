@@ -1,7 +1,7 @@
 
 
 import { useEffect, useRef, useCallback } from 'react';
-import { useAuth } from '@/context/auth-context';
+import { useAuth } from '@/contexts/auth-context';
 
 export function useInactivityTimeout(onTimeout: () => void, timeout: number = 3600000) {
   const { user } = useAuth();

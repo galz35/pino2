@@ -31,7 +31,7 @@ interface Sale {
 interface Delivery {
   id: string;
   total: number;
-  status: 'PENDING' | 'DELIVERED' | 'FAILED';
+  status: string;
   salesManagerName: string;
   createdAt: string;
   updatedAt?: string;
@@ -59,7 +59,7 @@ export function StoreAdminDashboardMetrics({ storeId }: StoreAdminDashboardMetri
       try {
         const [salesRes, deliveriesRes, storeRes] = await Promise.all([
           apiClient.get(`/sales?storeId=${storeId}`),
-          apiClient.get(`/orders/pending?storeId=${storeId}`),
+          apiClient.get(`/pending-deliveries?storeId=${storeId}`),
           apiClient.get(`/stores/${storeId}`)
         ]);
 
@@ -78,16 +78,25 @@ export function StoreAdminDashboardMetrics({ storeId }: StoreAdminDashboardMetri
     fetchData();
   }, [storeId]);
 
+  const normalizeDeliveryStatus = (status?: string) => {
+    const normalized = (status || '').toLowerCase();
+
+    if (normalized.includes('entreg')) return 'DELIVERED';
+    if (normalized.includes('pend')) return 'PENDING';
+    if (normalized.includes('fail') || normalized.includes('rechaz') || normalized.includes('devuelt')) return 'FAILED';
+    return normalized.toUpperCase() || 'UNKNOWN';
+  };
+
   const stats = useMemo(() => {
     if (!deliveryData) {
       return { dailyDeliveries: 0, pendingDeliveries: 0, ordersToday: 0, bestSalesManager: 'N/A' };
     }
 
     const dailyDeliveriesCount = deliveryData.filter(d => 
-        d.status === 'DELIVERED' && d.updatedAt && isToday(parseISO(d.updatedAt))
+        normalizeDeliveryStatus(d.status) === 'DELIVERED' && d.updatedAt && isToday(parseISO(d.updatedAt))
     ).length;
     
-    const pendingDeliveriesCount = deliveryData.filter(d => d.status === 'PENDING').length;
+    const pendingDeliveriesCount = deliveryData.filter(d => normalizeDeliveryStatus(d.status) === 'PENDING').length;
     const ordersTodayCount = deliveryData.filter(d => isToday(parseISO(d.createdAt))).length;
 
     const salesByManager = new Map<string, number>();

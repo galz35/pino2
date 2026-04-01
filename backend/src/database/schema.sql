@@ -290,7 +290,7 @@ CREATE TABLE IF NOT EXISTS accounts_receivable (
     total_amount DECIMAL(12, 2) NOT NULL,
     remaining_amount DECIMAL(12, 2) NOT NULL,
     description TEXT,
-    status VARCHAR(20) DEFAULT 'PENDING',
+    status VARCHAR(50) DEFAULT 'ACTIVE',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -300,9 +300,9 @@ CREATE TABLE IF NOT EXISTS account_payments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     account_id UUID REFERENCES accounts_receivable(id) ON DELETE CASCADE,
     amount DECIMAL(12, 2) NOT NULL,
-    payment_method VARCHAR(30) DEFAULT 'CASH',
+    payment_method VARCHAR(50) DEFAULT 'CASH',
     notes TEXT,
-    collected_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    collected_by VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -311,13 +311,13 @@ CREATE TABLE IF NOT EXISTS pending_orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     store_id UUID REFERENCES stores(id) ON DELETE CASCADE,
     client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
-    client_name VARCHAR(150),
+    client_name VARCHAR(255),
     items JSONB DEFAULT '[]',
     total DECIMAL(12, 2) DEFAULT 0,
     notes TEXT,
-    payment_method VARCHAR(30) DEFAULT 'Efectivo',
-    status VARCHAR(30) DEFAULT 'Pendiente',
-    dispatched_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    payment_method VARCHAR(50),
+    status VARCHAR(50) DEFAULT 'Pendiente',
+    dispatched_by VARCHAR(255),
     dispatched_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -329,14 +329,37 @@ CREATE TABLE IF NOT EXISTS pending_deliveries (
     store_id UUID REFERENCES stores(id) ON DELETE CASCADE,
     order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
     client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
-    client_name VARCHAR(150),
     rutero_id UUID REFERENCES users(id) ON DELETE SET NULL,
     address TEXT,
     notes TEXT,
-    status VARCHAR(30) DEFAULT 'Pendiente',
-    route_date DATE,
+    status VARCHAR(50) DEFAULT 'Pendiente',
+    route_date TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Zonas por tienda para vendedores (vendor-zones-page.tsx)
+CREATE TABLE IF NOT EXISTS store_zones (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    color VARCHAR(50),
+    description TEXT,
+    visit_day VARCHAR(30) DEFAULT 'Ninguno',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Visitas del Vendedor (vendor-dashboard-page.tsx)
+CREATE TABLE IF NOT EXISTS visit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    vendor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    notes TEXT,
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================================
@@ -416,17 +439,42 @@ CREATE TABLE IF NOT EXISTS daily_closings (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Rutas Formales del Vendedor (req. §13)
-CREATE TABLE IF NOT EXISTS vendor_routes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+-- Rutas Formales del Vendedor (routes.service.ts usa `routes` hoy)
+CREATE TABLE IF NOT EXISTS routes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID REFERENCES stores(id) ON DELETE CASCADE,
     vendor_id UUID REFERENCES users(id) ON DELETE SET NULL,
     client_ids JSONB DEFAULT '[]',
-    route_date DATE,
-    status VARCHAR(30) DEFAULT 'PLANNED',
+    route_date TIMESTAMP,
+    status VARCHAR(50) DEFAULT 'pending',
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Configuración y trazabilidad opcional de consultas lentas
+CREATE TABLE IF NOT EXISTS consultasql (
+    id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    activo BOOLEAN NOT NULL DEFAULT FALSE,
+    umbral_ms INTEGER NOT NULL DEFAULT 200 CHECK (umbral_ms >= 0),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO consultasql (id, activo, umbral_ms)
+VALUES (1, FALSE, 200)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS consultasql_historial (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    operacion VARCHAR(20),
+    origen VARCHAR(30) NOT NULL DEFAULT 'pool',
+    duracion_ms INTEGER NOT NULL,
+    row_count INTEGER,
+    consulta TEXT NOT NULL,
+    parametros JSONB,
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================================
@@ -458,6 +506,9 @@ ALTER TABLE vendor_inventories ADD COLUMN IF NOT EXISTS assigned_units INT DEFAU
 ALTER TABLE vendor_inventories ADD COLUMN IF NOT EXISTS current_bulks INT DEFAULT 0;
 ALTER TABLE vendor_inventories ADD COLUMN IF NOT EXISTS current_units INT DEFAULT 0;
 
+-- 4.6 Zonas por tienda: dia de visita para dashboard vendedor
+ALTER TABLE store_zones ADD COLUMN IF NOT EXISTS visit_day VARCHAR(30) DEFAULT 'Ninguno';
+
 -- ============================================================
 -- SECCIÓN 5: ÍNDICES DE PERFORMANCE
 -- ============================================================
@@ -472,4 +523,8 @@ CREATE INDEX IF NOT EXISTS idx_daily_closings_rutero ON daily_closings(rutero_id
 CREATE INDEX IF NOT EXISTS idx_pending_orders_store ON pending_orders(store_id, status);
 CREATE INDEX IF NOT EXISTS idx_pending_deliveries_store ON pending_deliveries(store_id, status);
 CREATE INDEX IF NOT EXISTS idx_pending_deliveries_rutero ON pending_deliveries(rutero_id);
-
+CREATE INDEX IF NOT EXISTS idx_store_zones_store ON store_zones(store_id);
+CREATE INDEX IF NOT EXISTS idx_routes_store ON routes(store_id, vendor_id);
+CREATE INDEX IF NOT EXISTS idx_visit_logs_store_vendor ON visit_logs(store_id, vendor_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_consultasql_historial_created_at ON consultasql_historial(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_consultasql_historial_duracion ON consultasql_historial(duracion_ms DESC);

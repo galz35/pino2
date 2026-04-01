@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useMemo } from 'react';
 import { Product } from '../types';
+import { toast } from '@/lib/swalert';
 
 export interface CartItem extends Product {
     uniqueId: string; // for React keys
@@ -67,11 +68,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
     };
 
     const handleCreditNoteClick = () => {
-        // TODO: Implementar nota de crédito
+        toast.info(
+            'Nota de crédito',
+            'El flujo formal de nota de crédito quedará en la siguiente fase operativa.'
+        );
     };
 
     const handleOpenDrawer = () => {
-        // TODO: Integrar con hardware de caja
+        toast.info(
+            'Abrir gaveta',
+            'La integración directa con hardware de caja se habilitará en la fase de dispositivos.'
+        );
     };
 
     const handlePayment = () => {

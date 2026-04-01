@@ -109,6 +109,29 @@ export class InvoicesService {
         );
       }
 
+      if (this.isCreditPaymentType(dto.paymentType)) {
+        await client.query(
+          `INSERT INTO accounts_payable (
+             store_id,
+             supplier_id,
+             invoice_id,
+             total_amount,
+             remaining_amount,
+             description,
+             due_date
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            dto.storeId,
+            dto.supplierId,
+            invoice.id,
+            dto.total,
+            dto.total,
+            `Factura Proveedor #${dto.invoiceNumber}`,
+            dto.dueDate ? new Date(dto.dueDate) : null,
+          ],
+        );
+      }
+
       return this.mapRow(invoice);
     });
   }
@@ -189,5 +212,14 @@ export class InvoicesService {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+  }
+
+  private isCreditPaymentType(paymentType?: string) {
+    const normalized = (paymentType || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    return normalized === 'credito' || normalized === 'credit';
   }
 }

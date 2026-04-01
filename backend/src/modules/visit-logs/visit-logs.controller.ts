@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { VisitLogsService } from './visit-logs.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -18,7 +18,13 @@ export class VisitLogsController {
 
   @Post()
   @ApiOperation({ summary: 'Registrar una visita de vendedor' })
-  create(@Body() dto: { storeId: string; vendorId: string; clientId: string; notes?: string; latitude?: number; longitude?: number }) {
-    return this.service.create(dto);
+  create(
+    @Body() dto: { storeId: string; vendorId?: string; clientId: string; notes?: string; latitude?: number; longitude?: number; status?: string; clientName?: string },
+    @Req() req: any,
+  ) {
+    return this.service.create({
+      ...dto,
+      vendorId: dto.vendorId || req.user?.sub,
+    });
   }
 }

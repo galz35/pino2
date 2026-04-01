@@ -49,8 +49,8 @@ export default function VendorRoutesPage() {
     const fetchData = async () => {
       try {
         const [vendorsRes, clientsRes] = await Promise.all([
-          apiClient.get(`/users?storeId=${storeId}&role=Vendedor Ambulante`),
-          apiClient.get(`/clients?storeId=${storeId}`),
+          apiClient.get('/users', { params: { storeId, role: 'Vendedor Ambulante' } }),
+          apiClient.get('/clients', { params: { storeId } }),
         ]);
         setVendors((vendorsRes.data || []).map((v: any) => ({ uid: v.id || v.uid, name: v.name })));
         setClients((clientsRes.data || []).map((c: any) => ({ id: c.id, name: c.name })));

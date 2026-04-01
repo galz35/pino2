@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Edit, Trash2, Building2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,7 +38,9 @@ export default function MasterChainsPage() {
                         <CardContent>
                             <div className="text-sm text-muted-foreground mb-4"><p><strong>Propietario:</strong> {chain.ownerName}</p><p><strong>Email:</strong> {chain.ownerEmail}</p><div className="mt-2"><Badge variant={chain.status === 'active' ? 'default' : 'secondary'}>{chain.status === 'active' ? 'Activa' : 'Inactiva'}</Badge></div></div>
                             <div className="flex gap-2 justify-end">
-                                <Button asChild variant="outline" size="sm"><Link to={`/master-admin/chains/${chain.id}`}><Edit className="mr-2 h-4 w-4" /> Detalles</Link></Button>
+                                <Button variant="outline" size="sm" disabled title="Vista detallada pendiente">
+                                    <Edit className="mr-2 h-4 w-4" /> Detalles
+                                </Button>
                                 <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="text-destructive hover:text-destructive/90"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                                     <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esto eliminará la cadena y desvinculará tiendas.</AlertDialogDescription></AlertDialogHeader>
                                         <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDelete(chain.id, chain.name)}>Eliminar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>

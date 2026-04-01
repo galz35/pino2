@@ -7,13 +7,30 @@ export class UsersService {
   constructor(private readonly db: DatabaseService) {}
 
   async findAll(storeId?: string, role?: string) {
-    let sql = 'SELECT DISTINCT u.id, u.email, u.name, u.role, u.is_active, u.created_at FROM users u';
+    let sql = `
+      SELECT
+        u.id,
+        u.email,
+        u.name,
+        u.role,
+        u.is_active,
+        u.created_at,
+        COALESCE(
+          array_agg(DISTINCT us.store_id) FILTER (WHERE us.store_id IS NOT NULL),
+          '{}'
+        ) AS store_ids
+      FROM users u
+      LEFT JOIN user_stores us ON u.id = us.user_id
+    `;
     const params: any[] = [];
     const conditions: string[] = [];
 
     if (storeId) {
-      sql += ' JOIN user_stores us ON u.id = us.user_id';
-      conditions.push(`us.store_id = $${params.push(storeId)}`);
+      conditions.push(`EXISTS (
+        SELECT 1
+        FROM user_stores usf
+        WHERE usf.user_id = u.id AND usf.store_id = $${params.push(storeId)}
+      )`);
     }
     if (role) {
       conditions.push(`u.role ILIKE $${params.push(role)}`);
@@ -21,7 +38,7 @@ export class UsersService {
     if (conditions.length > 0) {
       sql += ' WHERE ' + conditions.join(' AND ');
     }
-    sql += ' ORDER BY u.name ASC';
+    sql += ' GROUP BY u.id, u.email, u.name, u.role, u.is_active, u.created_at ORDER BY u.name ASC';
 
     const res = await this.db.query(sql, params);
     return res.rows.map(this.mapRow);
@@ -139,6 +156,7 @@ export class UsersService {
   }
 
   private mapRow(row: any): any {
+    const storeIds = Array.isArray(row.store_ids) ? row.store_ids.filter(Boolean) : [];
     return {
       id: row.id,
       email: row.email,
@@ -146,6 +164,8 @@ export class UsersService {
       role: row.role,
       isActive: row.is_active,
       createdAt: row.created_at,
+      storeIds,
+      storeId: storeIds[0] || undefined,
     };
   }
 }

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import React, { Suspense, lazy } from 'react';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
@@ -7,6 +7,9 @@ import { GlobalAlertProvider } from '@/components/global-alert-provider';
 import { Toaster } from '@/components/ui/toaster';
 import ErrorBoundary from '@/components/error-boundary';
 import AppLayout from '@/components/app-layout';
+import { APP_BASENAME } from '@/lib/runtime-config';
+import { getRedirectPath } from '@/lib/redirect-logic';
+import { isGlobalAdminRole, normalizeUserRole, type NormalizedUserRole } from '@/lib/user-role';
 
 // LAZY LOADED PAGES
 const LoginPage = lazy(() => import('@/pages/login-page'));
@@ -15,6 +18,7 @@ const DashboardPage = lazy(() => import('@/pages/store-admin/dashboard/dashboard
 const BillingPage = lazy(() => import('@/pages/store-admin/billing/billing-page'));
 const ProductsPage = lazy(() => import('@/pages/store-admin/products/products-page'));
 const AddProductPage = lazy(() => import('@/pages/store-admin/products/add-product-page'));
+const EditProductPage = lazy(() => import('@/pages/store-admin/products/edit-product-page'));
 const DepartmentsPage = lazy(() => import('@/pages/store-admin/products/departments-page'));
 const SubDepartmentsPage = lazy(() => import('@/pages/store-admin/products/sub-departments-page'));
 const ReportsPage = lazy(() => import('@/pages/store-admin/reports/reports-page'));
@@ -27,6 +31,7 @@ const InventoryAdjustmentsPage = lazy(() => import('@/pages/store-admin/inventor
 const SuppliersPage = lazy(() => import('@/pages/store-admin/suppliers/suppliers-page'));
 const AddSupplierPage = lazy(() => import('@/pages/store-admin/suppliers/add-supplier-page'));
 const EditSupplierPage = lazy(() => import('@/pages/store-admin/suppliers/edit-supplier-page'));
+const SupplierInvoicesPage = lazy(() => import('@/pages/store-admin/suppliers/supplier-invoices-page'));
 const CashRegisterPage = lazy(() => import('@/pages/store-admin/cash-register/cash-register-page'));
 const AuthorizationsPage = lazy(() => import('@/pages/store-admin/authorizations/authorizations-page'));
 const PendingOrdersPage = lazy(() => import('@/pages/store-admin/pending-orders/pending-orders-page'));
@@ -34,6 +39,7 @@ const DispatcherPage = lazy(() => import('@/pages/store-admin/dispatcher/dispatc
 const ControlTowerPage = lazy(() => import('@/pages/store-admin/control-tower/control-tower-page'));
 const DeliveryRoutePage = lazy(() => import('@/pages/store-admin/delivery-route/delivery-route-page'));
 const HelpPage = lazy(() => import('@/pages/store-admin/help/help-page'));
+const ReceivablesPage = lazy(() => import('@/pages/store-admin/finance/receivables-page'));
 const VendorsPage = lazy(() => import('@/pages/store-admin/vendors/vendors-page'));
 const VendorDashboardPage = lazy(() => import('@/pages/store-admin/vendors/vendor-dashboard-page'));
 const VendorZonesPage = lazy(() => import('@/pages/store-admin/vendors/vendor-zones-page'));
@@ -69,12 +75,45 @@ const LoadingFallback = () => (
   </div>
 );
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, loading } = useAuth();
+const MASTER_ROLES: NormalizedUserRole[] = ['master-admin', 'owner'];
+const STORE_ADMIN_ROLES: NormalizedUserRole[] = ['store-admin'];
+const CASHIER_ROLES: NormalizedUserRole[] = ['cashier', 'store-admin'];
+const INVENTORY_ROLES: NormalizedUserRole[] = ['inventory', 'store-admin'];
+const DISPATCH_ROLES: NormalizedUserRole[] = ['dispatcher', 'store-admin', 'sales-manager'];
+const DELIVERY_ROLES: NormalizedUserRole[] = ['rutero', 'store-admin', 'sales-manager'];
+const SALES_TEAM_ROLES: NormalizedUserRole[] = ['vendor', 'sales-manager', 'store-admin'];
+const SALES_ADMIN_ROLES: NormalizedUserRole[] = ['sales-manager', 'store-admin'];
+
+const ProtectedRoute = ({
+  children,
+  allowedRoles,
+  requireStoreAccess = false,
+}: {
+  children: React.ReactNode;
+  allowedRoles?: NormalizedUserRole[];
+  requireStoreAccess?: boolean;
+}) => {
+  const { user, isAuthenticated, loading } = useAuth();
+  const params = useParams();
   
   if (loading) return <LoadingFallback />;
   
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  const redirectPath = getRedirectPath(user) || '/login';
+  const normalizedRole = normalizeUserRole(user?.role);
+  const canBypassRoleChecks = isGlobalAdminRole(user?.role);
+
+  if (requireStoreAccess && params.storeId && !canBypassRoleChecks) {
+    const assignedStores = user?.storeIds || [];
+    if (!assignedStores.includes(params.storeId)) {
+      return <Navigate to={redirectPath} replace />;
+    }
+  }
+
+  if (allowedRoles && !canBypassRoleChecks && !allowedRoles.includes(normalizedRole)) {
+    return <Navigate to={redirectPath} replace />;
+  }
   
   return <AppLayout>{children}</AppLayout>;
 };
@@ -82,7 +121,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-      <BrowserRouter>
+      <BrowserRouter basename={APP_BASENAME}>
         <AuthProvider>
           <PosProvider>
             <GlobalAlertProvider />
@@ -103,61 +142,66 @@ function App() {
                   />
 
                   {/* RUTAS DE TIENDA */}
-                  <Route path="/store/:storeId/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/products/add" element={<ProtectedRoute><AddProductPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/products/departments" element={<ProtectedRoute><DepartmentsPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/products/sub-departments" element={<ProtectedRoute><SubDepartmentsPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/users/add" element={<ProtectedRoute><AddUserPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/users/edit/:userId" element={<ProtectedRoute><EditUserPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/inventory/movements" element={<ProtectedRoute><InventoryMovementsPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/inventory/adjustments" element={<ProtectedRoute><InventoryAdjustmentsPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/suppliers" element={<ProtectedRoute><SuppliersPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/suppliers/add" element={<ProtectedRoute><AddSupplierPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/suppliers/edit/:supplierId" element={<ProtectedRoute><EditSupplierPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/cash-register" element={<ProtectedRoute><CashRegisterPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/authorizations" element={<ProtectedRoute><AuthorizationsPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/pending-orders" element={<ProtectedRoute><PendingOrdersPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/dispatcher" element={<ProtectedRoute><DispatcherPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/control-tower" element={<ProtectedRoute><ControlTowerPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/delivery-route" element={<ProtectedRoute><DeliveryRoutePage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/help" element={<ProtectedRoute><HelpPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/dashboard" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><DashboardPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/billing" element={<ProtectedRoute requireStoreAccess allowedRoles={CASHIER_ROLES}><BillingPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/products" element={<ProtectedRoute requireStoreAccess allowedRoles={INVENTORY_ROLES}><ProductsPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/products/add" element={<ProtectedRoute requireStoreAccess allowedRoles={INVENTORY_ROLES}><AddProductPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/products/edit/:productId" element={<ProtectedRoute requireStoreAccess allowedRoles={INVENTORY_ROLES}><EditProductPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/products/departments" element={<ProtectedRoute requireStoreAccess allowedRoles={INVENTORY_ROLES}><DepartmentsPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/products/sub-departments" element={<ProtectedRoute requireStoreAccess allowedRoles={INVENTORY_ROLES}><SubDepartmentsPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/users" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><UsersPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/users/add" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><AddUserPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/users/edit/:userId" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><EditUserPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/settings" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><SettingsPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/inventory/movements" element={<ProtectedRoute requireStoreAccess allowedRoles={INVENTORY_ROLES}><InventoryMovementsPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/inventory/adjustments" element={<ProtectedRoute requireStoreAccess allowedRoles={INVENTORY_ROLES}><InventoryAdjustmentsPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/suppliers" element={<ProtectedRoute requireStoreAccess allowedRoles={INVENTORY_ROLES}><SuppliersPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/suppliers/add" element={<ProtectedRoute requireStoreAccess allowedRoles={INVENTORY_ROLES}><AddSupplierPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/suppliers/edit/:supplierId" element={<ProtectedRoute requireStoreAccess allowedRoles={INVENTORY_ROLES}><EditSupplierPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/suppliers/invoice" element={<ProtectedRoute requireStoreAccess allowedRoles={INVENTORY_ROLES}><SupplierInvoicesPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/cash-register" element={<ProtectedRoute requireStoreAccess allowedRoles={CASHIER_ROLES}><CashRegisterPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/authorizations" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><AuthorizationsPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/pending-orders" element={<ProtectedRoute requireStoreAccess allowedRoles={DISPATCH_ROLES}><PendingOrdersPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/dispatcher" element={<ProtectedRoute requireStoreAccess allowedRoles={DISPATCH_ROLES}><DispatcherPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/control-tower" element={<ProtectedRoute requireStoreAccess allowedRoles={DISPATCH_ROLES}><ControlTowerPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/delivery-route" element={<ProtectedRoute requireStoreAccess allowedRoles={DELIVERY_ROLES}><DeliveryRoutePage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/finance/receivables" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><ReceivablesPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/help" element={<ProtectedRoute requireStoreAccess><HelpPage /></ProtectedRoute>} />
                   
                   {/* VENDORS MODULE */}
-                  <Route path="/store/:storeId/vendors" element={<ProtectedRoute><VendorsPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/vendors/add" element={<ProtectedRoute><AddVendorPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/vendors/dashboard" element={<ProtectedRoute><VendorDashboardPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/vendors/zones" element={<ProtectedRoute><VendorZonesPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/vendors/clients" element={<ProtectedRoute><VendorClientsPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/vendors/collections" element={<ProtectedRoute><VendorCollectionsPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/vendors/inventory" element={<ProtectedRoute><VendorInventoryPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/vendors/quick-sale" element={<ProtectedRoute><VendorQuickSalePage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/vendors/sales" element={<ProtectedRoute><VendorSalesPage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/vendors/assign-route" element={<ProtectedRoute><AssignRoutePage /></ProtectedRoute>} />
-                  <Route path="/store/:storeId/vendors/routes" element={<ProtectedRoute><VendorRoutesPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/vendors" element={<ProtectedRoute requireStoreAccess allowedRoles={SALES_ADMIN_ROLES}><VendorsPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/vendors/add" element={<ProtectedRoute requireStoreAccess allowedRoles={SALES_ADMIN_ROLES}><AddVendorPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/vendors/dashboard" element={<ProtectedRoute requireStoreAccess allowedRoles={SALES_ADMIN_ROLES}><VendorDashboardPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/vendors/zones" element={<ProtectedRoute requireStoreAccess allowedRoles={SALES_TEAM_ROLES}><VendorZonesPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/vendors/clients" element={<ProtectedRoute requireStoreAccess allowedRoles={SALES_TEAM_ROLES}><VendorClientsPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/vendors/collections" element={<ProtectedRoute requireStoreAccess allowedRoles={[...SALES_TEAM_ROLES, 'rutero']}><VendorCollectionsPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/vendors/inventory" element={<ProtectedRoute requireStoreAccess allowedRoles={SALES_ADMIN_ROLES}><VendorInventoryPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/vendors/quick-sale" element={<ProtectedRoute requireStoreAccess allowedRoles={SALES_TEAM_ROLES}><VendorQuickSalePage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/vendors/sales" element={<ProtectedRoute requireStoreAccess allowedRoles={SALES_TEAM_ROLES}><VendorSalesPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/vendors/assign-route" element={<ProtectedRoute requireStoreAccess allowedRoles={SALES_ADMIN_ROLES}><AssignRoutePage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/vendors/routes" element={<ProtectedRoute requireStoreAccess allowedRoles={SALES_ADMIN_ROLES}><VendorRoutesPage /></ProtectedRoute>} />
 
-                  <Route path="/store/:storeId/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/reports" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><ReportsPage /></ProtectedRoute>} />
 
                   {/* MASTER ADMIN */}
-                  <Route path="/master-admin/dashboard" element={<ProtectedRoute><MasterDashboardPage /></ProtectedRoute>} />
-                  <Route path="/master-admin/stores" element={<ProtectedRoute><MasterStoresPage /></ProtectedRoute>} />
-                  <Route path="/master-admin/stores/add" element={<ProtectedRoute><AddStorePage /></ProtectedRoute>} />
-                  <Route path="/master-admin/stores/edit/:storeId" element={<ProtectedRoute><EditStorePage /></ProtectedRoute>} />
-                  <Route path="/master-admin/chains" element={<ProtectedRoute><MasterChainsPage /></ProtectedRoute>} />
-                  <Route path="/master-admin/chains/add" element={<ProtectedRoute><AddChainPage /></ProtectedRoute>} />
-                  <Route path="/master-admin/users" element={<ProtectedRoute><MasterUsersPage /></ProtectedRoute>} />
-                  <Route path="/master-admin/users/add" element={<ProtectedRoute><AddUserPage /></ProtectedRoute>} />
-                  <Route path="/master-admin/users/edit/:userId" element={<ProtectedRoute><EditUserPage /></ProtectedRoute>} />
-                  <Route path="/master-admin/licenses" element={<ProtectedRoute><MasterLicensesPage /></ProtectedRoute>} />
-                  <Route path="/master-admin/monitor" element={<ProtectedRoute><MasterMonitorPage /></ProtectedRoute>} />
-                  <Route path="/master-admin/config" element={<ProtectedRoute><MasterConfigPage /></ProtectedRoute>} />
-                  <Route path="/master-admin/config/zones" element={<ProtectedRoute><MasterZonesPage /></ProtectedRoute>} />
-                  <Route path="/master-admin/config/sub-zones" element={<ProtectedRoute><MasterSubZonesPage /></ProtectedRoute>} />
-                  <Route path="/master-admin/sync-monitor" element={<ProtectedRoute><MasterSyncMonitorPage /></ProtectedRoute>} />
-                  <Route path="/master-admin/help" element={<ProtectedRoute><MasterHelpPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/dashboard" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><MasterDashboardPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/stores" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><MasterStoresPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/stores/add" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><AddStorePage /></ProtectedRoute>} />
+                  <Route path="/master-admin/stores/edit/:storeId" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><EditStorePage /></ProtectedRoute>} />
+                  <Route path="/master-admin/chains" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><MasterChainsPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/chains/add" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><AddChainPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/users" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><MasterUsersPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/users/add" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><AddUserPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/users/edit/:userId" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><EditUserPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/licenses" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><MasterLicensesPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/monitor" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><MasterMonitorPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/config" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><MasterConfigPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/config/zones" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><MasterZonesPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/config/sub-zones" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><MasterSubZonesPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/sync-monitor" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><MasterSyncMonitorPage /></ProtectedRoute>} />
+                  <Route path="/master-admin/help" element={<ProtectedRoute allowedRoles={MASTER_ROLES}><MasterHelpPage /></ProtectedRoute>} />
+
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>
             </ErrorBoundary>

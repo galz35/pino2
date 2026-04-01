@@ -24,13 +24,13 @@ export class StoreZonesController {
 
   @Post()
   @ApiOperation({ summary: 'Crear zona de tienda' })
-  create(@Body() dto: { name: string; storeId: string; description?: string; color?: string }) {
+  create(@Body() dto: { name: string; storeId: string; description?: string; color?: string; visitDay?: string }) {
     return this.service.create(dto);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar zona de tienda' })
-  update(@Param('id') id: string, @Body() dto: { name?: string; description?: string; color?: string }) {
+  update(@Param('id') id: string, @Body() dto: { name?: string; description?: string; color?: string; visitDay?: string }) {
     return this.service.update(id, dto);
   }
 

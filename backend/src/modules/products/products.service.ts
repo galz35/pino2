@@ -1,21 +1,83 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { EventsGateway } from '../../common/gateways/events.gateway';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly eventsGateway: EventsGateway,
+  ) {}
+
+  private normalizeInventory(dto: any) {
+    const unitsPerBulk = Math.max(1, parseInt(dto.unitsPerBulk ?? dto.units_per_bulk ?? 1, 10) || 1);
+    const hasSplitStock = dto.stockBulks !== undefined || dto.stockUnits !== undefined;
+
+    const stockBulks = hasSplitStock
+      ? Math.max(0, parseInt(dto.stockBulks ?? 0, 10) || 0)
+      : Math.floor((parseInt(dto.currentStock ?? 0, 10) || 0) / unitsPerBulk);
+
+    const stockUnits = hasSplitStock
+      ? Math.max(0, parseInt(dto.stockUnits ?? 0, 10) || 0)
+      : (parseInt(dto.currentStock ?? 0, 10) || 0) % unitsPerBulk;
+
+    const currentStock = hasSplitStock
+      ? stockBulks * unitsPerBulk + stockUnits
+      : Math.max(0, parseInt(dto.currentStock ?? 0, 10) || 0);
+
+    return { unitsPerBulk, stockBulks, stockUnits, currentStock };
+  }
 
   async create(dto: any) {
+    const inventory = this.normalizeInventory(dto);
     const res = await this.db.query(
-      `INSERT INTO products (store_id, department_id, barcode, description, sale_price, cost_price, current_stock, units_per_bulk, stock_bulks, stock_units)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      `INSERT INTO products (
+         store_id, department_id, barcode, description, brand,
+         sale_price, cost_price, wholesale_price,
+         price1, price2, price3, price4, price5,
+         current_stock, units_per_bulk, stock_bulks, stock_units,
+         min_stock, uses_inventory, supplier_id, sub_department
+       )
+       VALUES (
+         $1, $2, $3, $4, $5,
+         $6, $7, $8,
+         $9, $10, $11, $12, $13,
+         $14, $15, $16, $17,
+         $18, $19, $20, $21
+       ) RETURNING *`,
       [
-        dto.storeId, dto.departmentId || null, dto.barcode || null, dto.description,
-        dto.salePrice || 0, dto.costPrice || 0, dto.currentStock || 0,
-        dto.unitsPerBulk || 1, dto.stockBulks || 0, dto.stockUnits || 0,
+        dto.storeId,
+        dto.departmentId || null,
+        dto.barcode || null,
+        dto.description,
+        dto.brand || null,
+        dto.salePrice ?? dto.price1 ?? 0,
+        dto.costPrice || 0,
+        dto.wholesalePrice || 0,
+        dto.price1 ?? dto.salePrice ?? 0,
+        dto.price2 ?? dto.salePrice ?? 0,
+        dto.price3 ?? 0,
+        dto.price4 ?? 0,
+        dto.price5 ?? 0,
+        inventory.currentStock,
+        inventory.unitsPerBulk,
+        inventory.stockBulks,
+        inventory.stockUnits,
+        dto.minStock || 0,
+        dto.usesInventory !== undefined ? dto.usesInventory : true,
+        dto.supplierId || null,
+        dto.subDepartment || null,
       ],
     );
-    return this.mapRow(res.rows[0]);
+    const product = await this.findOne(res.rows[0].id);
+
+    this.eventsGateway.emitSyncUpdate({
+      type: 'PRODUCT_CREATED',
+      storeId: product.storeId,
+      payload: product,
+    });
+
+    return product;
   }
 
   async findAll(storeId: string, search?: string, departmentId?: string, subDepartmentId?: string, limit: number = 1000, offset: number = 0) {
@@ -38,7 +100,7 @@ export class ProductsService {
     }
 
     if (subDepartmentId) {
-      query += ` AND p.sub_department_id = $${pIdx++}`;
+      query += ` AND p.sub_department = $${pIdx++}`;
       params.push(subDepartmentId);
     }
 
@@ -81,6 +143,12 @@ export class ProductsService {
       costPrice: 'cost_price',
       currentStock: 'current_stock',
       departmentId: 'department_id',
+      brand: 'brand',
+      wholesalePrice: 'wholesale_price',
+      minStock: 'min_stock',
+      usesInventory: 'uses_inventory',
+      supplierId: 'supplier_id',
+      subDepartment: 'sub_department',
       isActive: 'is_active',
       unitsPerBulk: 'units_per_bulk',
       stockBulks: 'stock_bulks',
@@ -112,7 +180,15 @@ export class ProductsService {
       `UPDATE products SET ${sets.join(', ')} WHERE id = $${idx}`,
       params,
     );
-    return this.findOne(id);
+    const product = await this.findOne(id);
+
+    this.eventsGateway.emitSyncUpdate({
+      type: 'PRODUCT_UPDATED',
+      storeId: product.storeId,
+      payload: product,
+    });
+
+    return product;
   }
 
   async remove(id: string) {
@@ -198,6 +274,7 @@ export class ProductsService {
       id: row.id,
       storeId: row.store_id,
       departmentId: row.department_id,
+      department: row.department_name || '',
       departmentName: row.department_name || '',
       barcode: row.barcode,
       description: row.description,

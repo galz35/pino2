@@ -79,15 +79,16 @@ export default function SubDepartmentsPage() {
   const fetchData = async () => {
     try {
       const [deptsRes, subDeptsRes] = await Promise.all([
-        apiClient.get('/departments', { params: { storeId } }),
-        apiClient.get('/departments', { params: { storeId, type: 'sub' } }).catch(() => ({ data: [] })),
+        apiClient.get('/departments', { params: { storeId, type: 'main' } }),
+        apiClient.get('/sub-departments', { params: { storeId } }).catch(() => ({ data: [] })),
       ]);
       const depts = deptsRes.data;
       setDepartments(depts);
       const departmentMap = new Map(depts.map((d: any) => [d.id, d.name]));
       const enriched = (subDeptsRes.data || []).map((sd: any) => ({
         ...sd,
-        departmentName: departmentMap.get(sd.departmentId) || 'Desconocido'
+        departmentId: sd.departmentId || sd.parentId || sd.parent_id || '',
+        departmentName: departmentMap.get(sd.departmentId || sd.parentId || sd.parent_id) || 'Desconocido'
       }));
       setSubDepartments(enriched);
     } catch (error) {

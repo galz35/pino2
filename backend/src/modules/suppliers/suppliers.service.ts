@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 
 @Injectable()
@@ -6,10 +6,26 @@ export class SuppliersService {
   constructor(private readonly db: DatabaseService) {}
 
   async create(dto: any) {
+    if (!dto.name) {
+      throw new BadRequestException('El nombre del proveedor es requerido');
+    }
+
+    let chainId = dto.chainId;
+    if (!chainId && dto.storeId) {
+      const storeRes = await this.db.query(
+        'SELECT chain_id FROM stores WHERE id = $1',
+        [dto.storeId],
+      );
+      if ((storeRes.rowCount ?? 0) === 0) {
+        throw new NotFoundException('Tienda no encontrada para derivar la cadena del proveedor');
+      }
+      chainId = storeRes.rows[0].chain_id;
+    }
+
     const res = await this.db.query(
       `INSERT INTO suppliers (chain_id, name, contact_name, email, phone, address) 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [dto.chainId || dto.storeId, dto.name, dto.contactName, dto.email, dto.phone, dto.address],
+      [chainId || null, dto.name, dto.contactName, dto.email, dto.phone, dto.address],
     );
     return this.mapRow(res.rows[0]);
   }

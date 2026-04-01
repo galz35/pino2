@@ -7,6 +7,7 @@
 
 import { indexedDBService, type PendingOperation, type SyncStatus } from './indexed-db-service';
 import apiClient from '../services/api-client';
+import { withAppBase } from './runtime-config';
 
 const BATCH_SIZE = 15; 
 
@@ -32,7 +33,7 @@ class SyncService {
         // Heartbeat cada 30s para verificar internet real
         setInterval(async () => {
             try {
-                await fetch('/favicon.ico', { method: 'HEAD', cache: 'no-cache' });
+                await fetch(withAppBase('/favicon.svg'), { method: 'HEAD', cache: 'no-cache' });
                 this.updateOnlineStatus(true);
             } catch (e) {
                 this.updateOnlineStatus(false);

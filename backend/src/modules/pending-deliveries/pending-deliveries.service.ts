@@ -5,11 +5,37 @@ import { DatabaseService } from '../../database/database.service';
 export class PendingDeliveriesService {
   constructor(private readonly db: DatabaseService) {}
 
+  private normalizeItems(items: any): any[] {
+    const parsed = typeof items === 'string' ? JSON.parse(items) : Array.isArray(items) ? items : [];
+    return parsed.map((item: any, index: number) => ({
+      id: item?.id || item?.productId || `item-${index + 1}`,
+      productId: item?.productId || item?.id || null,
+      description: item?.description || '',
+      quantity: Number.parseInt(String(item?.quantity ?? 0), 10) || 0,
+      salePrice: Number.parseFloat(String(item?.salePrice ?? item?.unitPrice ?? 0)) || 0,
+    }));
+  }
+
   async findAll(filters: { storeId?: string; status?: string; ruteroId?: string; unassigned?: boolean }) {
-    let sql = `SELECT pd.*, c.name as client_name, o.total as order_total
+    let sql = `SELECT pd.*, COALESCE(c.name, o.client_name) as client_name, COALESCE(pd.address, c.address) as client_address, o.total as order_total, o.sales_manager_name, o.payment_type,
+                  COALESCE(
+                    json_agg(
+                      json_build_object(
+                        'id', COALESCE(oi.id, oi.product_id),
+                        'productId', oi.product_id,
+                        'description', COALESCE(p.description, 'Producto'),
+                        'quantity', oi.quantity,
+                        'salePrice', oi.unit_price
+                      )
+                      ORDER BY oi.id
+                    ) FILTER (WHERE oi.id IS NOT NULL),
+                    '[]'::json
+                  ) as items
                FROM pending_deliveries pd 
                LEFT JOIN clients c ON pd.client_id = c.id 
                LEFT JOIN orders o ON pd.order_id = o.id 
+               LEFT JOIN order_items oi ON oi.order_id = o.id
+               LEFT JOIN products p ON p.id = oi.product_id
                WHERE 1=1`;
     const params: any[] = [];
 
@@ -18,9 +44,10 @@ export class PendingDeliveriesService {
     if (filters.ruteroId) sql += ` AND pd.rutero_id = $${params.push(filters.ruteroId)}`;
     if (filters.unassigned) sql += ' AND pd.rutero_id IS NULL';
 
-    sql += ' ORDER BY pd.created_at DESC';
+    sql += ` GROUP BY pd.id, c.name, c.address, o.client_name, o.total, o.sales_manager_name, o.payment_type
+             ORDER BY pd.created_at DESC`;
     const res = await this.db.query(sql, params);
-    return res.rows.map(this.mapRow);
+    return res.rows.map((row) => this.mapRow(row));
   }
 
   async create(dto: { storeId: string; orderId: string; clientId?: string; address?: string; notes?: string }) {
@@ -51,7 +78,7 @@ export class PendingDeliveriesService {
     return await this.db.withTransaction(async (client) => {
       for (const deliveryId of dto.deliveryIds) {
         await client.query(
-          `UPDATE pending_deliveries SET rutero_id = $1, status = 'Asignado', route_date = $2, updated_at = NOW() WHERE id = $3`,
+          `UPDATE pending_deliveries SET rutero_id = $1, status = 'Pendiente', route_date = $2, updated_at = NOW() WHERE id = $3`,
           [dto.ruteroId, dto.date || new Date().toISOString(), deliveryId],
         );
       }
@@ -60,12 +87,18 @@ export class PendingDeliveriesService {
   }
 
   private mapRow(row: any): any {
+    const items = this.normalizeItems(row.items);
     return {
       id: row.id,
       storeId: row.store_id,
       orderId: row.order_id,
       clientId: row.client_id,
       clientName: row.client_name,
+      clientAddress: row.client_address,
+      salesManagerName: row.sales_manager_name,
+      paymentType: row.payment_type || 'Crédito',
+      items,
+      total: row.order_total ? parseFloat(row.order_total) : 0,
       orderTotal: row.order_total ? parseFloat(row.order_total) : null,
       ruteroId: row.rutero_id,
       address: row.address,

@@ -1,8 +1,10 @@
 import Swal from 'sweetalert2';
+import { withAppBase } from '@/lib/runtime-config';
 
 const playSound = (type: 'success' | 'error' | 'info') => {
   try {
-    const audio = new Audio(type === 'error' ? '/sounds/error.mp3' : '/sounds/ping.mp3');
+    const soundPath = type === 'error' ? '/sounds/ping.mp3' : '/sounds/ping.mp3';
+    const audio = new Audio(withAppBase(soundPath));
     audio.play().catch(() => {}); // Ignorar si el navegador bloquea el auto-play
   } catch (e) {}
 };

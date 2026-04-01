@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { EventsGateway } from '../../common/gateways/events.gateway';
 
@@ -29,6 +29,20 @@ export class OrdersService {
         [dto.storeId, dto.clientId || null, dto.clientName || null, dto.vendorId || null, dto.salesManagerName || null, total, dto.notes || null, dto.paymentType || 'CONTADO', dto.priceLevel || 1],
       );
       const order = res.rows[0];
+
+      if ((dto.paymentType || 'CONTADO').toUpperCase() === 'CREDITO') {
+        await client.query(
+          `INSERT INTO accounts_receivable (store_id, client_id, order_id, total_amount, remaining_amount, description, status)
+           VALUES ($1, $2, $3, $4, $4, $5, 'PENDING')`,
+          [
+            dto.storeId,
+            dto.clientId || null,
+            order.id,
+            total,
+            dto.notes || `Cuenta por cobrar generada por pedido ${order.id}`,
+          ],
+        );
+      }
 
       for (const item of dto.items) {
         await client.query(
@@ -135,6 +149,17 @@ export class OrdersService {
       const targetStatus = newStatus.toUpperCase();
       const storeId = res.rows[0].store_id;
       const vendorId = res.rows[0].vendor_id;
+
+      if (currentStatus === targetStatus) {
+        return this.findOne(id);
+      }
+
+      const allowedTransitions = validTransitions[currentStatus] || [];
+      if (!allowedTransitions.includes(targetStatus)) {
+        throw new BadRequestException(
+          `Transición inválida: ${currentStatus} -> ${targetStatus}`,
+        );
+      }
 
       if (targetStatus === 'CARGADO_CAMION' && currentStatus !== 'CARGADO_CAMION') {
         if (!vendorId) throw new NotFoundException('El pedido requiere un vendor_id para cargar al camión.');

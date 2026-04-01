@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { API_BASE_URL, withAppBase } from '@/lib/runtime-config';
 
 const apiClient = axios.create({
-  baseURL: 'http://localhost:3010/api',
+  baseURL: API_BASE_URL,
 });
 
 // CACHE EN MEMORIA PARA MÁXIMA VELOCIDAD
@@ -35,7 +36,7 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.clear();
-      window.location.href = '/login';
+      window.location.assign(withAppBase('/login'));
     }
     return Promise.reject(error);
   }

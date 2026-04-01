@@ -31,7 +31,7 @@ import { CalendarIcon, History, Printer, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import apiClient from '@/services/api-client';
 import { useParams } from 'react-router-dom';
 import { PrintableTicket, generatePlainTextTicket } from '@/components/printable-ticket';
@@ -56,6 +56,8 @@ export default function InventoryMovementsPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [isShareSupported, setIsShareSupported] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedType, setSelectedType] = useState('all');
 
   useEffect(() => {
     if (typeof navigator !== 'undefined' && 'share' in navigator) {
@@ -77,20 +79,20 @@ export default function InventoryMovementsPage() {
 
     const fetchMovements = async () => {
       try {
-        const dateStr = selectedDate.toISOString();
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
         const response = await apiClient.get('/inventory/movements', {
-          params: { storeId, date: dateStr }
+          params: { storeId, date: dateStr, type: selectedType }
         });
 
         if (isMounted) {
           const movementsData = response.data.map((m: any) => ({
             id: m.id || Math.random().toString(),
             timestamp: m.createdAt || m.created_at || new Date(),
-            productDescription: m.product?.name || m.productDescription || 'Producto no especificado',
+            productDescription: m.productDescription || m.product_description || 'Producto no especificado',
             movement: m.reference || m.movement || 'Ajuste',
             type: m.type,
             quantity: m.quantity || 0,
-            had: m.balance - m.quantity || 0, // Aproximación
+            had: Math.max(0, (m.balance || 0) - (m.quantity || 0)),
             has: m.balance || 0
           })) as Movement[];
           
@@ -110,7 +112,20 @@ export default function InventoryMovementsPage() {
     fetchMovements();
 
     return () => { isMounted = false; };
-  }, [storeId, selectedDate]);
+  }, [storeId, selectedDate, selectedType]);
+
+  const filteredMovements = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    if (!normalizedSearch) {
+      return movements;
+    }
+
+    return movements.filter((movement) =>
+      movement.productDescription.toLowerCase().includes(normalizedSearch) ||
+      movement.movement.toLowerCase().includes(normalizedSearch) ||
+      movement.type.toLowerCase().includes(normalizedSearch),
+    );
+  }, [movements, searchTerm]);
 
 
   const getBadgeVariant = (type: string) => {
@@ -189,13 +204,13 @@ export default function InventoryMovementsPage() {
       )
     }
 
-    if (movements.length === 0) {
+    if (filteredMovements.length === 0) {
       return (
         <Alert>
           <History className="h-4 w-4" />
           <AlertTitle>No hay movimientos</AlertTitle>
           <AlertDescription>
-            No se han registrado movimientos de inventario para la fecha seleccionada.
+            No se encontraron movimientos para los filtros seleccionados.
           </AlertDescription>
         </Alert>
       )
@@ -216,7 +231,7 @@ export default function InventoryMovementsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {movements.map((item) => (
+            {filteredMovements.map((item) => (
               <TableRow key={item.id}>
                 <TableCell>
                   {item.timestamp ? format(new Date(item.timestamp as any), 'p', { locale: es }) : 'N/A'}
@@ -276,17 +291,22 @@ export default function InventoryMovementsPage() {
                 </PopoverContent>
               </Popover>
             </div>
-            <Input placeholder="Buscar por Cajero, Producto o Departamento..." className="flex-1" />
-            <Select>
+            <Input
+              placeholder="Buscar por producto, referencia o tipo..."
+              className="flex-1"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+            <Select value={selectedType} onValueChange={setSelectedType}>
               <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Movimientos" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="sale">Ventas</SelectItem>
-                <SelectItem value="entry">Entradas</SelectItem>
-                <SelectItem value="return">Devoluciones</SelectItem>
-                <SelectItem value="adjustment">Ajustes</SelectItem>
+                <SelectItem value="IN">Entradas</SelectItem>
+                <SelectItem value="OUT">Salidas</SelectItem>
+                <SelectItem value="DEVOLUCION">Devoluciones</SelectItem>
+                <SelectItem value="AJUSTE">Ajustes</SelectItem>
               </SelectContent>
             </Select>
           </div>

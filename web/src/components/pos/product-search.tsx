@@ -38,22 +38,28 @@ export function ProductSearch({ onProductSelect, className, searchTerm: external
     setSearchResults([]);
   };
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      if ((searchTerm || '').length < 2) {
-        setSearchResults([]);
-        return;
-      }
+    useEffect(() => {
+        const fetchProducts = async () => {
+            if ((searchTerm || '').length < 2) {
+                setSearchResults([]);
+                return;
+            }
 
-      setLoading(true);
-      try {
-        const response = await apiClient.get(`/products/search?storeId=${storeId}&q=${encodeURIComponent(searchTerm)}`);
-        setSearchResults(response.data);
-      } catch (error) {
-        console.error("Error searching products:", error);
-        toast.error("Error", "No se pudo realizar la búsqueda.");
-      } finally {
-        setLoading(false);
+            setLoading(true);
+            try {
+                const response = await apiClient.get('/products', {
+                    params: {
+                        storeId,
+                        search: searchTerm,
+                        limit: 20,
+                    },
+                });
+                setSearchResults(Array.isArray(response.data) ? response.data : []);
+            } catch (error) {
+                console.error("Error searching products:", error);
+                toast.error("Error", "No se pudo realizar la búsqueda.");
+            } finally {
+                setLoading(false);
       }
     };
 

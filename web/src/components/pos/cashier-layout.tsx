@@ -52,7 +52,7 @@ export function CashierLayout({ children }: CashierLayoutProps) {
                     isCollapsed ? "justify-center px-0" : "px-6 justify-between"
                 )}>
                     {!isCollapsed && (
-                        <Link to="/" className="flex items-center gap-2 font-semibold truncate">
+                        <Link to={storeId ? `/store/${storeId}/billing` : '/'} className="flex items-center gap-2 font-semibold truncate">
                             <WalletCards className="h-6 w-6 text-primary shrink-0" />
                             <span>PharmaSync</span>
                         </Link>
@@ -72,7 +72,7 @@ export function CashierLayout({ children }: CashierLayoutProps) {
                 <div className="flex-1 overflow-y-auto py-4">
                     <nav className="grid items-start px-2 text-sm font-medium lg:px-4 gap-1">
                         {cashierNavItems.map((item) => {
-                            const href = `/store-admin/${storeId}/${item.href}`;
+                            const href = `/store/${storeId}/${item.href}`;
                             const isActive = pathname.startsWith(href);
                             return (
                                 <Link

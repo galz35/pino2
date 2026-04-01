@@ -21,6 +21,7 @@ export class PendingOrdersController {
   create(@Body() dto: {
     storeId: string; clientId?: string; clientName?: string;
     items: any[]; total?: number; notes?: string; paymentMethod?: string;
+    dispatcherId?: string; dispatcherName?: string; subtotal?: number; tax?: number; status?: string;
   }) {
     return this.service.create(dto);
   }

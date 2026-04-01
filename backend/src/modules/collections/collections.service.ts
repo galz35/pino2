@@ -21,8 +21,33 @@ export class CollectionsService {
     if (dto.amount <= 0) {
       throw new BadRequestException('El monto del cobro debe ser mayor a 0');
     }
+    if (!dto.ruteroId) {
+      throw new BadRequestException('El rutero es requerido para registrar un cobro');
+    }
 
     return this.db.withTransaction(async (client) => {
+      let account: any = null;
+      if (dto.accountId) {
+        const accRes = await client.query(
+          'SELECT * FROM accounts_receivable WHERE id = $1 FOR UPDATE',
+          [dto.accountId],
+        );
+
+        if ((accRes.rowCount ?? 0) === 0) {
+          throw new NotFoundException('Cuenta por cobrar no encontrada');
+        }
+
+        account = accRes.rows[0];
+        if (account.store_id !== dto.storeId) {
+          throw new BadRequestException('La cuenta por cobrar no pertenece a la tienda enviada');
+        }
+
+        const remaining = parseFloat(account.remaining_amount);
+        if (dto.amount > remaining) {
+          throw new BadRequestException('El cobro no puede superar el saldo pendiente');
+        }
+      }
+
       // 1. Create collection record
       const colRes = await client.query(
         `INSERT INTO collections (store_id, account_id, rutero_id, client_id, amount, payment_method, notes)
@@ -41,16 +66,6 @@ export class CollectionsService {
 
       // 2. If linked to an accounts_receivable, update it
       if (dto.accountId) {
-        const accRes = await client.query(
-          'SELECT * FROM accounts_receivable WHERE id = $1 FOR UPDATE',
-          [dto.accountId],
-        );
-
-        if ((accRes.rowCount ?? 0) === 0) {
-          throw new NotFoundException('Cuenta por cobrar no encontrada');
-        }
-
-        const account = accRes.rows[0];
         const newRemaining = Math.max(0, parseFloat(account.remaining_amount) - dto.amount);
         const newStatus = newRemaining <= 0 ? 'PAID' : 'PARTIAL';
 

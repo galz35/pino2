@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CollectionsService } from './collections.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -17,14 +17,18 @@ export class CollectionsController {
     dto: {
       storeId: string;
       accountId?: string;
-      ruteroId: string;
+      ruteroId?: string;
       clientId?: string;
       amount: number;
       paymentMethod?: string;
       notes?: string;
     },
+    @Req() req: any,
   ) {
-    return this.service.create(dto);
+    return this.service.create({
+      ...dto,
+      ruteroId: dto.ruteroId || req.user?.sub,
+    });
   }
 
   @Get()

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -37,14 +37,36 @@ import apiClient from '@/services/api-client';
 const userFormSchema = z.object({
   name: z.string().min(3, 'El nombre es requerido.'),
   email: z.string().email('Correo electrónico no válido.'),
-  role: z.enum(['Cashier', 'Bodeguero', 'Ayudante de Bodega', 'store-admin', 'master-admin', 'chain-admin']),
+  role: z.string().min(1, 'Debes seleccionar un rol.'),
 });
+
+const STORE_ROLE_OPTIONS = [
+  { value: 'Cashier', label: 'CAJERO' },
+  { value: 'Bodeguero', label: 'BODEGUERO' },
+  { value: 'Ayudante de Bodega', label: 'AYUDANTE DE BODEGA' },
+  { value: 'store-admin', label: 'ADMINISTRADOR DE TIENDA' },
+];
+
+const MASTER_ROLE_OPTIONS = [
+  { value: 'master-admin', label: 'MASTER ADMIN' },
+  { value: 'chain-admin', label: 'CHAIN ADMIN' },
+  ...STORE_ROLE_OPTIONS,
+  { value: 'Vendedor Ambulante', label: 'VENDEDOR AMBULANTE' },
+  { value: 'Gestor de Ventas', label: 'GESTOR DE VENTAS' },
+  { value: 'Rutero', label: 'RUTERO' },
+];
 
 export default function EditUserPage() {
   const { storeId, userId } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
+  const isMasterMode = location.pathname.startsWith('/master-admin/');
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [assignedStores, setAssignedStores] = useState<Array<{ id: string; name: string }>>([]);
+
+  const roleOptions = isMasterMode ? MASTER_ROLE_OPTIONS : STORE_ROLE_OPTIONS;
+  const backHref = isMasterMode ? '/master-admin/users' : `/store/${storeId}/users`;
 
   const form = useForm<z.infer<typeof userFormSchema>>({
     resolver: zodResolver(userFormSchema),
@@ -66,10 +88,11 @@ export default function EditUserPage() {
           email: data.email || '',
           role: data.role as any || 'Cashier',
         });
+        setAssignedStores(data.stores || []);
       } catch (error) {
         console.error("Error fetching user:", error);
         toast.error('Error', 'No se pudo cargar el usuario.');
-        navigate(`/store/${storeId}/users`);
+        navigate(backHref);
       } finally {
         setLoading(false);
       }
@@ -79,7 +102,7 @@ export default function EditUserPage() {
   }, [userId]);
 
   async function onSubmit(values: z.infer<typeof userFormSchema>) {
-    if (!userId || !storeId) return;
+    if (!userId) return;
     setIsSaving(true);
     
     try {
@@ -89,7 +112,7 @@ export default function EditUserPage() {
       });
       
       toast.success('Usuario Actualizado', 'La información ha sido guardada.');
-      navigate(`/store/${storeId}/users`);
+      navigate(backHref);
     } catch (error) {
       console.error(error);
       toast.error('Error', 'No se pudo actualizar el usuario.');
@@ -110,13 +133,13 @@ export default function EditUserPage() {
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col gap-2">
-        <Link to={`/store/${storeId}/users`} className="flex items-center text-sm font-bold text-slate-400 hover:text-primary transition-colors mb-2 w-fit">
+        <Link to={backHref} className="flex items-center text-sm font-bold text-slate-400 hover:text-primary transition-colors mb-2 w-fit">
           <ArrowLeft className="h-4 w-4 mr-1" />
           Volver a Usuarios
         </Link>
         <h1 className="text-4xl font-black tracking-tight text-slate-800 flex items-center gap-3 uppercase italic">
           <EditIcon className="h-10 w-10 text-primary" />
-          Editar Colaborador
+          {isMasterMode ? 'Editar Usuario del Sistema' : 'Editar Colaborador'}
         </h1>
         <p className="text-slate-500 font-bold uppercase tracking-[0.3em] text-[10px] underline decoration-primary decoration-4 underline-offset-8">Actualización de Personal</p>
       </div>
@@ -189,16 +212,30 @@ export default function EditUserPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="rounded-2xl border-none shadow-xl">
-                          <SelectItem value="Cashier" className="font-bold cursor-pointer rounded-xl">CAJERO</SelectItem>
-                          <SelectItem value="Bodeguero" className="font-bold cursor-pointer rounded-xl">BODEGUERO</SelectItem>
-                          <SelectItem value="Ayudante de Bodega" className="font-bold cursor-pointer rounded-xl">AYUDANTE DE BODEGA</SelectItem>
-                          <SelectItem value="store-admin" className="font-bold cursor-pointer rounded-xl text-blue-600">ADMINISTRADOR DE TIENDA</SelectItem>
+                          {roleOptions.map((role) => (
+                            <SelectItem key={role.value} value={role.value} className="font-bold cursor-pointer rounded-xl">
+                              {role.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage className="ml-2 font-bold italic" />
                     </FormItem>
                   )}
                 />
+
+                {isMasterMode && (
+                  <div className="md:col-span-2 max-w-md">
+                    <p className="flex items-center gap-2 text-xs font-black uppercase text-slate-500 tracking-widest ml-2">
+                      <ShieldAlert className="h-4 w-4 text-primary" /> Tiendas Asignadas
+                    </p>
+                    <div className="mt-3 rounded-2xl bg-slate-100 px-5 py-4 text-sm font-medium text-slate-600">
+                      {assignedStores.length > 0
+                        ? assignedStores.map((store) => store.name).join(', ')
+                        : 'Sin tienda asignada'}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="pt-8 flex justify-end">

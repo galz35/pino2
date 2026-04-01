@@ -30,14 +30,22 @@ export function ClientSelectionDialog({ currentClient, onSelectClient, trigger }
     const [loading, setLoading] = useState(false);
     const params = useParams();
     const storeId = params.storeId as string;
+    const genericClient: Client = {
+        id: 'generic',
+        storeId: storeId || '',
+        name: 'Cliente Genérico',
+        phone: '',
+        address: '',
+        email: '',
+    };
 
-    const handleSearch = async (term: string) => {
+    const loadClients = async () => {
         setLoading(true);
         try {
-            const response = await apiClient.get(`/clients/search?storeId=${storeId}&q=${encodeURIComponent(term)}`);
-            setClients(response.data);
+            const response = await apiClient.get('/clients', { params: { storeId } });
+            setClients(Array.isArray(response.data) ? response.data : []);
         } catch (error) {
-            console.error("Error searching clients:", error);
+            console.error("Error loading clients:", error);
             toast.error("Error", "No se pudieron cargar los clientes.");
         } finally {
             setLoading(false);
@@ -46,13 +54,24 @@ export function ClientSelectionDialog({ currentClient, onSelectClient, trigger }
 
     useEffect(() => {
         if (isOpen) {
-            const timeoutId = setTimeout(() => handleSearch(searchTerm), 300);
-            return () => clearTimeout(timeoutId);
+            void loadClients();
         }
-    }, [searchTerm, isOpen, storeId]);
+    }, [isOpen, storeId]);
+
+    const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+    const filteredClients = [genericClient, ...clients].filter((client) => {
+        if (!normalizedSearchTerm) return true;
+        return [
+            client.name,
+            client.phone,
+            client.address,
+            client.email,
+        ].some((value) => value?.toLowerCase().includes(normalizedSearchTerm));
+    });
 
     const handleSelect = (client: Client) => {
         onSelectClient(client);
+        setSearchTerm('');
         setIsOpen(false);
     };
 
@@ -93,19 +112,17 @@ export function ClientSelectionDialog({ currentClient, onSelectClient, trigger }
                         {loading ? (
                             <div className="flex flex-col justify-center items-center h-[300px] text-slate-400 gap-4">
                                 <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
-                                <p className="font-bold uppercase tracking-widest text-xs">Buscando Clientes...</p>
+                                <p className="font-bold uppercase tracking-widest text-xs">Cargando Clientes...</p>
                             </div>
-                        ) : clients.length === 0 ? (
+                        ) : filteredClients.length === 0 ? (
                             <div className="flex flex-col justify-center items-center h-[300px] text-slate-300 gap-4">
                                 <User className="h-16 w-16 opacity-20" />
                                 <p className="font-black uppercase text-sm">No hay resultados</p>
-                                <Button variant="secondary" className="mt-2 font-bold text-blue-600">
-                                    <Plus className="w-4 h-4 mr-2" /> RECIÉN REGISTRAR
-                                </Button>
+                                <p className="text-xs font-medium text-slate-400">Usa el bot&oacute;n de nuevo cliente si necesitas registrarlo.</p>
                             </div>
                         ) : (
                             <div className="divide-y-2 divide-white">
-                                {clients.map((client) => (
+                                {filteredClients.map((client) => (
                                     <div
                                         key={client.id}
                                         className={cn(

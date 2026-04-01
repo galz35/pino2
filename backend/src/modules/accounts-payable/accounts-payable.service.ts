@@ -13,6 +13,10 @@ export class AccountsPayableService {
     description?: string;
     dueDate?: string;
   }) {
+    if (Number(dto.totalAmount) <= 0) {
+      throw new BadRequestException('El monto total debe ser mayor a 0');
+    }
+
     const res = await this.db.query(
       `INSERT INTO accounts_payable (store_id, supplier_id, invoice_id, total_amount, remaining_amount, description, due_date)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
@@ -50,36 +54,9 @@ export class AccountsPayableService {
   }
 
   async findOne(id: string) {
-    const res = await this.db.query(
-      `SELECT ap.*, s.name as supplier_name
-       FROM accounts_payable ap
-       LEFT JOIN suppliers s ON s.id = ap.supplier_id
-       WHERE ap.id = $1`,
-      [id],
-    );
-    if ((res.rowCount ?? 0) === 0) throw new NotFoundException('Cuenta por pagar no encontrada');
-
-    const account = { ...this.mapRow(res.rows[0]), supplierName: res.rows[0].supplier_name || '' };
-
-    // Get payments history
-    const paymentsRes = await this.db.query(
-      `SELECT pp.*, u.name as paid_by_name FROM payable_payments pp
-       LEFT JOIN users u ON u.id = pp.paid_by
-       WHERE pp.account_id = $1 ORDER BY pp.paid_at DESC`,
-      [id],
-    );
-
-    account.payments = paymentsRes.rows.map((r) => ({
-      id: r.id,
-      amount: parseFloat(r.amount || 0),
-      paymentMethod: r.payment_method,
-      notes: r.notes,
-      paidBy: r.paid_by,
-      paidByName: r.paid_by_name || '',
-      paidAt: r.paid_at,
-    }));
-
-    return account;
+    return this.findOneWithExecutor(id, {
+      query: (text: string, params?: any[]) => this.db.query(text, params),
+    });
   }
 
   async addPayment(accountId: string, dto: { amount: number; paymentMethod?: string; notes?: string; paidBy?: string }) {
@@ -110,8 +87,44 @@ export class AccountsPayableService {
         [accountId, dto.amount, dto.paymentMethod || 'TRANSFER', dto.notes || null, dto.paidBy || null],
       );
 
-      return this.findOne(accountId);
+      return this.findOneWithExecutor(accountId, client);
     });
+  }
+
+  private async findOneWithExecutor(
+    id: string,
+    executor: { query: (text: string, params?: any[]) => Promise<any> },
+  ) {
+    const res = await executor.query(
+      `SELECT ap.*, s.name as supplier_name
+       FROM accounts_payable ap
+       LEFT JOIN suppliers s ON s.id = ap.supplier_id
+       WHERE ap.id = $1`,
+      [id],
+    );
+    if ((res.rowCount ?? 0) === 0) throw new NotFoundException('Cuenta por pagar no encontrada');
+
+    const account = { ...this.mapRow(res.rows[0]), supplierName: res.rows[0].supplier_name || '' };
+
+    // Get payments history
+    const paymentsRes = await executor.query(
+      `SELECT pp.*, u.name as paid_by_name FROM payable_payments pp
+       LEFT JOIN users u ON u.id = pp.paid_by
+       WHERE pp.account_id = $1 ORDER BY pp.paid_at DESC`,
+      [id],
+    );
+
+    account.payments = paymentsRes.rows.map((r) => ({
+      id: r.id,
+      amount: parseFloat(r.amount || 0),
+      paymentMethod: r.payment_method,
+      notes: r.notes,
+      paidBy: r.paid_by,
+      paidByName: r.paid_by_name || '',
+      paidAt: r.paid_at,
+    }));
+
+    return account;
   }
 
   private mapRow(row: any): any {

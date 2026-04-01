@@ -96,9 +96,10 @@ export default function InventoryAdjustmentsPage() {
   }, [selectedProduct, form]);
 
   const filteredProducts = useMemo(() => {
-    if (!searchTerm) return products;
+    const inventoryProducts = products.filter((product) => product.usesInventory);
+    if (!searchTerm) return inventoryProducts;
     const lowercasedFilter = searchTerm.toLowerCase();
-    return products.filter(product =>
+    return inventoryProducts.filter(product =>
       product.description.toLowerCase().includes(lowercasedFilter) ||
       product.barcode?.toLowerCase().includes(lowercasedFilter)
     );
@@ -200,7 +201,7 @@ export default function InventoryAdjustmentsPage() {
                     <p className="text-sm text-muted-foreground mt-2">Descripción</p>
                     <p className="font-semibold">{selectedProduct.description}</p>
                     <p className="text-sm text-muted-foreground mt-2">Cantidad Actual</p>
-                    <p className="font-bold text-lg">{selectedProduct.currentStock.toFixed(2)}</p>
+                    <p className="font-bold text-lg">{selectedProduct.currentStock}</p>
                   </div>
                   <FormField<AdjustmentFormValues>
                     control={form.control}
@@ -209,7 +210,7 @@ export default function InventoryAdjustmentsPage() {
                       <FormItem>
                         <FormLabel className="text-base">Nueva Cantidad</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" {...field} className="text-lg h-12" />
+                          <Input type="number" step="1" min="0" {...field} className="text-lg h-12" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

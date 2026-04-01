@@ -1,0 +1,869 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
+import {
+  BadgeDollarSign,
+  CalendarClock,
+  FilePlus2,
+  FileSpreadsheet,
+  Loader2,
+  RefreshCw,
+  ReceiptText,
+  Trash2,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/auth-context';
+import { alert, toast } from '@/lib/swalert';
+import { formatCurrency } from '@/lib/utils';
+import financeService, {
+  type AccountPayable,
+  type ProductOption,
+  type SupplierInvoice,
+  type SupplierOption,
+} from '@/services/finance-service';
+
+const dateFormatter = new Intl.DateTimeFormat('es-NI', {
+  dateStyle: 'medium',
+});
+
+function formatDate(value?: string) {
+  if (!value) return 'Sin fecha';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Fecha inválida';
+  return dateFormatter.format(parsed);
+}
+
+function isOverdue(account: AccountPayable) {
+  if (!account.dueDate || account.status === 'PAID') return false;
+  const dueDate = new Date(account.dueDate);
+  if (Number.isNaN(dueDate.getTime())) return false;
+  return dueDate.getTime() < new Date().setHours(0, 0, 0, 0);
+}
+
+function getStatusVariant(status?: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+  switch (status) {
+    case 'PAID':
+    case 'PAGADA':
+    case 'RECIBIDA':
+      return 'default';
+    case 'PARTIAL':
+    case 'PENDIENTE':
+      return 'secondary';
+    case 'ANULADA':
+      return 'destructive';
+    default:
+      return 'outline';
+  }
+}
+
+type DraftInvoiceItem = {
+  localId: string;
+  selectedProductId: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+};
+
+function createDraftItem(): DraftInvoiceItem {
+  return {
+    localId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    selectedProductId: 'manual',
+    description: '',
+    quantity: 1,
+    unitPrice: 0,
+  };
+}
+
+export default function SupplierInvoicesPage() {
+  const { storeId } = useParams<{ storeId: string }>();
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const supplierFilter = searchParams.get('supplierId') || 'all';
+
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
+  const [products, setProducts] = useState<ProductOption[]>([]);
+  const [invoices, setInvoices] = useState<SupplierInvoice[]>([]);
+  const [payables, setPayables] = useState<AccountPayable[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [selectedPayable, setSelectedPayable] = useState<AccountPayable | null>(null);
+  const [processingInvoice, setProcessingInvoice] = useState(false);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [invoiceDraft, setInvoiceDraft] = useState({
+    supplierId: supplierFilter === 'all' ? '' : supplierFilter,
+    invoiceNumber: '',
+    paymentType: 'CONTADO',
+    dueDate: '',
+    status: 'RECIBIDA',
+    items: [createDraftItem()],
+  });
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '',
+    paymentMethod: 'TRANSFER',
+    notes: '',
+  });
+
+  const loadReferenceData = async () => {
+    if (!storeId) return;
+    const [suppliersData, productsData] = await Promise.all([
+      financeService.listSuppliers(storeId),
+      financeService.listProducts(storeId, 200),
+    ]);
+    setSuppliers(suppliersData);
+    setProducts(productsData);
+  };
+
+  const loadOperationalData = async (silent = false) => {
+    if (!storeId) return;
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const [invoicesData, payablesData] = await Promise.all([
+        financeService.listInvoices(storeId, supplierFilter === 'all' ? undefined : supplierFilter),
+        financeService.listPayables(storeId, {
+          supplierId: supplierFilter === 'all' ? undefined : supplierFilter,
+          pending: true,
+        }),
+      ]);
+      setInvoices(invoicesData);
+      setPayables(payablesData);
+    } catch (error) {
+      console.error(error);
+      toast.error('Error', 'No se pudieron cargar las facturas ni las cuentas por pagar.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReferenceData().catch((error) => {
+      console.error(error);
+      toast.error('Error', 'No se pudieron cargar proveedores ni productos.');
+    });
+  }, [storeId]);
+
+  useEffect(() => {
+    setInvoiceDraft((prev) => ({
+      ...prev,
+      supplierId: supplierFilter === 'all' ? prev.supplierId : supplierFilter,
+    }));
+    loadOperationalData();
+  }, [storeId, supplierFilter]);
+
+  const invoicesTotal = useMemo(
+    () => invoices.reduce((acc, invoice) => acc + Number(invoice.total || 0), 0),
+    [invoices],
+  );
+
+  const creditInvoicesTotal = useMemo(
+    () =>
+      invoices
+        .filter((invoice) => ['CREDITO', 'CRÉDITO', 'CREDIT'].includes((invoice.paymentType || '').toUpperCase()))
+        .reduce((acc, invoice) => acc + Number(invoice.total || 0), 0),
+    [invoices],
+  );
+
+  const pendingPayablesTotal = useMemo(
+    () => payables.reduce((acc, account) => acc + Number(account.remainingAmount || 0), 0),
+    [payables],
+  );
+
+  const overdueCount = useMemo(
+    () => payables.filter((account) => isOverdue(account)).length,
+    [payables],
+  );
+
+  const invoiceTotal = useMemo(
+    () =>
+      invoiceDraft.items.reduce(
+        (acc, item) => acc + Number(item.quantity || 0) * Number(item.unitPrice || 0),
+        0,
+      ),
+    [invoiceDraft.items],
+  );
+
+  const updateDraftItem = (localId: string, patch: Partial<DraftInvoiceItem>) => {
+    setInvoiceDraft((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => (item.localId === localId ? { ...item, ...patch } : item)),
+    }));
+  };
+
+  const handleProductSelection = (localId: string, selectedValue: string) => {
+    if (selectedValue === 'manual') {
+      updateDraftItem(localId, { selectedProductId: 'manual', description: '', unitPrice: 0 });
+      return;
+    }
+    const selectedProduct = products.find((product) => product.id === selectedValue);
+    updateDraftItem(localId, {
+      selectedProductId: selectedValue,
+      description: selectedProduct?.description || '',
+      unitPrice: Number(selectedProduct?.costPrice || 0),
+    });
+  };
+
+  const addDraftItem = () => {
+    setInvoiceDraft((prev) => ({ ...prev, items: [...prev.items, createDraftItem()] }));
+  };
+
+  const removeDraftItem = (localId: string) => {
+    setInvoiceDraft((prev) => ({
+      ...prev,
+      items: prev.items.length === 1 ? prev.items : prev.items.filter((item) => item.localId !== localId),
+    }));
+  };
+
+  const resetInvoiceDraft = () => {
+    setInvoiceDraft({
+      supplierId: supplierFilter === 'all' ? '' : supplierFilter,
+      invoiceNumber: '',
+      paymentType: 'CONTADO',
+      dueDate: '',
+      status: 'RECIBIDA',
+      items: [createDraftItem()],
+    });
+  };
+
+  const submitInvoice = async () => {
+    if (!storeId) return;
+
+    const validItems = invoiceDraft.items
+      .map((item) => ({
+        productId: item.selectedProductId === 'manual' ? undefined : item.selectedProductId,
+        description: item.description.trim(),
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+      }))
+      .filter((item) => item.description && item.quantity > 0 && item.unitPrice >= 0);
+
+    if (!invoiceDraft.supplierId) {
+      toast.error('Proveedor requerido', 'Debes seleccionar un proveedor.');
+      return;
+    }
+
+    if (!invoiceDraft.invoiceNumber.trim()) {
+      toast.error('Factura requerida', 'Debes indicar el número de factura.');
+      return;
+    }
+
+    if (validItems.length === 0) {
+      toast.error('Detalle requerido', 'Agrega al menos una línea válida a la factura.');
+      return;
+    }
+
+    if (invoiceDraft.paymentType === 'CREDITO' && !invoiceDraft.dueDate) {
+      toast.error('Fecha requerida', 'Las compras a crédito deben tener fecha de vencimiento.');
+      return;
+    }
+
+    setProcessingInvoice(true);
+    try {
+      await financeService.createInvoice({
+        storeId,
+        supplierId: invoiceDraft.supplierId,
+        invoiceNumber: invoiceDraft.invoiceNumber.trim(),
+        paymentType: invoiceDraft.paymentType,
+        dueDate: invoiceDraft.paymentType === 'CREDITO' ? invoiceDraft.dueDate : undefined,
+        total: validItems.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0),
+        status: invoiceDraft.status,
+        cashierName: user?.name || 'Sistema',
+        items: validItems,
+      });
+      toast.success('Factura registrada', 'La compra quedó guardada con su impacto financiero.');
+      setCreateDialogOpen(false);
+      resetInvoiceDraft();
+      await loadOperationalData(true);
+    } catch (error: any) {
+      console.error(error);
+      toast.error('Error al registrar factura', error?.response?.data?.message || 'No se pudo guardar la factura.');
+    } finally {
+      setProcessingInvoice(false);
+    }
+  };
+
+  const handleStatusChange = async (invoiceId: string, status: string) => {
+    try {
+      await financeService.updateInvoiceStatus(invoiceId, status);
+      toast.success('Estado actualizado', `La factura cambió a ${status}.`);
+      await loadOperationalData(true);
+    } catch (error: any) {
+      console.error(error);
+      toast.error('Error', error?.response?.data?.message || 'No se pudo actualizar el estado de la factura.');
+    }
+  };
+
+  const deleteInvoice = async (invoice: SupplierInvoice) => {
+    const result = await alert.confirm(
+      'Eliminar factura',
+      `Se eliminará la factura ${invoice.invoiceNumber} de ${invoice.supplierName}.`,
+    );
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await financeService.deleteInvoice(invoice.id);
+      toast.success('Factura eliminada', `La factura ${invoice.invoiceNumber} fue eliminada.`);
+      await loadOperationalData(true);
+    } catch (error: any) {
+      console.error(error);
+      toast.error('Error', error?.response?.data?.message || 'No se pudo eliminar la factura.');
+    }
+  };
+
+  const openPayableDialog = async (account: AccountPayable) => {
+    setSelectedPayable(account);
+    setPaymentForm({
+      amount: String(account.remainingAmount || 0),
+      paymentMethod: 'TRANSFER',
+      notes: '',
+    });
+    setPaymentDialogOpen(true);
+
+    try {
+      const detail = await financeService.getPayable(account.id);
+      setSelectedPayable(detail);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const resetPaymentDialog = () => {
+    setPaymentDialogOpen(false);
+    setSelectedPayable(null);
+    setPaymentForm({ amount: '', paymentMethod: 'TRANSFER', notes: '' });
+  };
+
+  const submitPayablePayment = async () => {
+    if (!selectedPayable) return;
+
+    const amount = Number(paymentForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('Monto inválido', 'El pago debe ser mayor a cero.');
+      return;
+    }
+    if (amount > Number(selectedPayable.remainingAmount || 0)) {
+      toast.error('Monto inválido', 'El pago no puede superar el saldo pendiente.');
+      return;
+    }
+
+    setProcessingPayment(true);
+    try {
+      await financeService.registerPayablePayment(selectedPayable.id, {
+        amount,
+        paymentMethod: paymentForm.paymentMethod,
+        notes: paymentForm.notes || undefined,
+        paidBy: user?.id,
+      });
+      toast.success('Pago registrado', `Se abonaron ${formatCurrency(amount)} a ${selectedPayable.supplierName}.`);
+      resetPaymentDialog();
+      await loadOperationalData(true);
+    } catch (error: any) {
+      console.error(error);
+      toast.error('Error', error?.response?.data?.message || 'No se pudo registrar el pago.');
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Facturas de proveedor y CxP</h1>
+          <p className="text-muted-foreground">
+            Registra compras, controla crédito con proveedores y vigila vencimientos sin salir del módulo web.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            value={supplierFilter}
+            onValueChange={(value) => setSearchParams(value === 'all' ? {} : { supplierId: value })}
+          >
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Filtrar proveedor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los proveedores</SelectItem>
+              {suppliers.map((supplier) => (
+                <SelectItem key={supplier.id} value={supplier.id}>
+                  {supplier.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={() => loadOperationalData(true)} disabled={refreshing}>
+            {refreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            Actualizar
+          </Button>
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <FilePlus2 className="mr-2 h-4 w-4" />
+            Nueva factura
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="border-l-4 border-l-cyan-500">
+          <CardHeader className="pb-2">
+            <CardDescription>Total facturado</CardDescription>
+            <CardTitle>{formatCurrency(invoicesTotal)}</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            {invoices.length} facturas en el filtro actual.
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-violet-500">
+          <CardHeader className="pb-2">
+            <CardDescription>Compras a crédito</CardDescription>
+            <CardTitle>{formatCurrency(creditInvoicesTotal)}</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Exposición financiera de compras no de contado.
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-amber-500">
+          <CardHeader className="pb-2">
+            <CardDescription>Saldo pendiente</CardDescription>
+            <CardTitle>{formatCurrency(pendingPayablesTotal)}</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Cuentas por pagar abiertas en proveedor.
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-rose-500">
+          <CardHeader className="pb-2">
+            <CardDescription>Vencidas</CardDescription>
+            <CardTitle>{overdueCount}</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Requieren seguimiento inmediato por fecha vencida.
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="invoices" className="space-y-4">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="invoices">Facturas</TabsTrigger>
+          <TabsTrigger value="payables">Cuentas por pagar</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="invoices">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ReceiptText className="h-5 w-5 text-cyan-600" />
+                Facturas recientes
+              </CardTitle>
+              <CardDescription>
+                Historial de compras de proveedor con control de estado documental.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : invoices.length === 0 ? (
+                <Alert>
+                  <FileSpreadsheet className="h-4 w-4" />
+                  <AlertTitle>Sin facturas</AlertTitle>
+                  <AlertDescription>No hay facturas registradas para el filtro actual.</AlertDescription>
+                </Alert>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Factura</TableHead>
+                        <TableHead>Proveedor</TableHead>
+                        <TableHead>Pago</TableHead>
+                        <TableHead>Creada</TableHead>
+                        <TableHead>Vence</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invoices.map((invoice) => (
+                        <TableRow key={invoice.id}>
+                          <TableCell>
+                            <div className="font-medium">{invoice.invoiceNumber}</div>
+                            <div className="text-xs text-muted-foreground">{invoice.cashierName || 'Sin usuario'}</div>
+                          </TableCell>
+                          <TableCell>{invoice.supplierName || 'Proveedor no disponible'}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{invoice.paymentType}</Badge>
+                          </TableCell>
+                          <TableCell>{formatDate(invoice.createdAt)}</TableCell>
+                          <TableCell>{formatDate(invoice.dueDate)}</TableCell>
+                          <TableCell>
+                            <Select value={invoice.status} onValueChange={(value) => handleStatusChange(invoice.id, value)}>
+                              <SelectTrigger className="w-[150px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="RECIBIDA">RECIBIDA</SelectItem>
+                                <SelectItem value="PENDIENTE">PENDIENTE</SelectItem>
+                                <SelectItem value="PAGADA">PAGADA</SelectItem>
+                                <SelectItem value="ANULADA">ANULADA</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">{formatCurrency(invoice.total)}</TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => deleteInvoice(invoice)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payables">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BadgeDollarSign className="h-5 w-5 text-amber-600" />
+                Cuentas por pagar abiertas
+              </CardTitle>
+              <CardDescription>
+                Saldos por proveedor con pago parcial o total desde la misma interfaz.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : payables.length === 0 ? (
+                <Alert>
+                  <CalendarClock className="h-4 w-4" />
+                  <AlertTitle>Sin saldo pendiente</AlertTitle>
+                  <AlertDescription>No hay cuentas por pagar abiertas en el filtro actual.</AlertDescription>
+                </Alert>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Proveedor</TableHead>
+                        <TableHead>Detalle</TableHead>
+                        <TableHead>Vence</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead className="text-right">Saldo</TableHead>
+                        <TableHead className="text-right">Acción</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {payables.map((account) => (
+                        <TableRow key={account.id}>
+                          <TableCell>
+                            <div className="font-medium">{account.supplierName || 'Proveedor sin nombre'}</div>
+                            <div className="text-xs text-muted-foreground">{formatCurrency(account.totalAmount)}</div>
+                          </TableCell>
+                          <TableCell className="max-w-[260px] text-sm text-muted-foreground">
+                            {account.description || 'Sin descripción'}
+                          </TableCell>
+                          <TableCell>
+                            <div>{formatDate(account.dueDate)}</div>
+                            {isOverdue(account) ? (
+                              <div className="text-xs font-medium text-destructive">Vencida</div>
+                            ) : null}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={isOverdue(account) ? 'destructive' : getStatusVariant(account.status)}>
+                              {account.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {formatCurrency(account.remainingAmount)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button size="sm" onClick={() => openPayableDialog(account)}>
+                              Registrar pago
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={createDialogOpen} onOpenChange={(open) => !open ? (setCreateDialogOpen(false), resetInvoiceDraft()) : setCreateDialogOpen(true)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Nueva factura de proveedor</DialogTitle>
+            <DialogDescription>
+              Registra la compra, el detalle de productos y el compromiso financiero en una sola acción.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label>Proveedor</Label>
+              <Select
+                value={invoiceDraft.supplierId}
+                onValueChange={(value) => setInvoiceDraft((prev) => ({ ...prev, supplierId: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona proveedor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="invoiceNumber">Número de factura</Label>
+              <Input
+                id="invoiceNumber"
+                value={invoiceDraft.invoiceNumber}
+                onChange={(event) => setInvoiceDraft((prev) => ({ ...prev, invoiceNumber: event.target.value }))}
+                placeholder="Ej. F-2026-0012"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Tipo de pago</Label>
+              <Select
+                value={invoiceDraft.paymentType}
+                onValueChange={(value) =>
+                  setInvoiceDraft((prev) => ({
+                    ...prev,
+                    paymentType: value,
+                    dueDate: value === 'CREDITO' ? prev.dueDate : '',
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CONTADO">Contado</SelectItem>
+                  <SelectItem value="CREDITO">Crédito</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="dueDate">Vencimiento</Label>
+              <Input
+                id="dueDate"
+                type="date"
+                value={invoiceDraft.dueDate}
+                disabled={invoiceDraft.paymentType !== 'CREDITO'}
+                onChange={(event) => setInvoiceDraft((prev) => ({ ...prev, dueDate: event.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold">Detalle de compra</h3>
+                <p className="text-sm text-muted-foreground">
+                  Puedes seleccionar productos existentes o dejar líneas manuales para mercancía nueva.
+                </p>
+              </div>
+              <Button variant="outline" onClick={addDraftItem}>
+                Agregar línea
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {invoiceDraft.items.map((item, index) => (
+                <Card key={item.localId} className="bg-muted/30">
+                  <CardContent className="grid gap-3 p-4 md:grid-cols-[1.5fr_2fr_110px_140px_auto]">
+                    <div className="grid gap-2">
+                      <Label>Producto</Label>
+                      <Select value={item.selectedProductId} onValueChange={(value) => handleProductSelection(item.localId, value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Producto o manual" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manual">Manual / no existe aún</SelectItem>
+                          {products.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.description}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Descripción</Label>
+                      <Input
+                        value={item.description}
+                        onChange={(event) => updateDraftItem(item.localId, { description: event.target.value })}
+                        placeholder={`Línea ${index + 1}`}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Cantidad</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={item.quantity}
+                        onChange={(event) => updateDraftItem(item.localId, { quantity: Number(event.target.value) })}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Costo unitario</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.unitPrice}
+                        onChange={(event) => updateDraftItem(item.localId, { unitPrice: Number(event.target.value) })}
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={invoiceDraft.items.length === 1}
+                        onClick={() => removeDraftItem(item.localId)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border bg-muted/40 p-4">
+            <div className="text-sm text-muted-foreground">Total calculado</div>
+            <div className="text-3xl font-bold">{formatCurrency(invoiceTotal)}</div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setCreateDialogOpen(false); resetInvoiceDraft(); }}>
+              Cancelar
+            </Button>
+            <Button onClick={submitInvoice} disabled={processingInvoice}>
+              {processingInvoice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FilePlus2 className="mr-2 h-4 w-4" />}
+              Guardar factura
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={paymentDialogOpen} onOpenChange={(open) => !open && resetPaymentDialog()}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Registrar pago a proveedor</DialogTitle>
+            <DialogDescription>
+              {selectedPayable
+                ? `${selectedPayable.supplierName} tiene ${formatCurrency(selectedPayable.remainingAmount)} pendientes.`
+                : 'Selecciona una cuenta por pagar.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label htmlFor="payAmount">Monto</Label>
+              <Input
+                id="payAmount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={paymentForm.amount}
+                onChange={(event) => setPaymentForm((prev) => ({ ...prev, amount: event.target.value }))}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Método</Label>
+              <Select
+                value={paymentForm.paymentMethod}
+                onValueChange={(value) => setPaymentForm((prev) => ({ ...prev, paymentMethod: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TRANSFER">Transferencia</SelectItem>
+                  <SelectItem value="CASH">Efectivo</SelectItem>
+                  <SelectItem value="CARD">Tarjeta</SelectItem>
+                  <SelectItem value="CHECK">Cheque</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="payNotes">Notas</Label>
+              <Textarea
+                id="payNotes"
+                value={paymentForm.notes}
+                onChange={(event) => setPaymentForm((prev) => ({ ...prev, notes: event.target.value }))}
+                placeholder="Referencia bancaria, comprobante o comentario."
+              />
+            </div>
+
+            {selectedPayable?.payments?.length ? (
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="mb-2 text-sm font-semibold">Pagos recientes</div>
+                <div className="space-y-2 text-sm">
+                  {selectedPayable.payments.slice(0, 3).map((payment) => (
+                    <div key={payment.id} className="flex items-center justify-between gap-4">
+                      <div>
+                        <div>{payment.paidByName || payment.paidBy || 'Usuario no identificado'}</div>
+                        <div className="text-xs text-muted-foreground">{formatDate(payment.paidAt)}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold">{formatCurrency(payment.amount)}</div>
+                        <div className="text-xs text-muted-foreground">{payment.paymentMethod}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={resetPaymentDialog}>
+              Cancelar
+            </Button>
+            <Button onClick={submitPayablePayment} disabled={processingPayment}>
+              {processingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BadgeDollarSign className="mr-2 h-4 w-4" />}
+              Confirmar pago
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

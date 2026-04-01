@@ -72,7 +72,6 @@ export function UserSwitchDialog({ trigger, open: controlledOpen, onOpenChange: 
             toast.success('Cambio de usuario exitoso', 'Bienvenido al sistema.');
             setOpen(false);
             form.reset();
-            window.location.href = '/';
         } catch (error: unknown) {
             logError(error, { location: 'user-switch-dialog' });
             const errorMessage = (error as any).response?.data?.message || 'Error al cambiar de usuario.';

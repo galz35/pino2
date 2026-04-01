@@ -20,7 +20,7 @@ export class VisitLogsService {
     return res.rows.map(this.mapRow);
   }
 
-  async create(dto: { storeId: string; vendorId: string; clientId: string; notes?: string; latitude?: number; longitude?: number }) {
+  async create(dto: { storeId: string; vendorId: string; clientId: string; notes?: string; latitude?: number; longitude?: number; status?: string; clientName?: string }) {
     const res = await this.db.query(
       `INSERT INTO visit_logs (store_id, vendor_id, client_id, notes, latitude, longitude) 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
@@ -44,10 +44,12 @@ export class VisitLogsService {
       storeId: row.store_id,
       vendorId: row.vendor_id,
       clientId: row.client_id,
+      status: 'visited',
       notes: row.notes,
       latitude: row.latitude,
       longitude: row.longitude,
       createdAt: row.created_at,
+      date: row.created_at,
     };
   }
 }

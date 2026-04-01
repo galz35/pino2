@@ -31,8 +31,13 @@ export function ProductGridNavigation({ storeId, onProductSelect, className }: P
         async function fetchDepartments() {
             setLoading(true);
             try {
-                const response = await apiClient.get(`/departments?storeId=${storeId}`);
-                setDepartments(response.data);
+                const response = await apiClient.get('/departments', {
+                    params: {
+                        storeId,
+                        type: 'main',
+                    },
+                });
+                setDepartments(Array.isArray(response.data) ? response.data : []);
             } catch (error) {
                 console.error("Error fetching departments:", error);
             } finally {

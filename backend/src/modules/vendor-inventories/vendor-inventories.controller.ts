@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { VendorInventoriesService } from './vendor-inventories.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -24,10 +24,21 @@ export class VendorInventoriesController {
 
   @Post('transaction')
   @ApiOperation({ summary: 'Procesar transacción de inventario de vendedor (asignar/devolver/vender)' })
-  processTransaction(@Body() dto: {
-    vendorId: string; productId: string; storeId: string;
-    type: 'ASSIGN' | 'RETURN' | 'SALE'; quantity: number; userId: string;
-  }) {
-    return this.service.processTransaction(dto);
+  processTransaction(
+    @Body()
+    dto: {
+      vendorId: string;
+      productId: string;
+      storeId: string;
+      type: 'ASSIGN' | 'RETURN' | 'SALE' | 'assign' | 'return' | 'sale';
+      quantity: number;
+      userId?: string;
+    },
+    @Req() req: any,
+  ) {
+    return this.service.processTransaction({
+      ...dto,
+      userId: dto.userId || req.user?.sub || null,
+    });
   }
 }

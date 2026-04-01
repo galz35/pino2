@@ -13,6 +13,8 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import apiClient from '@/services/api-client';
+import { ClientSelectionDialog } from '@/components/pos/client-selection-dialog';
+import { AddClientDialog } from '@/components/pos/add-client-dialog';
 
 interface Product {
     id: string;
@@ -148,6 +150,17 @@ export default function DispatcherPage() {
                 <Card>
                     <CardHeader><CardTitle>Cliente</CardTitle><CardDescription>Busca o selecciona un cliente para asociar la comanda.</CardDescription></CardHeader>
                     <CardContent>
+                        <div className="flex flex-wrap gap-3">
+                            <ClientSelectionDialog
+                                currentClient={selectedClient}
+                                onSelectClient={setSelectedClient}
+                                trigger={<Button variant="outline" className="flex-1 justify-between min-w-[220px]">Buscar o seleccionar cliente</Button>}
+                            />
+                            <AddClientDialog
+                                onClientAdded={setSelectedClient}
+                                trigger={<Button variant="outline">Nuevo cliente</Button>}
+                            />
+                        </div>
                         <div className="mt-2 p-4 border rounded-lg bg-muted/30 flex items-center gap-4">
                             <User className="h-8 w-8 text-muted-foreground" />
                             <div><p className="font-semibold">{selectedClient.name}</p><p className="text-sm text-muted-foreground">{selectedClient.phone || 'Sin teléfono'}</p></div>

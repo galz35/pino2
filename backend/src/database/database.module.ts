@@ -17,10 +17,19 @@ import { DatabaseService } from './database.service';
           user: configService.get<string>('DATABASE_USER'),
           password: configService.get<string>('DATABASE_PASSWORD'),
           database: configService.get<string>('DATABASE_NAME'),
-          // Optimizaciones del pool para alta concurrencia
-          max: 20,
-          idleTimeoutMillis: 30000,
-          connectionTimeoutMillis: 2000,
+          application_name: configService.get<string>('DATABASE_APP_NAME') || 'pino-backend',
+          keepAlive: true,
+          max: Number(configService.get<string>('DATABASE_POOL_MAX') || 20),
+          idleTimeoutMillis: Number(
+            configService.get<string>('DATABASE_IDLE_TIMEOUT_MS') || 30000,
+          ),
+          connectionTimeoutMillis: Number(
+            configService.get<string>('DATABASE_CONNECTION_TIMEOUT_MS') || 2000,
+          ),
+          statement_timeout: Number(
+            configService.get<string>('DATABASE_STATEMENT_TIMEOUT_MS') || 0,
+          ),
+          query_timeout: Number(configService.get<string>('DATABASE_QUERY_TIMEOUT_MS') || 0),
         });
 
         return pool;

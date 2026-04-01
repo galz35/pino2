@@ -131,14 +131,19 @@ export default function AddProductPage() {
     let isMounted = true;
     const loadData = async () => {
       try {
-        const [deptsRes, supRes] = await Promise.all([
-          apiClient.get('/departments', { params: { storeId } }),
+        const [deptsRes, subDeptsRes, supRes] = await Promise.all([
+          apiClient.get('/departments', { params: { storeId, type: 'main' } }),
+          apiClient.get('/sub-departments', { params: { storeId } }).catch(() => ({ data: [] })),
           apiClient.get('/suppliers', { params: { storeId } }).catch(() => ({ data: [] }))
         ]);
         
         if (isMounted) {
           setDepartments(deptsRes.data.map((d: any) => ({ ...d, name: d.name || d.nombre })));
-          setSubDepartments([]); 
+          setSubDepartments((subDeptsRes.data || []).map((sd: any) => ({
+            id: sd.id,
+            name: sd.name || sd.nombre,
+            departmentId: sd.departmentId || sd.parentId || sd.parent_id || '',
+          })));
           setSuppliers(supRes.data.map((s: any) => ({ ...s, name: s.name || s.nombre })));
         }
       } catch (err: any) {
@@ -597,5 +602,4 @@ export default function AddProductPage() {
     </div>
   );
 }
-
 

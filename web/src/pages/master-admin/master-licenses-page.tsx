@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +50,17 @@ export default function MasterLicensesPage() {
                             <div><h4 className="font-semibold mb-2">Licencia</h4>{store.license ? (<div className="space-y-1"><p className="text-sm"><strong>Tipo:</strong> {store.license.type}</p><p className="text-sm"><strong>Inicio:</strong> {store.license.startDate}</p><p className="text-sm"><strong>Expiración:</strong> {store.license.expiryDate}</p><p className="text-sm"><strong>Usuarios:</strong> {store.license.numberOfUsers}</p></div>) : (<p className="text-sm text-muted-foreground">Sin licencia asignada.</p>)}</div>
                             <div><h4 className="font-semibold mb-2">Tienda</h4><p className="text-sm"><strong>Dirección:</strong> {store.address}</p><p className="text-sm"><strong>Teléfono:</strong> {store.phone}</p><p className="text-sm"><strong>Email:</strong> {store.ownerEmail}</p></div>
                         </div>
-                        <div className="mt-4 flex gap-2">{store.license ? (<Button variant="outline" size="sm">Renovar Licencia</Button>) : (<Button asChild size="sm"><Link to={`/master-admin/licenses/add?storeId=${store.id}`}>Agregar Licencia</Link></Button>)}</div>
+                        <div className="mt-4 flex gap-2">
+                            {store.license ? (
+                                <Button variant="outline" size="sm" disabled title="Renovación aún no implementada">
+                                    Renovar Licencia
+                                </Button>
+                            ) : (
+                                <Button size="sm" disabled title="Alta de licencia aún no implementada">
+                                    Agregar Licencia
+                                </Button>
+                            )}
+                        </div>
                     </AccordionContent>
                 </AccordionItem>))}
             </Accordion></div>

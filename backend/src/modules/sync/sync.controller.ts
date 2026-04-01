@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SyncService } from './sync.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -20,5 +20,11 @@ export class SyncController {
   @ApiOperation({ summary: 'Recibir una carga batch de operaciones offline' })
   processBatch(@Body() dto: { storeId: string; operations: any[] }) {
     return this.service.processBatchSync(dto.storeId, dto.operations);
+  }
+
+  @Post('force/:storeId')
+  @ApiOperation({ summary: 'Forzar un nuevo ciclo de sincronización para una tienda' })
+  forceSync(@Param('storeId') storeId: string) {
+    return this.service.forceSync(storeId);
   }
 }

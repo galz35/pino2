@@ -35,8 +35,8 @@ export default function AssignRoutePage() {
     const fetchData = async () => {
       try {
         const [deliveriesRes, ruterosRes] = await Promise.all([
-          apiClient.get(`/pending-deliveries?storeId=${storeId}&status=Pendiente&unassigned=true`),
-          apiClient.get(`/users?storeId=${storeId}&role=Rutero`),
+          apiClient.get('/pending-deliveries', { params: { storeId, status: 'Pendiente', unassigned: true } }),
+          apiClient.get('/users', { params: { storeId, role: 'Rutero' } }),
         ]);
         setDeliveries(deliveriesRes.data || []);
         setRuteros((ruterosRes.data || []).map((r: any) => ({ uid: r.id || r.uid, name: r.name })));
@@ -72,7 +72,7 @@ export default function AssignRoutePage() {
       setSelectedDeliveries({});
       setSelectedRutero(null);
       
-      const res = await apiClient.get(`/pending-deliveries?storeId=${storeId}&status=Pendiente&unassigned=true`);
+      const res = await apiClient.get('/pending-deliveries', { params: { storeId, status: 'Pendiente', unassigned: true } });
       setDeliveries(res.data || []);
     } catch (error) {
       logError(error, { location: 'assign-route-submit' });

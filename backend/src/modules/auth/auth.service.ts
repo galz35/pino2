@@ -2,12 +2,14 @@ import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/co
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { DatabaseService } from '../../database/database.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly db: DatabaseService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async register(dto: {
@@ -127,7 +129,9 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload);
-    const refreshTokenValue = this.jwtService.sign(payload, { expiresIn: '7d' });
+    const refreshTokenValue = this.jwtService.sign(payload, {
+      expiresIn: this.configService.get('JWT_REFRESH_EXPIRES_IN') || '7d',
+    });
 
     // Store refresh token en la BD
     await client.query(

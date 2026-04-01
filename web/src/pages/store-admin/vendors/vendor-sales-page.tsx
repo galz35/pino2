@@ -5,13 +5,15 @@ import { MinusCircle, PlusCircle, User, ShoppingBag, Loader2, PackagePlus } from
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Separator } from '@/components/ui/separator';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import apiClient from '@/services/api-client';
+import { ClientSelectionDialog } from '@/components/pos/client-selection-dialog';
+import { AddClientDialog } from '@/components/pos/add-client-dialog';
 
 interface Product { id: string; description: string; salePrice: number; costPrice?: number; barcode?: string; }
 interface CartItem extends Product { quantity: number; }
@@ -29,13 +31,43 @@ export default function VendorSalesPage() {
     const [searchResults, setSearchResults] = useState<Product[]>([]);
 
     const { storeId } = useParams<{ storeId: string }>();
+    const [searchParams] = useSearchParams();
     const { user } = useAuth();
     const { toast } = useToast();
+    const clientId = searchParams.get('clientId');
 
     useEffect(() => {
         if (!storeId) return;
         apiClient.get(`/stores/${storeId}`).then(res => { if (res.data?.settings) setSettings(res.data.settings); }).catch(() => {});
     }, [storeId]);
+
+    useEffect(() => {
+        if (!clientId) {
+            return;
+        }
+
+        let isMounted = true;
+        apiClient
+            .get(`/clients/${clientId}`)
+            .then((res) => {
+                if (isMounted && res.data) {
+                    setSelectedClient(res.data);
+                }
+            })
+            .catch(() => {
+                if (isMounted) {
+                    toast({
+                        variant: 'destructive',
+                        title: 'Cliente no disponible',
+                        description: 'No se pudo cargar el cliente seleccionado.',
+                    });
+                }
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [clientId, toast]);
 
     const handleSearch = async (term: string) => {
         setSearchTerm(term);
@@ -81,6 +113,17 @@ export default function VendorSalesPage() {
                     ))}</div>)}
                 </CardContent></Card>
                 <Card><CardHeader><CardTitle>Cliente</CardTitle><CardDescription>Selecciona un cliente para el pedido.</CardDescription></CardHeader><CardContent>
+                    <div className="flex flex-wrap gap-3">
+                        <ClientSelectionDialog
+                            currentClient={selectedClient}
+                            onSelectClient={setSelectedClient}
+                            trigger={<Button variant="outline" className="flex-1 justify-between min-w-[220px]">Buscar o seleccionar cliente</Button>}
+                        />
+                        <AddClientDialog
+                            onClientAdded={setSelectedClient}
+                            trigger={<Button variant="outline">Nuevo cliente</Button>}
+                        />
+                    </div>
                     <div className="mt-2 p-4 border rounded-lg bg-muted/30 flex items-center gap-4"><User className="h-8 w-8 text-muted-foreground" /><div><p className="font-semibold">{selectedClient.name}</p><p className="text-sm text-muted-foreground">{selectedClient.phone || 'Sin teléfono'}</p></div></div>
                 </CardContent></Card>
             </div>

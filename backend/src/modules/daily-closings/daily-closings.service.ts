@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 
 @Injectable()
@@ -15,10 +15,23 @@ export class DailyClosingsService {
     closingDate: string;
     notes?: string;
   }) {
+    if (!dto.ruteroId) {
+      throw new BadRequestException('El rutero es requerido para registrar el cierre');
+    }
+
     const res = await this.db.query(
       `INSERT INTO daily_closings (store_id, rutero_id, total_sales, total_collections, total_returns, cash_total, closing_date, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [dto.storeId, dto.ruteroId, dto.totalSales, dto.totalCollections, dto.totalReturns, dto.cashTotal, dto.closingDate, dto.notes || null],
+      [
+        dto.storeId,
+        dto.ruteroId,
+        Number(dto.totalSales || 0),
+        Number(dto.totalCollections || 0),
+        Number(dto.totalReturns || 0),
+        Number(dto.cashTotal || 0),
+        dto.closingDate,
+        dto.notes || null,
+      ],
     );
     return this.mapRow(res.rows[0]);
   }

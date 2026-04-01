@@ -80,17 +80,20 @@ export default function ProductsPage() {
 
         const fetchData = async () => {
             try {
-                const [prodsRes, deptsRes] = await Promise.all([
+                const [prodsRes, deptsRes, subDeptsRes] = await Promise.all([
                     apiClient.get('/products', { params: { storeId } }),
-                    apiClient.get('/departments', { params: { storeId } }),
-                    // Sub-departments are currently not actively migrated to a separate table
-                    // We'll leave subDepartments as an empty array for now
+                    apiClient.get('/departments', { params: { storeId, type: 'main' } }),
+                    apiClient.get('/sub-departments', { params: { storeId } }).catch(() => ({ data: [] })),
                 ]);
 
                 if (isMounted) {
                     setProducts(prodsRes.data as Product[]);
                     setDepartments(deptsRes.data.map((d: any) => ({ ...d, name: d.name || d.nombre })));
-                    setSubDepartments([]); // Simulated empty for now
+                    setSubDepartments((subDeptsRes.data || []).map((subDept: any) => ({
+                        id: subDept.id,
+                        name: subDept.name || subDept.nombre,
+                        departmentId: subDept.departmentId || subDept.parentId || subDept.parent_id || '',
+                    })));
                     setLoading(false);
                 }
             } catch (err: any) {

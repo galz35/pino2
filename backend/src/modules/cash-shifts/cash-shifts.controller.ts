@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Query, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, Param, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CashShiftsService } from './cash-shifts.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -13,9 +13,10 @@ export class CashShiftsController {
   @Post()
   @ApiOperation({ summary: 'Abrir un nuevo turno de caja' })
   openShift(
-    @Body() dto: { storeId: string; userId: string; startingCash: number },
+    @Body() dto: { storeId: string; userId?: string; startingCash: number },
+    @Req() req: any,
   ) {
-    return this.service.openShift(dto.storeId, dto.userId, dto.startingCash);
+    return this.service.openShift(dto.storeId, dto.userId || req.user?.sub, dto.startingCash);
   }
 
   @Post('close')
@@ -26,16 +27,19 @@ export class CashShiftsController {
       shiftId: string;
       storeId: string;
       expectedCash: number;
+      actualCash: number;
       difference: number;
-      userId: string;
+      userId?: string;
     },
+    @Req() req: any,
   ) {
     return this.service.closeShift(
       dto.shiftId,
       dto.storeId,
       dto.expectedCash,
+      dto.actualCash,
       dto.difference,
-      dto.userId,
+      dto.userId || req.user?.sub,
     );
   }
 
@@ -71,8 +75,16 @@ export class CashShiftsController {
   @ApiOperation({ summary: 'Cerrar un turno de caja por ID en URL' })
   closeShiftById(
     @Param('id') id: string,
-    @Body() dto: { storeId: string; expectedCash: number; difference: number; userId: string },
+    @Body() dto: { storeId: string; expectedCash: number; actualCash: number; difference: number; userId?: string },
+    @Req() req: any,
   ) {
-    return this.service.closeShift(id, dto.storeId, dto.expectedCash, dto.difference, dto.userId);
+    return this.service.closeShift(
+      id,
+      dto.storeId,
+      dto.expectedCash,
+      dto.actualCash,
+      dto.difference,
+      dto.userId || req.user?.sub,
+    );
   }
 }

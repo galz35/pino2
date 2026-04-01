@@ -1,51 +1,25 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { toast } from '@/lib/swalert';
-
-const SOCKET_URL = 'http://localhost:3010/events';
+import { SOCKET_PATH, SOCKET_URL } from '@/lib/runtime-config';
 
 export const useRealTimeEvents = (storeId?: string) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [lastEvent, setLastEvent] = useState<any>(null);
   const [connected, setConnected] = useState(false);
 
-  useEffect(() => {
-    const newSocket = io(SOCKET_URL, {
-      transports: ['websocket'],
-      autoConnect: true,
-    });
-
-    newSocket.on('connect', () => {
-      setConnected(true);
-      if (storeId) {
-        newSocket.emit('join_store', storeId);
+  const isRelevantEvent = useCallback(
+    (event: any) => {
+      if (!storeId || !event?.storeId) {
+        return true;
       }
-    });
 
-    newSocket.on('disconnect', () => {
-      setConnected(false);
-    });
+      return event.storeId === storeId;
+    },
+    [storeId],
+  );
 
-    // Listen for Sync Updates (New Orders, Visits, etc.)
-    newSocket.on('sync_update', (data) => {
-      setLastEvent(data);
-      _handleNotification(data);
-    });
-
-    // Specific Store Updates
-    newSocket.on('store_update', (data) => {
-      setLastEvent(data);
-      _handleNotification(data);
-    });
-
-    setSocket(newSocket);
-
-    return () => {
-      newSocket.close();
-    };
-  }, [storeId]);
-
-  const _handleNotification = (event: any) => {
+  const handleNotification = useCallback((event: any) => {
     switch (event.type) {
       case 'NEW_ORDER':
         toast.success(
@@ -62,7 +36,46 @@ export const useRealTimeEvents = (storeId?: string) => {
       default:
         break;
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const newSocket = io(SOCKET_URL, {
+      transports: ['websocket'],
+      autoConnect: true,
+      path: SOCKET_PATH,
+    });
+
+    const handleRealtimeEvent = (data: any) => {
+      if (!isRelevantEvent(data)) {
+        return;
+      }
+
+      setLastEvent(data);
+      handleNotification(data);
+    };
+
+    newSocket.on('connect', () => {
+      setConnected(true);
+      if (storeId) {
+        newSocket.emit('join_store', storeId);
+      }
+    });
+
+    newSocket.on('disconnect', () => {
+      setConnected(false);
+    });
+
+    newSocket.on('sync_update', handleRealtimeEvent);
+    newSocket.on('store_update', handleRealtimeEvent);
+
+    setSocket(newSocket);
+
+    return () => {
+      newSocket.off('sync_update', handleRealtimeEvent);
+      newSocket.off('store_update', handleRealtimeEvent);
+      newSocket.close();
+    };
+  }, [handleNotification, isRelevantEvent, storeId]);
 
   return { socket, lastEvent, connected };
 };

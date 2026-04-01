@@ -42,9 +42,10 @@ const clientFormSchema = z.object({
 
 interface AddClientDialogProps {
   onClientAdded: (client: Client) => void;
+  trigger?: React.ReactNode;
 }
 
-export function AddClientDialog({ onClientAdded }: AddClientDialogProps) {
+export function AddClientDialog({ onClientAdded, trigger }: AddClientDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const params = useParams();
@@ -87,10 +88,12 @@ export function AddClientDialog({ onClientAdded }: AddClientDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="icon">
-          <UserPlus className="w-5 h-5" />
-          <span className="sr-only">Agregar Nuevo Cliente</span>
-        </Button>
+        {trigger || (
+          <Button variant="outline" size="icon">
+            <UserPlus className="w-5 h-5" />
+            <span className="sr-only">Agregar Nuevo Cliente</span>
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

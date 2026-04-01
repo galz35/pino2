@@ -34,6 +34,20 @@ export class SyncService {
     return statuses;
   }
 
+  async forceSync(storeId: string) {
+    await this.db.query(
+      'INSERT INTO sync_logs (store_id, payload, status) VALUES ($1, $2, $3)',
+      [storeId, JSON.stringify({ forced: true, source: 'master-sync-monitor' }), 'PENDING'],
+    );
+
+    return {
+      success: true,
+      storeId,
+      status: 'PENDING',
+      message: 'Sincronización marcada para reintento',
+    };
+  }
+
   /**
    * Recibe una carga batch de operaciones realizadas en el frontend durante modo offline
    * Procesa todo dentro de una única transacción SQL para asegurar consistencia

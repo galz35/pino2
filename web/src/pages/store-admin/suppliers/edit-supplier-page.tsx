@@ -55,7 +55,7 @@ export default function EditSupplierPage() {
     } catch (error) {
       console.error('Error fetching supplier:', error);
       toast.error('Error', 'No se pudo cargar la información del proveedor.');
-      navigate(`/store-admin/${storeId}/suppliers`);
+      navigate(`/store/${storeId}/suppliers`);
     } finally {
       setLoading(false);
     }
@@ -67,7 +67,7 @@ export default function EditSupplierPage() {
     try {
       await apiClient.patch(`/suppliers/${supplierId}`, formData);
       toast.success('Actualizado', 'Los datos del proveedor han sido actualizados.');
-      navigate(`/store-admin/${storeId}/suppliers`);
+      navigate(`/store/${storeId}/suppliers`);
     } catch (error: any) {
       const msg = error.response?.data?.message || 'Error al actualizar el proveedor.';
       toast.error('Error', msg);
@@ -88,7 +88,7 @@ export default function EditSupplierPage() {
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <Button variant="ghost" className="rounded-xl font-bold h-12 text-slate-400 hover:text-primary transition-colors" asChild>
-          <Link to={`/store-admin/${storeId}/suppliers`}>
+          <Link to={`/store/${storeId}/suppliers`}>
             <ArrowLeft className="mr-2 h-5 w-5" />
             CANCELAR EDICIÓN
           </Link>

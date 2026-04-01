@@ -56,8 +56,8 @@ export class SalesController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener detalle de una venta con sus items' })
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(id);
+  findOne(@Param('id') id: string, @Query('storeId') storeId?: string) {
+    return this.service.findOne(id, storeId);
   }
 
   @Post(':id/return')

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { EventsGateway } from '../../common/gateways/events.gateway';
 
@@ -11,88 +11,161 @@ export class ReturnsService {
 
   async create(dto: {
     storeId: string;
-    orderId: string;
-    ruteroId: string;
+    orderId?: string;
+    saleId?: string;
+    ruteroId?: string;
+    cashierId?: string;
     notes?: string;
-    items: Array<{
-      productId: string;
-      quantityBulks: number;
-      quantityUnits: number;
-      unitPrice: number;
-    }>;
+    items: Array<
+      | {
+          productId: string;
+          quantityBulks: number;
+          quantityUnits: number;
+          unitPrice: number;
+        }
+      | {
+          productId: string;
+          quantity: number;
+        }
+    >;
   }) {
-    return this.db.withTransaction(async (client) => {
-      // Calculate total
-      const total = dto.items.reduce((sum, item) => {
-        const product_units = item.quantityBulks + item.quantityUnits;
-        return sum + product_units * item.unitPrice;
-      }, 0);
+    if (dto.saleId) {
+      return this.createSaleReturn({
+        storeId: dto.storeId,
+        saleId: dto.saleId,
+        cashierId: dto.cashierId,
+        notes: dto.notes,
+        items: dto.items as Array<{ productId: string; quantity: number }>,
+      });
+    }
 
-      // 1. Create return record
+    return this.db.withTransaction(async (client) => {
+      const preparedItems: Array<{
+        productId: string;
+        unitPrice: number;
+        quantityBulks: number;
+        quantityUnits: number;
+        totalUnits: number;
+      }> = [];
+
+      for (const rawItem of dto.items) {
+        const item = rawItem as {
+          productId: string;
+          quantityBulks?: number;
+          quantityUnits?: number;
+          unitPrice?: number;
+        };
+        const quantityBulks = this.toInt(item.quantityBulks);
+        const quantityUnits = this.toInt(item.quantityUnits);
+
+        const prodRes = await client.query(
+          'SELECT current_stock, units_per_bulk FROM products WHERE id = $1 FOR UPDATE',
+          [item.productId],
+        );
+        if (prodRes.rowCount === 0) {
+          throw new NotFoundException('Producto no encontrado para devolución');
+        }
+
+        const unitsPerBulk = this.toUnitsPerBulk(prodRes.rows[0].units_per_bulk);
+        const totalUnits = quantityBulks * unitsPerBulk + quantityUnits;
+        if (totalUnits <= 0) {
+          throw new BadRequestException('La devolución debe incluir al menos una unidad');
+        }
+
+        preparedItems.push({
+          productId: item.productId,
+          unitPrice: this.toAmount(item.unitPrice),
+          quantityBulks,
+          quantityUnits,
+          totalUnits,
+        });
+      }
+
+      const total = preparedItems.reduce((sum, item) => sum + item.totalUnits * item.unitPrice, 0);
+
       const returnRes = await client.query(
         `INSERT INTO returns (store_id, order_id, rutero_id, notes, total)
          VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [dto.storeId, dto.orderId, dto.ruteroId, dto.notes || null, total],
+        [dto.storeId, dto.orderId || null, dto.ruteroId || null, dto.notes || null, total],
       );
       const returnRecord = returnRes.rows[0];
 
-      // 2. Process each item
-      for (const item of dto.items) {
-        const subtotal = (item.quantityBulks + item.quantityUnits) * item.unitPrice;
+      for (const item of preparedItems) {
+        const subtotal = item.totalUnits * item.unitPrice;
 
-        // Insert return item
         await client.query(
           `INSERT INTO return_items (return_id, product_id, quantity_bulks, quantity_units, unit_price, subtotal)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [returnRecord.id, item.productId, item.quantityBulks, item.quantityUnits, item.unitPrice, subtotal],
         );
 
-        // 3. Return product to warehouse inventory (bodega)
-        // Get product to know units_per_bulk for total unit calculation
         const prodRes = await client.query(
           'SELECT current_stock, stock_bulks, stock_units, units_per_bulk FROM products WHERE id = $1 FOR UPDATE',
           [item.productId],
         );
 
-        if (prodRes.rowCount > 0) {
-          const product = prodRes.rows[0];
-          const unitsPerBulk = product.units_per_bulk || 1;
-          const totalUnitsReturned = item.quantityBulks * unitsPerBulk + item.quantityUnits;
+        if (prodRes.rowCount === 0) {
+          throw new NotFoundException('Producto no encontrado para devolución');
+        }
 
-          const newStockBulks = (product.stock_bulks || 0) + item.quantityBulks;
-          const newStockUnits = (product.stock_units || 0) + item.quantityUnits;
-          const newCurrentStock = (product.current_stock || 0) + totalUnitsReturned;
+        const product = prodRes.rows[0];
+        const unitsPerBulk = this.toUnitsPerBulk(product.units_per_bulk);
+        const currentStock = this.toInt(product.current_stock);
+        const newCurrentStock = currentStock + item.totalUnits;
+        const newProductSplit = this.toSplit(newCurrentStock, unitsPerBulk);
 
-          await client.query(
-            'UPDATE products SET current_stock = $1, stock_bulks = $2, stock_units = $3, updated_at = NOW() WHERE id = $4',
-            [newCurrentStock, newStockBulks, newStockUnits, item.productId],
+        await client.query(
+          'UPDATE products SET current_stock = $1, stock_bulks = $2, stock_units = $3, updated_at = NOW() WHERE id = $4',
+          [newCurrentStock, newProductSplit.bulks, newProductSplit.units, item.productId],
+        );
+
+        if (dto.ruteroId) {
+          const vendorRes = await client.query(
+            `SELECT current_quantity
+             FROM vendor_inventories
+             WHERE vendor_id = $1 AND product_id = $2
+             FOR UPDATE`,
+            [dto.ruteroId, item.productId],
           );
 
-          // 4. Reduce from rutero inventory
+          if (vendorRes.rowCount === 0 || this.toInt(vendorRes.rows[0].current_quantity) < item.totalUnits) {
+            throw new BadRequestException('Inventario insuficiente del rutero para procesar la devolución');
+          }
+
+          const newVendorStock = this.toInt(vendorRes.rows[0].current_quantity) - item.totalUnits;
+          const newVendorSplit = this.toSplit(newVendorStock, unitsPerBulk);
+
           await client.query(
-            `UPDATE vendor_inventories 
-             SET current_quantity = current_quantity - $1, 
-                 current_bulks = GREATEST(0, current_bulks - $2), 
-                 current_units = GREATEST(0, current_units - $3),
+            `UPDATE vendor_inventories
+             SET current_quantity = $1,
+                 current_bulks = $2,
+                 current_units = $3,
                  updated_at = NOW()
              WHERE vendor_id = $4 AND product_id = $5`,
-            [totalUnitsReturned, item.quantityBulks, item.quantityUnits, dto.ruteroId, item.productId],
-          );
-
-          // 5. Log movement in kárdex
-          await client.query(
-            `INSERT INTO movements (store_id, product_id, user_id, type, quantity, balance, quantity_bulks, quantity_units, balance_bulks, balance_units, reference)
-             VALUES ($1, $2, $3, 'IN', $4, $5, $6, $7, $8, $9, $10)`,
-            [dto.storeId, item.productId, dto.ruteroId, totalUnitsReturned, newCurrentStock,
-             item.quantityBulks, item.quantityUnits, newStockBulks, newStockUnits,
-             `Devolución #${returnRecord.id.substring(0, 8)}`],
+            [newVendorStock, newVendorSplit.bulks, newVendorSplit.units, dto.ruteroId, item.productId],
           );
         }
+
+        await client.query(
+          `INSERT INTO movements (store_id, product_id, user_id, type, quantity, balance, quantity_bulks, quantity_units, balance_bulks, balance_units, reference)
+           VALUES ($1, $2, $3, 'IN', $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            dto.storeId,
+            item.productId,
+            dto.ruteroId || null,
+            item.totalUnits,
+            newCurrentStock,
+            item.quantityBulks,
+            item.quantityUnits,
+            newProductSplit.bulks,
+            newProductSplit.units,
+            `Devolución #${returnRecord.id.substring(0, 8)}`,
+          ],
+        );
       }
 
       const result = this.mapRow(returnRecord);
 
-      // 6. Emit realtime event
       this.eventsGateway.emitSyncUpdate({
         type: 'NEW_RETURN',
         storeId: dto.storeId,
@@ -147,6 +220,126 @@ export class ReturnsService {
     return returnRecord;
   }
 
+  private async createSaleReturn(dto: {
+    storeId: string;
+    saleId: string;
+    cashierId?: string;
+    notes?: string;
+    items: Array<{ productId: string; quantity: number }>;
+  }) {
+    return this.db.withTransaction(async (client) => {
+      const saleRes = await client.query('SELECT * FROM sales WHERE id = $1', [dto.saleId]);
+      if (saleRes.rowCount === 0) {
+        throw new NotFoundException('Venta no encontrada');
+      }
+
+      const sale = saleRes.rows[0];
+      const storeId = dto.storeId || sale.store_id;
+      const userId = dto.cashierId || sale.cashier_id || null;
+      const normalizedItems = dto.items.map((item) => ({
+        productId: item.productId,
+        quantity: this.toInt(item.quantity),
+      }));
+
+      if (normalizedItems.length === 0 || normalizedItems.some((item) => item.quantity <= 0)) {
+        throw new BadRequestException('La devolución debe incluir al menos una unidad válida');
+      }
+
+      let totalRefund = 0;
+      const preparedItems = [];
+
+      for (const item of normalizedItems) {
+        const saleItemRes = await client.query(
+          'SELECT product_id, unit_price FROM sale_items WHERE sale_id = $1 AND (product_id = $2 OR id = $2)',
+          [dto.saleId, item.productId],
+        );
+        if (saleItemRes.rowCount === 0) {
+          throw new BadRequestException('El producto no pertenece a la venta indicada');
+        }
+
+        const resolvedProductId = saleItemRes.rows[0].product_id;
+        const unitPrice = this.toAmount(saleItemRes.rows[0].unit_price);
+        totalRefund += unitPrice * item.quantity;
+        preparedItems.push({
+          productId: resolvedProductId,
+          quantity: item.quantity,
+          unitPrice,
+        });
+      }
+
+      const returnRes = await client.query(
+        `INSERT INTO returns (store_id, order_id, rutero_id, notes, total)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [
+          storeId,
+          null,
+          userId,
+          dto.notes || `Devolución de venta ${sale.ticket_number || dto.saleId}`,
+          totalRefund,
+        ],
+      );
+      const returnRecord = returnRes.rows[0];
+
+      for (const item of preparedItems) {
+        const prodRes = await client.query(
+          'SELECT current_stock, units_per_bulk FROM products WHERE id = $1 FOR UPDATE',
+          [item.productId],
+        );
+        if (prodRes.rowCount === 0) {
+          throw new NotFoundException('Producto no encontrado para devolución');
+        }
+
+        const unitsPerBulk = this.toUnitsPerBulk(prodRes.rows[0].units_per_bulk);
+        const currentStock = this.toInt(prodRes.rows[0].current_stock);
+        const newCurrentStock = currentStock + item.quantity;
+        const newProductSplit = this.toSplit(newCurrentStock, unitsPerBulk);
+
+        await client.query(
+          `INSERT INTO return_items (return_id, product_id, quantity_bulks, quantity_units, unit_price, subtotal)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [returnRecord.id, item.productId, 0, item.quantity, item.unitPrice, item.quantity * item.unitPrice],
+        );
+
+        await client.query(
+          'UPDATE products SET current_stock = $1, stock_bulks = $2, stock_units = $3, updated_at = NOW() WHERE id = $4',
+          [newCurrentStock, newProductSplit.bulks, newProductSplit.units, item.productId],
+        );
+
+        await client.query(
+          `INSERT INTO movements (store_id, product_id, user_id, type, quantity, balance, quantity_bulks, quantity_units, balance_bulks, balance_units, reference)
+           VALUES ($1, $2, $3, 'IN', $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            storeId,
+            item.productId,
+            userId,
+            item.quantity,
+            newCurrentStock,
+            0,
+            item.quantity,
+            newProductSplit.bulks,
+            newProductSplit.units,
+            `Devolución Venta: ${sale.ticket_number || dto.saleId}`,
+          ],
+        );
+      }
+
+      const result = {
+        ...this.mapRow(returnRecord),
+        saleId: dto.saleId,
+        totalRefund,
+        success: true,
+      };
+
+      this.eventsGateway.emitSyncUpdate({
+        type: 'NEW_RETURN',
+        storeId,
+        payload: result,
+      });
+
+      return result;
+    });
+  }
+
   private mapRow(row: any): any {
     return {
       id: row.id,
@@ -156,6 +349,30 @@ export class ReturnsService {
       notes: row.notes,
       total: parseFloat(row.total || 0),
       createdAt: row.created_at,
+    };
+  }
+
+  private toAmount(value: any): number {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private toInt(value: any): number {
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private toUnitsPerBulk(value: any): number {
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  }
+
+  private toSplit(totalUnits: number, unitsPerBulk: number): { bulks: number; units: number } {
+    const safeTotal = Math.max(0, this.toInt(totalUnits));
+    const safeUnitsPerBulk = this.toUnitsPerBulk(unitsPerBulk);
+    return {
+      bulks: Math.floor(safeTotal / safeUnitsPerBulk),
+      units: safeTotal % safeUnitsPerBulk,
     };
   }
 }

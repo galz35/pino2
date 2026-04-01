@@ -1,14 +1,16 @@
 import apiClient from '@/services/api-client';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth-context';
 import { AppHeader } from '@/components/app-header';
 import { cn } from '@/lib/utils';
+import { isGlobalAdminRole, normalizeUserRole } from '@/lib/user-role';
+import { useRealTimeEvents } from '@/hooks/use-real-time-events';
 import {
   LayoutDashboard, Store, Briefcase, Users, WalletCards, RefreshCw,
   FileText, Map, MapPin, Settings, LifeBuoy, Package, History, Wrench,
   ShoppingCart, ClipboardCheck, AreaChart, UsersRound, Truck, HandCoins,
-  ShieldCheck, SendToBack, Route, DollarSign, ListOrdered, PackagePlus,
+  ShieldCheck, SendToBack, Route, DollarSign, ListOrdered, PackagePlus, ReceiptText,
 } from 'lucide-react';
 
 export interface Notification {
@@ -25,6 +27,12 @@ interface StoreSettings {
   enableDispatcherMode?: boolean;
   enableSalesManagerMode?: boolean;
   enableSupplierManagement?: boolean;
+}
+
+interface RealtimeEvent {
+  type?: string;
+  storeId?: string;
+  payload?: Record<string, any>;
 }
 
 const translations = {
@@ -56,6 +64,7 @@ const translations = {
     quickSale: 'Venta Rápida',
     authorizations: 'Autorizaciones',
     accountsReceivable: 'Cuentas por Cobrar',
+    supplierInvoices: 'Facturas Proveedor',
     routes: 'Rutas',
   },
   en: {
@@ -86,6 +95,7 @@ const translations = {
     quickSale: 'Quick Sale',
     authorizations: 'Authorizations',
     accountsReceivable: 'Accounts Receivable',
+    supplierInvoices: 'Supplier Invoices',
     routes: 'Routes',
   }
 };
@@ -127,17 +137,21 @@ const getStoreAdminNav = (storeId: string, lang: 'es' | 'en', settings: StoreSet
       name: translations[lang].suppliers,
       href: `/store/${storeId}/suppliers`,
       icon: Briefcase,
+    }, {
+      name: translations[lang].supplierInvoices,
+      href: `/store/${storeId}/suppliers/invoice`,
+      icon: ReceiptText,
     }] : []),
     { name: translations[lang].reports, href: `/store/${storeId}/reports`, icon: AreaChart },
     { name: translations[lang].users, href: `/store/${storeId}/users`, icon: Users },
     { name: 'Zonas y Barrios', href: `/store/${storeId}/vendors/zones`, icon: Map },
+    { name: translations[lang].accountsReceivable, href: `/store/${storeId}/finance/receivables`, icon: HandCoins },
     ...(settings.enableSalesManagerMode ? [
       { name: translations[lang].vendors, href: `/store/${storeId}/vendors`, icon: UsersRound },
       { name: translations[lang].assignRoute, href: `/store/${storeId}/vendors/assign-route`, icon: Route },
       { name: translations[lang].routes, href: `/store/${storeId}/vendors/routes`, icon: MapPin },
       { name: translations[lang].addClient, href: `/store/${storeId}/vendors/clients`, icon: Users },
       { name: translations[lang].assignInventory, href: `/store/${storeId}/vendors/inventory`, icon: Truck },
-      { name: translations[lang].accountsReceivable, href: `/store/${storeId}/vendors/collections`, icon: HandCoins },
     ] : []),
     {
       name: translations[lang].authorizations,
@@ -203,6 +217,85 @@ const getGestorVentasNav = (storeId: string, lang: 'es' | 'en') => [
   { name: translations[lang].help, href: `/store/${storeId}/help`, icon: LifeBuoy },
 ];
 
+const buildNotificationKey = (event: RealtimeEvent) =>
+  [
+    event.type,
+    event.storeId,
+    event.payload?.id,
+    event.payload?.productId,
+    event.payload?.reference,
+    event.payload?.createdAt,
+    event.payload?.updatedAt,
+  ]
+    .filter(Boolean)
+    .join(':');
+
+const buildRealtimeNotification = (
+  event: RealtimeEvent,
+  currentUserId?: string,
+  fallbackStoreId?: string,
+  isGlobalAdmin = false,
+): Notification | null => {
+  const effectiveStoreId = event.storeId || event.payload?.storeId || fallbackStoreId;
+  const baseStorePath = effectiveStoreId ? `/store/${effectiveStoreId}` : null;
+  const fallbackHref = isGlobalAdmin ? '/master-admin/monitor' : '/';
+  const id = buildNotificationKey(event);
+
+  if (!event.type || !id) {
+    return null;
+  }
+
+  switch (event.type) {
+    case 'NEW_ORDER':
+      return {
+        id,
+        title: 'Nuevo pedido',
+        description: `Pedido ${event.payload?.id || ''} por C$ ${Number(event.payload?.total || 0).toFixed(2)}`.trim(),
+        href: baseStorePath ? `${baseStorePath}/pending-orders` : fallbackHref,
+        userId: currentUserId || 'system',
+        read: false,
+      };
+    case 'NEW_VISIT':
+      return {
+        id,
+        title: 'Nueva visita',
+        description: `Visita registrada${event.payload?.clientId ? ` para cliente ${event.payload.clientId}` : ''}`,
+        href: baseStorePath ? `${baseStorePath}/vendors/dashboard` : fallbackHref,
+        userId: currentUserId || 'system',
+        read: false,
+      };
+    case 'PRODUCT_CREATED':
+      return {
+        id,
+        title: 'Producto creado',
+        description: event.payload?.description || 'Se registró un producto nuevo.',
+        href: baseStorePath ? `${baseStorePath}/products` : fallbackHref,
+        userId: currentUserId || 'system',
+        read: false,
+      };
+    case 'PRODUCT_UPDATED':
+      return {
+        id,
+        title: 'Producto actualizado',
+        description: event.payload?.description || 'Se actualizó un producto.',
+        href: baseStorePath ? `${baseStorePath}/products` : fallbackHref,
+        userId: currentUserId || 'system',
+        read: false,
+      };
+    case 'INVENTORY_UPDATE':
+      return {
+        id,
+        title: 'Inventario actualizado',
+        description: `Movimiento ${event.payload?.type || ''}${event.payload?.quantity ? ` por ${event.payload.quantity}` : ''}`.trim(),
+        href: baseStorePath ? `${baseStorePath}/inventory/movements` : fallbackHref,
+        userId: currentUserId || 'system',
+        read: false,
+      };
+    default:
+      return null;
+  }
+};
+
 
 function MainNav({
   navItems,
@@ -256,8 +349,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     enableSupplierManagement: true,
   });
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const seenNotificationIds = useRef<Set<string>>(new Set());
   const location = useLocation();
   const pathname = location.pathname;
+  const { lastEvent } = useRealTimeEvents(storeId);
 
   useEffect(() => {
     if (!storeId) return;
@@ -284,30 +379,46 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   };
 
+  useEffect(() => {
+    seenNotificationIds.current.clear();
+    setNotifications([]);
+  }, [storeId, user?.id]);
+
+  useEffect(() => {
+    const notification = buildRealtimeNotification(
+      lastEvent,
+      user?.id,
+      storeId,
+      isGlobalAdminRole(user?.role),
+    );
+
+    if (!notification || seenNotificationIds.current.has(notification.id)) {
+      return;
+    }
+
+    seenNotificationIds.current.add(notification.id);
+    setNotifications((prev) => [notification, ...prev].slice(0, 12));
+  }, [lastEvent, storeId, user?.id, user?.role]);
+
   const navItems = useMemo(() => {
-    const roleId = user?.role?.toLowerCase() || '';
+    const roleId = normalizeUserRole(user?.role);
     switch (roleId) {
       case 'master-admin':
       case 'owner':
         return getMasterAdminNav(language);
       case 'store-admin':
-      case 'admin':
         return getStoreAdminNav(storeId || '', language, storeSettings);
       case 'inventory':
-      case 'bodeguero':
-      case 'ayudante de bodega':
         return getBodegueroNav(storeId || '', language);
       case 'cashier':
-      case 'cajero':
         return getCashierNav(storeId || '', language, storeSettings);
       case 'dispatcher':
-      case 'despacho':
         return getDespachoNav(storeId || '', language);
       case 'rutero':
         return getRuteroNav(storeId || '', language, storeSettings);
-      case 'vendedor ambulante':
+      case 'vendor':
         return getVendedorAmbulanteNav(storeId || '', language);
-      case 'gestor de ventas':
+      case 'sales-manager':
         return getGestorVentasNav(storeId || '', language);
       default:
         // Default to store admin nav for robust fallback if storeId exists
@@ -317,7 +428,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const nav = <MainNav navItems={navItems} onLinkClick={() => {}} />;
 
-  if (pathname === '/' && user?.role !== 'master-admin' && user?.role !== 'owner') {
+  if (pathname === '/' && !isGlobalAdminRole(user?.role)) {
     return <>{children}</>;
   }
 
@@ -326,7 +437,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="hidden border-r bg-muted/40 md:block">
         <div className="flex h-full max-h-screen flex-col gap-2">
           <div className="flex h-16 items-center border-b px-4 lg:h-[60px] lg:px-6">
-            <Link to={user?.role === 'master-admin' ? '/master-admin/dashboard' : (storeId ? `/store/${storeId}/dashboard` : '/')} className="flex items-center gap-2 font-semibold">
+            <Link to={isGlobalAdminRole(user?.role) ? '/master-admin/dashboard' : (storeId ? `/store/${storeId}/dashboard` : '/')} className="flex items-center gap-2 font-semibold">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"

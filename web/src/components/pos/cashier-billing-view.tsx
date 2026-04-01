@@ -90,7 +90,10 @@ export function CashierBillingView({
         
         // Cargar ajustes para impresión
         if (storeId) {
-            apiClient.get(`/stores/${storeId}/settings`).then(res => setStoreSettings(res.data)).catch(() => {});
+            apiClient
+                .get(`/stores/${storeId}`)
+                .then((res) => setStoreSettings(res.data?.settings || {}))
+                .catch(() => {});
         }
     }, [storeId]);
 

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 
 @Injectable()
@@ -15,11 +15,21 @@ export class RoutesService {
   }
 
   async create(dto: { storeId: string; vendorId: string; clientIds?: string[]; date?: string; notes?: string; status?: string }) {
+    if (!dto.storeId || !dto.vendorId) {
+      throw new BadRequestException('La tienda y el vendedor son requeridos');
+    }
+
+    const parsedDate = dto.date ? new Date(dto.date) : new Date();
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new BadRequestException('La fecha de ruta no es válida');
+    }
+
+    const routeDate = parsedDate.toISOString();
     const res = await this.db.query(
       `INSERT INTO routes (store_id, vendor_id, client_ids, route_date, notes, status) 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [dto.storeId, dto.vendorId, JSON.stringify(dto.clientIds || []),
-       dto.date || new Date().toISOString(), dto.notes || null, dto.status || 'pending'],
+       routeDate, dto.notes || null, dto.status || 'pending'],
     );
     return this.mapRow(res.rows[0]);
   }

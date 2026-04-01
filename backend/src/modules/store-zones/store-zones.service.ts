@@ -19,16 +19,16 @@ export class StoreZonesService {
     return this.mapRow(res.rows[0]);
   }
 
-  async create(dto: { name: string; storeId: string; description?: string; color?: string }) {
+  async create(dto: { name: string; storeId: string; description?: string; color?: string; visitDay?: string }) {
     const res = await this.db.query(
-      `INSERT INTO store_zones (store_id, name, description, color) 
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [dto.storeId, dto.name, dto.description || null, dto.color || null],
+      `INSERT INTO store_zones (store_id, name, description, color, visit_day) 
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [dto.storeId, dto.name, dto.description || null, dto.color || null, dto.visitDay || 'Ninguno'],
     );
     return this.mapRow(res.rows[0]);
   }
 
-  async update(id: string, dto: { name?: string; description?: string; color?: string }) {
+  async update(id: string, dto: { name?: string; description?: string; color?: string; visitDay?: string }) {
     const sets: string[] = [];
     const params: any[] = [];
     let idx = 1;
@@ -36,6 +36,7 @@ export class StoreZonesService {
     if (dto.name !== undefined) { sets.push(`name = $${idx++}`); params.push(dto.name); }
     if (dto.description !== undefined) { sets.push(`description = $${idx++}`); params.push(dto.description); }
     if (dto.color !== undefined) { sets.push(`color = $${idx++}`); params.push(dto.color); }
+    if (dto.visitDay !== undefined) { sets.push(`visit_day = $${idx++}`); params.push(dto.visitDay); }
 
     if (sets.length === 0) return this.findOne(id);
 
@@ -57,6 +58,7 @@ export class StoreZonesService {
       name: row.name,
       description: row.description,
       color: row.color,
+      visitDay: row.visit_day || 'Ninguno',
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

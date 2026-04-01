@@ -114,7 +114,7 @@ export function PriceSelectionDialog({
                 onClose={() => setAuthDialogOpen(false)}
                 onConfirm={handleAuthSuccess}
                 title="Autorización Requerida"
-                description={`Para aplicar el ${pendingPrice?.label} se requiere PIN de administrador.`}
+                description={`Para aplicar el ${pendingPrice?.label} se requieren credenciales de administrador.`}
             />
         </>
     );

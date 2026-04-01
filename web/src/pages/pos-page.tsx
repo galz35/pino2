@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth-context';
 import { Loader2 } from 'lucide-react';
+import { getRedirectPath } from '@/lib/redirect-logic';
 
 export default function PosPage() {
   const { user, loading } = useAuth();
@@ -14,21 +15,9 @@ export default function PosPage() {
         return;
       }
 
-      // Master admins go to master dashboard
-      if (user.role === 'master-admin' || user.role === 'owner') {
-        navigate('/master-admin/dashboard');
-        return;
-      }
-
-      // Store users go to their default store's billing
-      if (user.storeIds && user.storeIds.length > 0) {
-        navigate(`/store/${user.storeIds[0]}/billing`);
-      } else if (user.role === 'Admin' || user.role === 'store-admin') {
-         // Fallback for admins without specific storeIds array (unlikely but safe)
-         navigate('/store/default/dashboard'); 
-      } else {
-        // No stores assigned?
-        console.warn('User has no assigned stores');
+      const redirectPath = getRedirectPath(user);
+      if (redirectPath) {
+        navigate(redirectPath);
       }
     }
   }, [user, loading, navigate]);

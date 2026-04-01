@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { toast } from '@/lib/swalert';
@@ -125,10 +124,8 @@ export default function LoginPage() {
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex justify-center text-sm">
-            <Button variant="link" className="p-0" asChild>
-              <Link to="/forgot-password">¿Olvidaste tu contraseña?</Link>
-            </Button>
+          <CardFooter className="flex justify-center text-center text-sm text-muted-foreground">
+            Si olvidaste tu contraseña, solicita el reinicio a un administrador.
           </CardFooter>
         </Card>
       </main>

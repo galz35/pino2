@@ -1,4 +1,5 @@
 import { User } from '@/types';
+import { normalizeUserRole } from '@/lib/user-role';
 
 /**
  * Normaliza los roles del usuario de NestJS/Postgres y retorna la ruta de dashboard apropiada.
@@ -8,14 +9,14 @@ export function getRedirectPath(user: User | null): string | null {
         return null;
     }
 
-    const role = user.role?.toLowerCase().trim();
+    const role = normalizeUserRole(user.role);
     const storeId = user.storeIds?.[0]; // En v2 usamos el primer storeId asignado por ahora
 
 
 
     // Master Admin / Owner (Acceso global)
     if (role === 'master-admin' || role === 'owner') {
-        return '/';
+        return '/master-admin/dashboard';
     }
 
     // Si no tiene tienda asignada y no es admin global, error
@@ -27,19 +28,21 @@ export function getRedirectPath(user: User | null): string | null {
     // Roles específicos de tienda
     switch (role) {
         case 'store-admin':
-        case 'admin':
             return `/store/${storeId}/dashboard`;
         case 'cashier':
-        case 'cajero':
-            return `/store/${storeId}/pos`;
+            return `/store/${storeId}/billing`;
         case 'inventory':
-        case 'bodeguero':
             return `/store/${storeId}/products`;
         case 'dispatcher':
-        case 'despacho':
-            return `/store/${storeId}/pos`;
+            return `/store/${storeId}/dispatcher`;
+        case 'rutero':
+            return `/store/${storeId}/delivery-route`;
+        case 'vendor':
+            return `/store/${storeId}/vendors/quick-sale`;
+        case 'sales-manager':
+            return `/store/${storeId}/vendors/dashboard`;
         default:
-            console.error(`[RedirectLogic] Unrecognized role: "${role}"`);
+            console.error(`[RedirectLogic] Unrecognized role: "${user.role}" -> "${role}"`);
             return `/store/${storeId}/products`; // Fallback al listado de productos
     }
 }

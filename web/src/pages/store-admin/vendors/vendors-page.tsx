@@ -8,6 +8,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from "@/components/ui/badge";
 import { useParams } from "react-router-dom";
 import apiClient from '@/services/api-client';
+import { normalizeUserRole } from '@/lib/user-role';
 
 interface User { uid: string; name: string; email: string; role: string; }
 
@@ -21,8 +22,12 @@ export default function VendorsPage() {
         if (!storeId) return;
         const fetchVendors = async () => {
             try {
-                const res = await apiClient.get(`/users?storeId=${storeId}&role=vendor`);
-                setVendors((res.data || []).map((u: any) => ({ uid: u.id || u.uid, name: u.name, email: u.email, role: u.role })));
+                const res = await apiClient.get('/users', { params: { storeId } });
+                const routeStaff = (res.data || []).filter((u: any) => {
+                    const role = normalizeUserRole(u.role);
+                    return role === 'vendor' || role === 'sales-manager' || role === 'rutero';
+                });
+                setVendors(routeStaff.map((u: any) => ({ uid: u.id || u.uid, name: u.name, email: u.email, role: u.role })));
             } catch (err) { setError("No se pudieron cargar los vendedores."); }
             finally { setLoading(false); }
         };

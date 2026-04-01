@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DailyClosingsService } from './daily-closings.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -16,7 +16,7 @@ export class DailyClosingsController {
     @Body()
     dto: {
       storeId: string;
-      ruteroId: string;
+      ruteroId?: string;
       totalSales: number;
       totalCollections: number;
       totalReturns: number;
@@ -24,8 +24,12 @@ export class DailyClosingsController {
       closingDate: string;
       notes?: string;
     },
+    @Req() req: any,
   ) {
-    return this.service.create(dto);
+    return this.service.create({
+      ...dto,
+      ruteroId: dto.ruteroId || req.user?.sub,
+    });
   }
 
   @Get()

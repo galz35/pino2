@@ -1,10 +1,8 @@
 
-
-import { db } from "@/lib/firebase";
-import { doc, getDoc, type Timestamp } from "firebase/firestore";
 import { useEffect, useState, forwardRef } from "react";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import apiClient from '@/services/api-client';
 
 interface SaleItem {
   id: string;
@@ -31,7 +29,7 @@ export interface Sale {
   amountReceived: number;
   change: number;
   ticketNumber?: string;
-  createdAt: Date | Timestamp;
+  createdAt: Date | string | { toDate: () => Date };
 }
 
 interface Settings {
@@ -53,10 +51,9 @@ interface PrintableTicketProps {
 
 async function fetchStoreSettings(storeId: string): Promise<Settings | null> {
   try {
-    const storeDocRef = doc(db, 'stores', storeId);
-    const storeDoc = await getDoc(storeDocRef);
-    if (storeDoc.exists() && storeDoc.data().settings) {
-      return storeDoc.data().settings;
+    const response = await apiClient.get(`/stores/${storeId}`);
+    if (response.data?.settings) {
+      return response.data.settings;
     }
     return null;
   } catch (error) {
@@ -78,7 +75,12 @@ export const PrintableSaleTicket = forwardRef<HTMLDivElement, PrintableTicketPro
 
   if (!sale) return null;
 
-  const saleDate = sale.createdAt instanceof Date ? sale.createdAt : sale.createdAt.toDate();
+  const saleDate =
+    sale.createdAt instanceof Date
+      ? sale.createdAt
+      : typeof sale.createdAt === 'string'
+        ? new Date(sale.createdAt)
+        : sale.createdAt.toDate();
 
   return (
     <div

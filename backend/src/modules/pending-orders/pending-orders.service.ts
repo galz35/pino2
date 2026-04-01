@@ -5,8 +5,21 @@ import { DatabaseService } from '../../database/database.service';
 export class PendingOrdersService {
   constructor(private readonly db: DatabaseService) {}
 
+  private normalizeItems(items: any): any[] {
+    const parsed = typeof items === 'string' ? JSON.parse(items) : Array.isArray(items) ? items : [];
+    return parsed.map((item: any, index: number) => ({
+      id: item?.id || item?.productId || `item-${index + 1}`,
+      productId: item?.productId || item?.id || null,
+      description: item?.description || '',
+      quantity: Number.parseInt(String(item?.quantity ?? 0), 10) || 0,
+      salePrice: Number.parseFloat(String(item?.salePrice ?? item?.unitPrice ?? 0)) || 0,
+      unitPrice: Number.parseFloat(String(item?.unitPrice ?? item?.salePrice ?? 0)) || 0,
+      costPrice: Number.parseFloat(String(item?.costPrice ?? 0)) || 0,
+    }));
+  }
+
   async findAll(storeId: string, status?: string) {
-    let sql = `SELECT po.*, c.name as client_name 
+    let sql = `SELECT po.*, COALESCE(c.name, po.client_name) as client_name 
                FROM pending_orders po 
                LEFT JOIN clients c ON po.client_id = c.id 
                WHERE po.store_id = $1`;
@@ -14,18 +27,24 @@ export class PendingOrdersService {
     if (status) sql += ` AND po.status = $${params.push(status)}`;
     sql += ' ORDER BY po.created_at DESC';
     const res = await this.db.query(sql, params);
-    return res.rows.map(this.mapRow);
+    return res.rows.map((row) => this.mapRow(row));
   }
 
   async create(dto: {
     storeId: string; clientId?: string; clientName?: string;
     items: any[]; total?: number; notes?: string; paymentMethod?: string;
+    dispatcherId?: string; dispatcherName?: string; subtotal?: number; tax?: number; status?: string;
   }) {
+    const normalizedItems = this.normalizeItems(dto.items || []);
+    const computedTotal =
+      dto.total ??
+      ((Number.parseFloat(String(dto.subtotal ?? 0)) || 0) + (Number.parseFloat(String(dto.tax ?? 0)) || 0));
+
     const res = await this.db.query(
-      `INSERT INTO pending_orders (store_id, client_id, client_name, items, total, notes, payment_method, status) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'Pendiente') RETURNING *`,
+      `INSERT INTO pending_orders (store_id, client_id, client_name, items, total, notes, payment_method, status, dispatched_by) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [dto.storeId, dto.clientId || null, dto.clientName || null,
-       JSON.stringify(dto.items || []), dto.total || 0, dto.notes || null, dto.paymentMethod || 'Efectivo'],
+       JSON.stringify(normalizedItems), computedTotal, dto.notes || null, dto.paymentMethod || 'Efectivo', dto.status || 'Pendiente', dto.dispatcherName || null],
     );
     return this.mapRow(res.rows[0]);
   }
@@ -48,12 +67,15 @@ export class PendingOrdersService {
   }
 
   private mapRow(row: any): any {
+    const items = this.normalizeItems(row.items);
     return {
       id: row.id,
       storeId: row.store_id,
       clientId: row.client_id,
       clientName: row.client_name,
-      items: typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []),
+      dispatcherName: row.dispatched_by,
+      salesManagerName: row.dispatched_by,
+      items,
       total: parseFloat(row.total || 0),
       notes: row.notes,
       paymentMethod: row.payment_method,

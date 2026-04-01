@@ -1,15 +1,31 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 
 @Injectable()
-export class DatabaseService {
+export class DatabaseService implements OnModuleInit {
   private readonly logger = new Logger(DatabaseService.name);
+  private slowQueryConfigCache:
+    | {
+        active: boolean;
+        thresholdMs: number;
+        loadedAt: number;
+      }
+    | null = null;
+  private readonly slowQueryConfigTtlMs = 30_000;
 
-  constructor(@Inject('PG_CONNECTION') private readonly pool: Pool) {
+  constructor(
+    @Inject('PG_CONNECTION') private readonly pool: Pool,
+    private readonly configService: ConfigService,
+  ) {
     this.pool.on('error', (err) => {
       this.logger.error('Unexpected error on idle client', err);
       process.exit(-1);
     });
+  }
+
+  async onModuleInit() {
+    await this.ensureOperationalTables();
   }
 
   /**
@@ -17,10 +33,17 @@ export class DatabaseService {
    */
   async query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
     const start = Date.now();
-    const res = await this.pool.query<T>(text, params);
-    const duration = Date.now() - start;
-    this.logger.debug(`Executed query: { text: ${text}, time: ${duration}ms, rows: ${res.rowCount} }`);
-    return res;
+    try {
+      const res = await this.pool.query<T>(text, params);
+      const duration = Date.now() - start;
+      this.logger.debug(`Executed query: { text: ${text}, time: ${duration}ms, rows: ${res.rowCount} }`);
+      await this.maybeCaptureSlowQuery(text, params, duration, res.rowCount ?? 0, 'pool');
+      return res;
+    } catch (error) {
+      const duration = Date.now() - start;
+      await this.maybeCaptureSlowQuery(text, params, duration, 0, 'pool', error);
+      throw error;
+    }
   }
 
   /**
@@ -39,19 +62,200 @@ export class DatabaseService {
     callback: (client: PoolClient) => Promise<T>
   ): Promise<T> {
     const client = await this.getClient();
+    const rawQuery = client.query.bind(client);
     try {
-      await client.query('BEGIN');
+      (client as PoolClient & { query: any }).query = async (text: string, params?: any[]) => {
+        const start = Date.now();
+        try {
+          const result = await rawQuery(text, params);
+          const duration = Date.now() - start;
+          await this.maybeCaptureSlowQuery(text, params, duration, result.rowCount ?? 0, 'transaction');
+          return result;
+        } catch (error) {
+          const duration = Date.now() - start;
+          await this.maybeCaptureSlowQuery(text, params, duration, 0, 'transaction', error);
+          throw error;
+        }
+      };
+
+      await rawQuery('BEGIN');
       
       const result = await callback(client);
       
-      await client.query('COMMIT');
+      await rawQuery('COMMIT');
       return result;
     } catch (e) {
       this.logger.error('Transaction rollback due to error', e.stack);
-      await client.query('ROLLBACK');
+      await rawQuery('ROLLBACK');
       throw e;
     } finally {
+      (client as PoolClient & { query: any }).query = rawQuery;
       client.release();
     }
+  }
+
+  private async ensureOperationalTables() {
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS consultasql (
+        id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+        activo BOOLEAN NOT NULL DEFAULT FALSE,
+        umbral_ms INTEGER NOT NULL DEFAULT 200 CHECK (umbral_ms >= 0),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await this.pool.query(`
+      INSERT INTO consultasql (id, activo, umbral_ms)
+      VALUES (1, FALSE, 200)
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS consultasql_historial (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        operacion VARCHAR(20),
+        origen VARCHAR(30) NOT NULL DEFAULT 'pool',
+        duracion_ms INTEGER NOT NULL,
+        row_count INTEGER,
+        consulta TEXT NOT NULL,
+        parametros JSONB,
+        error_message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_consultasql_historial_created_at
+      ON consultasql_historial(created_at DESC);
+    `);
+
+    await this.pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_consultasql_historial_duracion
+      ON consultasql_historial(duracion_ms DESC);
+    `);
+  }
+
+  private async maybeCaptureSlowQuery(
+    text: string,
+    params: any[] | undefined,
+    durationMs: number,
+    rowCount: number,
+    source: 'pool' | 'transaction',
+    error?: any,
+  ) {
+    if (!text || this.shouldSkipSlowQueryCapture(text)) {
+      return;
+    }
+
+    const config = await this.getSlowQueryConfig();
+    if (!config.active || durationMs < config.thresholdMs) {
+      return;
+    }
+
+    const operation = this.extractOperation(text);
+    const trimmedText = text.trim().replace(/\s+/g, ' ').slice(0, 4000);
+    const serializedParams = this.serializeParams(params);
+    const errorMessage =
+      error instanceof Error ? error.message : typeof error === 'string' ? error : null;
+
+    await this.pool.query(
+      `INSERT INTO consultasql_historial (
+         operacion,
+         origen,
+         duracion_ms,
+         row_count,
+         consulta,
+         parametros,
+         error_message
+       ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
+      [
+        operation,
+        source,
+        durationMs,
+        rowCount,
+        trimmedText,
+        serializedParams ? JSON.stringify(serializedParams) : null,
+        errorMessage,
+      ],
+    );
+
+    this.logger.warn(
+      `Slow query captured: { operation: ${operation}, source: ${source}, time: ${durationMs}ms, rows: ${rowCount} }`,
+    );
+  }
+
+  private async getSlowQueryConfig() {
+    const now = Date.now();
+    if (
+      this.slowQueryConfigCache &&
+      now - this.slowQueryConfigCache.loadedAt < this.slowQueryConfigTtlMs
+    ) {
+      return this.slowQueryConfigCache;
+    }
+
+    const defaultThreshold = Number(
+      this.configService.get<string>('DATABASE_SLOW_QUERY_THRESHOLD_MS') || 200,
+    );
+
+    try {
+      const res = await this.pool.query(
+        'SELECT activo, umbral_ms FROM consultasql WHERE id = 1 LIMIT 1',
+      );
+      const row = res.rows[0];
+      this.slowQueryConfigCache = {
+        active: !!row?.activo,
+        thresholdMs: Number(row?.umbral_ms ?? defaultThreshold ?? 200),
+        loadedAt: now,
+      };
+    } catch {
+      this.slowQueryConfigCache = {
+        active: false,
+        thresholdMs: defaultThreshold || 200,
+        loadedAt: now,
+      };
+    }
+
+    return this.slowQueryConfigCache;
+  }
+
+  private shouldSkipSlowQueryCapture(text: string) {
+    const normalized = text.trim().toLowerCase();
+    if (!normalized) {
+      return true;
+    }
+
+    return (
+      normalized.startsWith('begin') ||
+      normalized.startsWith('commit') ||
+      normalized.startsWith('rollback') ||
+      normalized.includes('consultasql_historial') ||
+      normalized.includes(' from consultasql ') ||
+      normalized.includes(' into consultasql ')
+    );
+  }
+
+  private extractOperation(text: string) {
+    const operation = text.trim().split(/\s+/)[0]?.toUpperCase() || 'UNKNOWN';
+    return operation.slice(0, 20);
+  }
+
+  private serializeParams(params?: any[]) {
+    if (!params || params.length === 0) {
+      return null;
+    }
+
+    return params.map((value) => {
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+      if (typeof value === 'bigint') {
+        return value.toString();
+      }
+      if (Buffer.isBuffer(value)) {
+        return `<Buffer:${value.length}>`;
+      }
+      return value;
+    });
   }
 }

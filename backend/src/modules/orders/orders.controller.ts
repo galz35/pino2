@@ -52,4 +52,34 @@ export class OrdersController {
   ) {
     return this.service.updateStatus(id, dto.status, dto.updatedBy);
   }
+
+  @Patch(':id/prepare')
+  @ApiOperation({ summary: 'Marcar pedido en preparación' })
+  prepare(@Param('id') id: string, @Body() dto: { updatedBy?: string }) {
+    return this.service.updateStatus(id, 'EN_PREPARACION', dto.updatedBy);
+  }
+
+  @Patch(':id/stage')
+  @ApiOperation({ summary: 'Marcar pedido como alistado' })
+  stage(@Param('id') id: string, @Body() dto: { updatedBy?: string }) {
+    return this.service.updateStatus(id, 'ALISTADO', dto.updatedBy);
+  }
+
+  @Patch(':id/load-truck')
+  @ApiOperation({ summary: 'Marcar pedido como cargado al camión' })
+  loadTruck(@Param('id') id: string, @Body() dto: { updatedBy?: string }) {
+    return this.service.updateStatus(id, 'CARGADO_CAMION', dto.updatedBy);
+  }
+
+  @Patch(':id/dispatch')
+  @ApiOperation({ summary: 'Marcar pedido en entrega' })
+  dispatch(@Param('id') id: string, @Body() dto: { updatedBy?: string }) {
+    return this.service.updateStatus(id, 'EN_ENTREGA', dto.updatedBy);
+  }
+
+  @Patch(':id/deliver')
+  @ApiOperation({ summary: 'Marcar pedido entregado' })
+  deliver(@Param('id') id: string, @Body() dto: { updatedBy?: string }) {
+    return this.service.updateStatus(id, 'ENTREGADO', dto.updatedBy);
+  }
 }

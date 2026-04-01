@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ReturnsService } from './returns.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -11,23 +11,36 @@ export class ReturnsController {
   constructor(private readonly service: ReturnsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Registrar devolución del rutero' })
+  @ApiOperation({ summary: 'Registrar devolución de rutero o devolución POS basada en venta' })
   create(
     @Body()
     dto: {
       storeId: string;
-      orderId: string;
-      ruteroId: string;
+      orderId?: string;
+      saleId?: string;
+      ruteroId?: string;
+      cashierId?: string;
       notes?: string;
-      items: Array<{
-        productId: string;
-        quantityBulks: number;
-        quantityUnits: number;
-        unitPrice: number;
-      }>;
+      items: Array<
+        | {
+            productId: string;
+            quantityBulks: number;
+            quantityUnits: number;
+            unitPrice: number;
+          }
+        | {
+            productId: string;
+            quantity: number;
+          }
+      >;
     },
+    @Req() req: any,
   ) {
-    return this.service.create(dto);
+    return this.service.create({
+      ...dto,
+      ruteroId: dto.ruteroId || req.user?.sub || undefined,
+      cashierId: dto.cashierId || req.user?.sub || undefined,
+    });
   }
 
   @Get()

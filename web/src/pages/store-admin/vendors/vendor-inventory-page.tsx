@@ -34,8 +34,8 @@ export default function VendorInventoryPage() {
         const fetchData = async () => {
             try {
                 const [vendorsRes, productsRes] = await Promise.all([
-                    apiClient.get(`/users?storeId=${storeId}&role=Vendedor Ambulante`),
-                    apiClient.get(`/products?storeId=${storeId}&usesInventory=true`),
+                    apiClient.get('/users', { params: { storeId, role: 'Vendedor Ambulante' } }),
+                    apiClient.get('/products', { params: { storeId, usesInventory: true } }),
                 ]);
                 setVendors((vendorsRes.data || []).map((v: any) => ({ uid: v.id || v.uid, name: v.name })));
                 setProducts(productsRes.data || []);

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
 import { Upload, FileDown, Loader2 } from 'lucide-react';
 
 import apiClient from '@/services/api-client';
@@ -55,6 +54,45 @@ const HEADER_MAPPING: Record<string, string> = {
 
 const SPANISH_HEADERS = Object.keys(HEADER_MAPPING);
 
+const TEMPLATE_ROWS = [
+  {
+    'Código de Barras': '7501001155925',
+    'Descripción': 'Coca-Cola 600ml',
+    'Precio de Costo': 10.5,
+    'Precio de Venta': 15,
+    'Precio Mayorista': 14,
+    'Precio 1': 15,
+    'Precio 2': 14.5,
+    'Precio 3': 14,
+    'Precio 4': 13.5,
+    'Precio 5': 13,
+    'Departamento': 'Bebidas',
+    'Subdepartamento': 'Gaseosas',
+    'Proveedor': 'Coca-Cola Company',
+    'Usa Inventario': 'SI',
+    'Stock Actual': 100,
+    'Stock Mínimo': 10,
+  },
+  {
+    'Código de Barras': '',
+    'Descripción': 'Sabritas Originales 45g',
+    'Precio de Costo': 8,
+    'Precio de Venta': 12,
+    'Precio Mayorista': 11.5,
+    'Precio 1': 12,
+    'Precio 2': 11.75,
+    'Precio 3': 11.5,
+    'Precio 4': 11,
+    'Precio 5': 10.5,
+    'Departamento': 'Snacks',
+    'Subdepartamento': '',
+    'Proveedor': 'PepsiCo',
+    'Usa Inventario': 'SI',
+    'Stock Actual': 50,
+    'Stock Mínimo': 5,
+  },
+];
+
 interface ProductDataRow {
   barcode?: string;
   brand?: string;
@@ -96,87 +134,38 @@ export function ImportProductsDialog({ storeId }: ImportProductsDialogProps) {
 
       const reader = new FileReader();
 
-      if (file.name.endsWith('.csv')) {
-        reader.onload = (e) => {
-          const text = e.target?.result as string;
-          Papa.parse(text, {
-            header: true,
-            skipEmptyLines: true,
-            transformHeader: (header) => HEADER_MAPPING[header.trim()] || header.trim(),
-            complete: (results) => setParsedData(results.data as ProductDataRow[]),
-            error: (error: any) => toast({ variant: 'destructive', title: 'Error al leer CSV', description: error.message }),
-          });
-        };
-        reader.readAsText(file);
-      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-        reader.onload = (e) => {
-          const data = e.target?.result;
-          const workbook = XLSX.read(data, { type: 'binary' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const json = XLSX.utils.sheet_to_json(worksheet);
-
-          const mappedJson = json.map((row: any) => {
-            const newRow: any = {};
-            for (const key in row) {
-              const mappedKey = HEADER_MAPPING[key.trim()] || key.trim();
-              newRow[mappedKey] = row[key];
-            }
-            return newRow;
-          });
-          setParsedData(mappedJson as ProductDataRow[]);
-        };
-        reader.readAsBinaryString(file);
-      } else {
-        toast({ variant: 'destructive', title: 'Formato no soportado', description: 'Por favor, sube un archivo CSV o Excel.' });
+      if (!file.name.endsWith('.csv')) {
+        toast({ variant: 'destructive', title: 'Formato no soportado', description: 'Por seguridad, la importación masiva acepta solo archivos CSV.' });
+        return;
       }
+
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        Papa.parse(text, {
+          header: true,
+          skipEmptyLines: true,
+          transformHeader: (header) => HEADER_MAPPING[header.trim()] || header.trim(),
+          complete: (results) => setParsedData(results.data as ProductDataRow[]),
+          error: (error: any) => toast({ variant: 'destructive', title: 'Error al leer CSV', description: error.message }),
+        });
+      };
+      reader.readAsText(file);
     }
   };
 
-  const handleDownloadExcelTemplate = () => {
-    const data = [
-      {
-        'Código de Barras': '7501001155925',
-        'Descripción': 'Coca-Cola 600ml',
-        'Precio de Costo': 10.50,
-        'Precio de Venta': 15.00,
-        'Precio Mayorista': 14.00,
-        'Precio 1': 15.00,
-        'Precio 2': 14.50,
-        'Precio 3': 14.00,
-        'Precio 4': 13.50,
-        'Precio 5': 13.00,
-        'Departamento': 'Bebidas',
-        'Subdepartamento': 'Gaseosas',
-        'Proveedor': 'Coca-Cola Company',
-        'Usa Inventario': 'SI',
-        'Stock Actual': 100,
-        'Stock Mínimo': 10
-      },
-      {
-        'Código de Barras': '',
-        'Descripción': 'Sabritas Originales 45g',
-        'Precio de Costo': 8.00,
-        'Precio de Venta': 12.00,
-        'Precio Mayorista': 11.50,
-        'Precio 1': 12.00,
-        'Precio 2': 11.75,
-        'Precio 3': 11.50,
-        'Precio 4': 11.00,
-        'Precio 5': 10.50,
-        'Departamento': 'Snacks',
-        'Subdepartamento': '',
-        'Proveedor': 'PepsiCo',
-        'Usa Inventario': 'SI',
-        'Stock Actual': 50,
-        'Stock Mínimo': 5
-      }
-    ];
-
-    const worksheet = XLSX.utils.json_to_sheet(data, { header: SPANISH_HEADERS });
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Plantilla');
-    XLSX.writeFile(workbook, 'plantilla_productos.xlsx');
+  const handleDownloadCsvTemplate = () => {
+    const csv = Papa.unparse(TEMPLATE_ROWS, {
+      columns: SPANISH_HEADERS,
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'plantilla_productos.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleImport = async () => {
@@ -255,32 +244,26 @@ export function ImportProductsDialog({ storeId }: ImportProductsDialogProps) {
         <DialogHeader>
           <DialogTitle>Importación Masiva de Productos</DialogTitle>
           <DialogDescription>
-            Sigue estos pasos para agregar múltiples productos a tu inventario desde un archivo CSV o Excel.
+            Sigue estos pasos para agregar múltiples productos a tu inventario desde un archivo CSV.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-6 py-4">
           <div className="space-y-2">
             <h3 className="font-semibold">Paso 1: Descarga la plantilla</h3>
             <p className="text-sm text-muted-foreground">
-              Descarga la plantilla, ábrela en un programa de hojas de cálculo (como Excel o Google Sheets) y llénala con tus productos.
+              Descarga la plantilla CSV, ábrela en Excel, LibreOffice o Google Sheets y llénala con tus productos.
             </p>
             <div className="flex flex-wrap gap-4 mt-2">
-              <a href="/plantilla_productos.csv?v=3" download>
-                <Button variant="outline">
-                  <FileDown className="mr-2 h-4 w-4" />
-                  Descargar Plantilla CSV
-                </Button>
-              </a>
-              <Button variant="outline" onClick={handleDownloadExcelTemplate}>
+              <Button variant="outline" onClick={handleDownloadCsvTemplate}>
                 <FileDown className="mr-2 h-4 w-4" />
-                Descargar Plantilla Excel
+                Descargar Plantilla CSV
               </Button>
             </div>
           </div>
           <div className="space-y-2">
             <h3 className="font-semibold">Paso 2: Sube tu archivo</h3>
             <p className="text-sm text-muted-foreground">
-              Una vez que hayas llenado la plantilla, guárdala como CSV o Excel y súbela aquí.
+              Una vez que hayas llenado la plantilla, guárdala como CSV y súbela aquí.
             </p>
             <div className="flex items-center justify-center w-full">
               <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-muted/50">
@@ -291,11 +274,11 @@ export function ImportProductsDialog({ storeId }: ImportProductsDialogProps) {
                   ) : (
                     <>
                       <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Haz clic para subir</span> o arrastra y suelta</p>
-                      <p className="text-xs text-muted-foreground">Archivo CSV, XLS, XLSX (máx. 5MB)</p>
+                      <p className="text-xs text-muted-foreground">Archivo CSV (máx. 5MB)</p>
                     </>
                   )}
                 </div>
-                <input id="dropzone-file" type="file" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" className="hidden" onChange={handleFileChange} />
+                <input id="dropzone-file" type="file" accept=".csv,text/csv" className="hidden" onChange={handleFileChange} />
               </label>
             </div>
           </div>

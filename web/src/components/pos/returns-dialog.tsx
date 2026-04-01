@@ -20,6 +20,7 @@ import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
 import apiClient from '@/services/api-client';
 import { toast, alert } from '@/lib/swalert';
+import { cn } from '@/lib/utils';
 
 interface SaleItem {
     id: string;

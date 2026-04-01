@@ -48,6 +48,7 @@ import { Separator } from '@/components/ui/separator';
 import apiClient from '@/services/api-client';
 import { ReturnsDialog } from '@/components/pos/returns-dialog';
 import { AddClientDialog } from '@/components/pos/add-client-dialog';
+import { ClientSelectionDialog } from '@/components/pos/client-selection-dialog';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/auth-context';
 import { toast } from '@/lib/swalert';
@@ -414,19 +415,26 @@ export default function BillingPage() {
             }}
           />
           <ProductSearch onProductSelect={handleProductSelect} />
-          <Card>
-            <CardHeader>
-              <CardTitle>Cliente</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-4">
-                <Input placeholder="Buscar cliente..." />
-                <AddClientDialog onClientAdded={setSelectedClient} />
-              </div>
-              <div className="mt-4 p-4 border rounded-lg bg-muted/30 flex items-center gap-4">
-                <User className="h-8 w-8 text-muted-foreground" />
-                <div>
-                  <p className="font-semibold">{selectedClient.name}</p>
+            <Card>
+              <CardHeader>
+                <CardTitle>Cliente</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <ClientSelectionDialog
+                    currentClient={selectedClient}
+                    onSelectClient={setSelectedClient}
+                    trigger={<Button variant="outline" className="flex-1 justify-between">Buscar o seleccionar cliente</Button>}
+                  />
+                  <AddClientDialog
+                    onClientAdded={setSelectedClient}
+                    trigger={<Button variant="outline">Nuevo cliente</Button>}
+                  />
+                </div>
+                <div className="mt-4 p-4 border rounded-lg bg-muted/30 flex items-center gap-4">
+                  <User className="h-8 w-8 text-muted-foreground" />
+                  <div>
+                    <p className="font-semibold">{selectedClient.name}</p>
                   <p className="text-sm text-muted-foreground">{selectedClient.phone || 'Sin teléfono'}</p>
                 </div>
               </div>

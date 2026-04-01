@@ -8,6 +8,7 @@ import { Plus, Search, Phone, MapPin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import apiClient from '@/services/api-client';
+import { AddClientDialog, type Client as NewClient } from '@/components/pos/add-client-dialog';
 
 interface Client { id: string; name: string; phone?: string; address: string; vendorId?: string; zoneId?: string; isCreditClient?: boolean; }
 
@@ -20,35 +21,50 @@ export default function VendorClientsPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
 
+    const fetchData = async () => {
+        if (!storeId) return;
+        try {
+            const [vendorsRes, zonesRes, clientsRes] = await Promise.all([
+                apiClient.get('/users', { params: { storeId, role: 'Vendedor Ambulante' } }),
+                apiClient.get('/store-zones', { params: { storeId } }),
+                apiClient.get('/clients', { params: { storeId } }),
+            ]);
+            const vendorMap: Record<string, string> = {};
+            (vendorsRes.data || []).forEach((v: any) => { vendorMap[v.id || v.uid] = v.name; });
+            setVendors(vendorMap);
+            const zoneMap: Record<string, string> = {};
+            (zonesRes.data || []).forEach((z: any) => { zoneMap[z.id] = z.name; });
+            setZones(zoneMap);
+            setClients(clientsRes.data || []);
+        } catch { 
+            // silent
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (!storeId) return;
-        const fetchData = async () => {
-            try {
-                const [vendorsRes, zonesRes, clientsRes] = await Promise.all([
-                    apiClient.get(`/users?storeId=${storeId}&role=vendor`),
-                    apiClient.get(`/store-zones?storeId=${storeId}`),
-                    apiClient.get(`/clients?storeId=${storeId}`),
-                ]);
-                const vendorMap: Record<string, string> = {};
-                (vendorsRes.data || []).forEach((v: any) => { vendorMap[v.id || v.uid] = v.name; });
-                setVendors(vendorMap);
-                const zoneMap: Record<string, string> = {};
-                (zonesRes.data || []).forEach((z: any) => { zoneMap[z.id] = z.name; });
-                setZones(zoneMap);
-                setClients(clientsRes.data || []);
-            } catch { }
-            finally { setLoading(false); }
-        };
         fetchData();
     }, [storeId]);
 
     const filteredClients = clients.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.address.toLowerCase().includes(searchTerm.toLowerCase()));
 
+    const handleClientAdded = (client: NewClient) => {
+        setClients((prev) => [...prev, client].sort((a, b) => a.name.localeCompare(b.name)));
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div><h1 className="text-3xl font-bold tracking-tight">Gestión de Clientes</h1><p className="text-muted-foreground">Listado de clientes vinculados.</p></div>
-                <Button onClick={() => navigate(`/store/${storeId}/vendors/add-client`)}><Plus className="mr-2 h-4 w-4" />Agregar Cliente</Button>
+                <div className="flex items-center gap-2">
+                    <AddClientDialog onClientAdded={handleClientAdded} />
+                    <Button onClick={() => navigate(`/store/${storeId}/vendors/quick-sale`)}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Venta rápida
+                    </Button>
+                </div>
             </div>
             <Card>
                 <CardHeader>

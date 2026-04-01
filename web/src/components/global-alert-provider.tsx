@@ -3,24 +3,34 @@ import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useEffect, useRef } from 'react';
+import { normalizeUserRole } from '@/lib/user-role';
+import { withAppBase } from '@/lib/runtime-config';
 
 export function GlobalAlertProvider() {
     const { toast } = useToast();
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const previousAlertIds = useRef<Set<string>>(new Set());
     const { user } = useAuth();
+    const role = normalizeUserRole(user?.role);
+    const storeId = user?.storeIds?.[0];
+    const canManageAuthorizations = role === 'store-admin' || role === 'master-admin' || role === 'owner';
 
     useEffect(() => {
-        audioRef.current = new Audio('/sounds/ping.mp3');
+        audioRef.current = new Audio(withAppBase('/sounds/ping.mp3'));
         audioRef.current.load();
     }, []);
 
     useEffect(() => {
-        if (!user) return;
+        if (!user || !canManageAuthorizations) return;
 
         const fetchAlerts = async () => {
             try {
-                const res = await apiClient.get('/authorizations', { params: { status: 'pending' } });
+                const res = await apiClient.get('/authorizations', {
+                    params: {
+                        ...(storeId ? { storeId } : {}),
+                        status: 'PENDING',
+                    },
+                });
                 const alerts = res.data || [];
 
                 for (const alert of alerts) {
@@ -70,7 +80,7 @@ export function GlobalAlertProvider() {
             previousAlertIds.current.clear();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user]);
+    }, [canManageAuthorizations, storeId, user]);
 
     const handleAction = async (id: string, status: string) => {
         try {

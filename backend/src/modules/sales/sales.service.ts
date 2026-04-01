@@ -33,7 +33,7 @@ export class SalesService {
     return await this.db.withTransaction(async (client) => {
       // 1. Validar caja abierta
       const shiftRes = await client.query(
-        'SELECT status, actual_cash FROM cash_shifts WHERE id = $1 AND store_id = $2 FOR UPDATE',
+        'SELECT status, actual_cash, starting_cash FROM cash_shifts WHERE id = $1 AND store_id = $2 FOR UPDATE',
         [cashShiftId, dto.storeId]
       );
       if (shiftRes.rowCount === 0 || shiftRes.rows[0].status !== 'OPEN') {
@@ -70,32 +70,54 @@ export class SalesService {
 
         // B. Extraer stock actual y restar (con bloqueo concurrente preventivo)
         const prodRes = await client.query(
-          'SELECT current_stock, uses_inventory FROM products WHERE id = $1 FOR UPDATE',
+          'SELECT current_stock, uses_inventory, units_per_bulk FROM products WHERE id = $1 FOR UPDATE',
           [productId]
         );
         if (prodRes.rowCount === 0) continue; // producto puede no tener inventario
         
         if (!prodRes.rows[0].uses_inventory) continue;
         
-        const oldStock = prodRes.rows[0].current_stock;
+        const oldStock = this.toInt(prodRes.rows[0].current_stock);
         const newStock = oldStock - item.quantity;
+        if (newStock < 0) {
+          throw new BadRequestException('Stock insuficiente para completar la venta');
+        }
+        const unitsPerBulk = this.toUnitsPerBulk(prodRes.rows[0].units_per_bulk);
+        const stockSplit = this.toSplit(newStock, unitsPerBulk);
+        const soldSplit = this.toSplit(item.quantity, unitsPerBulk);
 
         await client.query(
-          'UPDATE products SET current_stock = $1 WHERE id = $2',
-          [newStock, productId]
+          'UPDATE products SET current_stock = $1, stock_bulks = $2, stock_units = $3, updated_at = NOW() WHERE id = $4',
+          [newStock, stockSplit.bulks, stockSplit.units, productId]
         );
 
         // C. Asentar en Kárdex
         await client.query(
-          `INSERT INTO movements (store_id, product_id, user_id, type, quantity, balance, reference) 
-           VALUES ($1, $2, $3, 'OUT', $4, $5, $6)`,
-          [dto.storeId, productId, dto.cashierId, item.quantity, newStock, `Venta Ticket: ${ticketNumber}`]
+          `INSERT INTO movements (store_id, product_id, user_id, type, quantity, quantity_bulks, quantity_units, balance, balance_bulks, balance_units, reference) 
+           VALUES ($1, $2, $3, 'OUT', $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            dto.storeId,
+            productId,
+            dto.cashierId,
+            item.quantity,
+            soldSplit.bulks,
+            soldSplit.units,
+            newStock,
+            stockSplit.bulks,
+            stockSplit.units,
+            `Venta Ticket: ${ticketNumber}`,
+          ]
         );
       }
 
       // 5. Acumular a Caja (Si es Efectivo)
       if (dto.paymentMethod === 'CASH' || dto.paymentMethod === 'Efectivo') {
-        const newCash = parseFloat(shiftRes.rows[0].actual_cash) + total;
+        const actualCash = parseFloat(shiftRes.rows[0].actual_cash);
+        const startingCash = parseFloat(shiftRes.rows[0].starting_cash);
+        const currentCash = Number.isFinite(actualCash)
+          ? actualCash
+          : (Number.isFinite(startingCash) ? startingCash : 0);
+        const newCash = currentCash + total;
         await client.query(
           'UPDATE cash_shifts SET actual_cash = $1 WHERE id = $2',
           [newCash, cashShiftId]
@@ -148,8 +170,16 @@ export class SalesService {
     return res.rows.map(this.mapSaleRow);
   }
 
-  async findOne(id: string) {
-    const saleRes = await this.db.query('SELECT * FROM sales WHERE id = $1', [id]);
+  async findOne(id: string, storeId?: string) {
+    const params: any[] = [id];
+    let sql = 'SELECT * FROM sales WHERE (id::text = $1 OR ticket_number = $1)';
+    if (storeId) {
+      sql += ' AND store_id = $2';
+      params.push(storeId);
+    }
+    sql += ' ORDER BY created_at DESC LIMIT 1';
+
+    const saleRes = await this.db.query(sql, params);
     if (saleRes.rowCount === 0) throw new NotFoundException('Venta no encontrada');
 
     const itemsRes = await this.db.query(
@@ -157,18 +187,21 @@ export class SalesService {
        FROM sale_items si 
        LEFT JOIN products p ON si.product_id = p.id 
        WHERE si.sale_id = $1`,
-      [id]
+      [saleRes.rows[0].id]
     );
 
     const sale = this.mapSaleRow(saleRes.rows[0]);
     sale.items = itemsRes.rows.map(r => ({
-      id: r.id,
+      id: r.product_id,
+      saleItemId: r.id,
       productId: r.product_id,
       description: r.description,
       barcode: r.barcode,
       quantity: parseInt(r.quantity),
       unitPrice: parseFloat(r.unit_price),
+      salePrice: parseFloat(r.unit_price),
       subtotal: parseFloat(r.subtotal),
+      returnedQty: 0,
     }));
 
     return sale;
@@ -186,28 +219,48 @@ export class SalesService {
       for (const item of dto.items) {
         // Get original sale item price
         const siRes = await client.query(
-          'SELECT unit_price FROM sale_items WHERE sale_id = $1 AND product_id = $2',
+          'SELECT product_id, unit_price FROM sale_items WHERE sale_id = $1 AND (product_id = $2 OR id = $2)',
           [saleId, item.productId]
         );
+        const resolvedProductId = siRes.rows[0]?.product_id || item.productId;
         const unitPrice = siRes.rowCount > 0 ? parseFloat(siRes.rows[0].unit_price) : 0;
         totalRefund += unitPrice * item.quantity;
 
-        // Restore stock
-        await client.query(
-          'UPDATE products SET current_stock = current_stock + $1 WHERE id = $2',
-          [item.quantity, item.productId]
+        const prodLockRes = await client.query(
+          'SELECT current_stock, units_per_bulk FROM products WHERE id = $1 FOR UPDATE',
+          [resolvedProductId],
         );
+        if (prodLockRes.rowCount === 0) {
+          throw new NotFoundException('Producto no encontrado');
+        }
 
-        // Get new balance for movement log
-        const prodRes = await client.query('SELECT current_stock FROM products WHERE id = $1', [item.productId]);
-        const newBalance = prodRes.rows[0]?.current_stock || 0;
+        const currentStock = this.toInt(prodLockRes.rows[0].current_stock);
+        const unitsPerBulk = this.toUnitsPerBulk(prodLockRes.rows[0].units_per_bulk);
+        const newBalance = currentStock + item.quantity;
+        const stockSplit = this.toSplit(newBalance, unitsPerBulk);
+        const returnedSplit = this.toSplit(item.quantity, unitsPerBulk);
+
+        await client.query(
+          'UPDATE products SET current_stock = $1, stock_bulks = $2, stock_units = $3, updated_at = NOW() WHERE id = $4',
+          [newBalance, stockSplit.bulks, stockSplit.units, resolvedProductId],
+        );
 
         // Log inventory movement
         await client.query(
-          `INSERT INTO movements (store_id, product_id, user_id, type, quantity, balance, reference)
-           VALUES ($1, $2, $3, 'IN', $4, $5, $6)`,
-          [sale.store_id, item.productId, sale.cashier_id, item.quantity, newBalance,
-           `Devolución Venta: ${sale.ticket_number}. ${dto.reason || ''}`]
+          `INSERT INTO movements (store_id, product_id, user_id, type, quantity, quantity_bulks, quantity_units, balance, balance_bulks, balance_units, reference)
+           VALUES ($1, $2, $3, 'IN', $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            sale.store_id,
+            resolvedProductId,
+            sale.cashier_id,
+            item.quantity,
+            returnedSplit.bulks,
+            returnedSplit.units,
+            newBalance,
+            stockSplit.bulks,
+            stockSplit.units,
+            `Devolución Venta: ${sale.ticket_number}. ${dto.reason || ''}`,
+          ]
         );
       }
 
@@ -287,6 +340,25 @@ export class SalesService {
       notes: '',
       createdAt: row.created_at,
       items: [],
+    };
+  }
+
+  private toInt(value: any): number {
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private toUnitsPerBulk(value: any): number {
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  }
+
+  private toSplit(totalUnits: number, unitsPerBulk: number): { bulks: number; units: number } {
+    const safeTotal = Math.max(0, this.toInt(totalUnits));
+    const safeUnitsPerBulk = this.toUnitsPerBulk(unitsPerBulk);
+    return {
+      bulks: Math.floor(safeTotal / safeUnitsPerBulk),
+      units: safeTotal % safeUnitsPerBulk,
     };
   }
 }
