@@ -9,6 +9,17 @@ El proyecto sigue una estructura de monorepo lógico dividido en 3 pilares princ
 - `/backend`: API REST, Lógica de Negocio y WebSockets (NestJS + TypeORM + PostgreSQL).
 - `/web`: Aplicación de Punto de Venta PWA SPA (Vite + React + Tailwind + Radix UI).
 - `/flutter`: [Futuro] Aplicación móvil conectada a esta API (Clean Architecture).
+- `/docs`: Documentación consolidada para humanos y para IA local.
+- `/plan`: Bitácora histórica de análisis, decisiones y avances.
+
+## Punto de entrada recomendado
+
+Si vas a retomar el proyecto o darselo a una IA local:
+
+1. leer [docs/00_INDEX.md](./docs/00_INDEX.md)
+2. leer [docs/01_GEMINI_HANDOFF.md](./docs/01_GEMINI_HANDOFF.md)
+3. leer [docs/06_BASE_DE_DATOS_ESTADO_ACTUAL.md](./docs/06_BASE_DE_DATOS_ESTADO_ACTUAL.md)
+4. usar `plan/2026-04-01/` como historial detallado del corte actual
 
 ## Decisiones Técnicas
 
