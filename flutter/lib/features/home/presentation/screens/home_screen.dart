@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/app_config.dart';
+import '../../../../core/database/local_cache_repository.dart';
+import '../../../../core/realtime/realtime_controller.dart';
+import '../../../../core/realtime/realtime_event.dart';
+import '../../../../core/realtime/websocket_service.dart';
 import '../../../../core/utils/role_utils.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../data/home_repository.dart';
@@ -31,10 +35,20 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   String? _selectedStoreId;
+  bool _realtimeBootstrapped = false;
+
+  @override
+  void dispose() {
+    ref.read(realtimeControllerProvider.notifier).disconnect();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
+    final realtimeState = ref.watch(realtimeControllerProvider);
+    final pendingSyncCountAsync = ref.watch(pendingSyncCountProvider);
+    final latestRealtimeEventAsync = ref.watch(latestRealtimeEventProvider);
     final storesAsync = ref.watch(assignedStoresProvider);
     final session = authState.session;
 
@@ -43,6 +57,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     final role = normalizeRole(session.user.role);
+
+    if (!_realtimeBootstrapped) {
+      _realtimeBootstrapped = true;
+      Future<void>.microtask(
+        () => ref
+            .read(realtimeControllerProvider.notifier)
+            .connect(
+              session,
+              storeId: _selectedStoreId ?? session.user.primaryStoreId,
+            ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -90,6 +116,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         setState(() {
                           _selectedStoreId = storeId;
                         });
+                        ref
+                            .read(realtimeControllerProvider.notifier)
+                            .connect(session, storeId: storeId);
                       },
                     ),
                     const SizedBox(height: 18),
@@ -110,6 +139,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               socketBaseUrl:
                   '${AppConfig.socketBaseUrl}${AppConfig.socketPath}',
               namespace: AppConfig.socketNamespace,
+              realtimeState: realtimeState,
+              pendingSyncCount: pendingSyncCountAsync.asData?.value ?? 0,
+              latestCachedEvent: latestRealtimeEventAsync.asData?.value,
             ),
           ],
         ),
@@ -475,11 +507,17 @@ class _BackendRuntimeCard extends StatelessWidget {
     required this.apiBaseUrl,
     required this.socketBaseUrl,
     required this.namespace,
+    required this.realtimeState,
+    required this.pendingSyncCount,
+    required this.latestCachedEvent,
   });
 
   final String apiBaseUrl;
   final String socketBaseUrl;
   final String namespace;
+  final RealtimeState realtimeState;
+  final int pendingSyncCount;
+  final RealtimeEvent? latestCachedEvent;
 
   @override
   Widget build(BuildContext context) {
@@ -508,9 +546,46 @@ class _BackendRuntimeCard extends StatelessWidget {
           _RuntimeLine(label: 'Socket', value: socketBaseUrl),
           const SizedBox(height: 8),
           _RuntimeLine(label: 'Namespace', value: namespace),
+          const SizedBox(height: 8),
+          _RuntimeLine(
+            label: 'Realtime',
+            value: _statusLabel(realtimeState.status),
+          ),
+          const SizedBox(height: 8),
+          _RuntimeLine(
+            label: 'Cola offline',
+            value: '$pendingSyncCount pendientes',
+          ),
+          if (realtimeState.lastEvent != null) ...[
+            const SizedBox(height: 8),
+            _RuntimeLine(
+              label: 'Último evento',
+              value: realtimeState.lastEvent!.label,
+            ),
+          ],
+          if (latestCachedEvent != null) ...[
+            const SizedBox(height: 8),
+            _RuntimeLine(
+              label: 'Último evento cache',
+              value: latestCachedEvent!.label,
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  String _statusLabel(RealtimeConnectionStatus status) {
+    switch (status) {
+      case RealtimeConnectionStatus.disconnected:
+        return 'Desconectado';
+      case RealtimeConnectionStatus.connecting:
+        return 'Conectando';
+      case RealtimeConnectionStatus.connected:
+        return 'Conectado';
+      case RealtimeConnectionStatus.error:
+        return 'Error';
+    }
   }
 }
 

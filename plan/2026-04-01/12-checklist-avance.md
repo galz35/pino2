@@ -8,7 +8,7 @@
 - Base de datos + backend: **100%**
 - React web: **100%**
 - Despliegue `/dev` + `/api-dev`: **92%**
-- Flutter: **18%** (`corte inicial reactivado`)
+- Flutter: **34%** (`auth + shell + drift base + cache offline + realtime base`)
 
 ## Hecho
 
@@ -177,6 +177,12 @@
 - [x] Sesion persistida en Flutter con `flutter_secure_storage`
 - [x] Router Flutter base con `go_router`
 - [x] `SplashScreen`, `LoginScreen` y `HomeScreen` iniciales implementadas
+- [x] Base local Flutter con `drift` implementada
+- [x] Cache offline de tiendas asignadas implementada
+- [x] Bitácora local de eventos realtime implementada
+- [x] Cola offline base implementada
+- [x] `HomeScreen` conectada a cache local y estado realtime
+- [x] `build_runner` / generación Drift OK
 - [x] `flutter analyze` OK
 - [x] `flutter test` OK
 
@@ -188,9 +194,9 @@
 - [ ] Empujar el corte final a git
 - [ ] Ajustar uso operativo de `consultasql` solo cuando se quiera perf profiling
 - [ ] Implementar modulo de bodega dedicado si entra en alcance
-- [ ] Implementar persistencia local con `drift`
-- [ ] Implementar sync offline
-- [ ] Implementar realtime por `socket_io_client`
+- [ ] Implementar procesador real de sync offline
+- [ ] Implementar reconciliación online/offline por conectividad
+- [ ] Conectar realtime a features de negocio reales
 - [ ] Implementar features móviles de negocio
 
 ## Siguiente bloque recomendado

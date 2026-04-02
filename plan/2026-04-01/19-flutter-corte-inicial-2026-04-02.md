@@ -23,6 +23,11 @@ Salir de cero y dejar una base móvil real conectada al backend actual de `pino`
 - `HomeScreen`
 - lectura de tiendas asignadas del usuario
 - normalización de rol para UI móvil
+- base local con `drift`
+- cache offline de tiendas asignadas
+- bitácora local de eventos realtime
+- cola offline base para acciones futuras
+- integración inicial entre `home`, `realtime` y persistencia local
 
 ## 3. Validación técnica
 
@@ -30,6 +35,7 @@ Validado en este corte:
 
 - `flutter analyze` -> OK
 - `flutter test` -> OK
+- `build_runner` / generación Drift -> OK
 
 ## 4. Hallazgo importante del repo
 
@@ -43,9 +49,9 @@ Se convirtió `flutter/` en carpeta normal del repo principal para poder version
 
 ## 5. Lo que falta ahora
 
-- `drift`
-- cola offline
-- realtime por `socket_io_client`
+- procesador real de cola offline
+- sincronización online/offline por conectividad
+- listeners realtime conectados a features de negocio
 - catálogo móvil
 - preventa
 - ruta
@@ -59,3 +65,11 @@ Flutter ya no está en cero.
 Tampoco está listo para producción móvil todavía.
 
 Este corte deja una base sólida para seguir trabajando sin volver a empezar desde el template.
+
+Ahora Flutter ya tiene:
+
+- sesión real
+- shell navegable
+- cache local útil
+- realtime base
+- estructura lista para entrar a features

@@ -24,9 +24,8 @@ Lo que si existe hoy:
 
 Lo que no existe todavia:
 
-- base local `drift`
-- cola offline
-- listeners realtime
+- procesador de sync offline completo
+- features de negocio móviles
 - pantallas de negocio
 
 En otras palabras: la carpeta `flutter/` ya es una app base real, pero todavía no es la app móvil completa de `pino`.
@@ -130,7 +129,8 @@ Observacion importante:
 
 - `flutter/lib/main.dart` ya no es el template roto inicial
 - existe un primer corte funcional con auth y navegación
-- todavía faltan features reales de preventa, ruta, cobros, devoluciones y realtime
+- existe base local `drift`, cache offline y realtime base
+- todavía faltan features reales de preventa, ruta, cobros, devoluciones y procesamiento offline completo
 
 ## 6. Reparacion de versionado
 
@@ -145,9 +145,9 @@ En este corte se reemplazó ese gitlink roto por una carpeta normal versionable 
 ## 7. Orden correcto para continuar
 El orden correcto desde este corte es:
 
-1. drift local
-2. sync offline
-3. realtime
+1. procesador real de sync offline
+2. reconciliación de conectividad
+3. integrar realtime en features
 4. catálogo móvil
 5. preventa
 6. ruta y entrega
