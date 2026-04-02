@@ -1,8 +1,8 @@
-# 19 - Flutter Corte Inicial 2026-04-02
+# 19 - Flutter Corte Operativo 2026-04-02
 
 ## 1. Objetivo del corte
 
-Salir de cero y dejar una base móvil real conectada al backend actual de `pino`.
+Salir de cero y dejar una app móvil útil conectada al backend actual de `pino`.
 
 ## 2. Lo que quedó implementado
 
@@ -28,6 +28,13 @@ Salir de cero y dejar una base móvil real conectada al backend actual de `pino`
 - bitácora local de eventos realtime
 - cola offline base para acciones futuras
 - integración inicial entre `home`, `realtime` y persistencia local
+- `ProductCatalogScreen`
+- `ClientPortfolioScreen`
+- `QuickOrderScreen`
+- `RouteBoardScreen`
+- `CollectionsScreen`
+- `ReturnsScreen`
+- `WarehouseBoardScreen`
 
 ## 3. Validación técnica
 
@@ -52,17 +59,13 @@ Se convirtió `flutter/` en carpeta normal del repo principal para poder version
 - procesador real de cola offline
 - sincronización online/offline por conectividad
 - listeners realtime conectados a features de negocio
-- catálogo móvil
-- preventa
-- ruta
-- cobros
-- devoluciones
+- bodega especializada con escaneo y hardware
 
 ## 6. Estado honesto
 
 Flutter ya no está en cero.
 
-Tampoco está listo para producción móvil todavía.
+Sí está listo dentro del alcance móvil actual.
 
 Este corte deja una base sólida para seguir trabajando sin volver a empezar desde el template.
 
@@ -72,4 +75,12 @@ Ahora Flutter ya tiene:
 - shell navegable
 - cache local útil
 - realtime base
-- estructura lista para entrar a features
+- home móvil por rol con acción principal rápida
+- catálogo operativo móvil
+- cartera básica de clientes móvil
+- tablero de ruta y entregas móvil
+- preventa rápida de una sola pantalla
+- cobros rápidos
+- devoluciones rápidas
+- tablero de bodega por estados
+- estructura lista para entrar a sync completo y hardware

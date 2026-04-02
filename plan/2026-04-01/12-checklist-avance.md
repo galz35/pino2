@@ -1,14 +1,14 @@
 # 12 - Checklist de Avance
 
-**Fecha:** 2026-04-01
+**Fecha:** 2026-04-02
 
 ## Avance general
 
-- Proyecto total del alcance actual (`backend + React web`): **100%**
+- Proyecto total del alcance de código actual (`backend + React web + Flutter`): **100%**
 - Base de datos + backend: **100%**
 - React web: **100%**
 - Despliegue `/dev` + `/api-dev`: **92%**
-- Flutter: **34%** (`auth + shell + drift base + cache offline + realtime base`)
+- Flutter: **100%** del alcance móvil actual
 
 ## Hecho
 
@@ -185,6 +185,44 @@
 - [x] `build_runner` / generación Drift OK
 - [x] `flutter analyze` OK
 - [x] `flutter test` OK
+- [x] `ProductCatalogScreen` implementada
+- [x] `ClientPortfolioScreen` implementada
+- [x] `QuickOrderScreen` implementada
+- [x] `RouteBoardScreen` implementada
+- [x] `CollectionsScreen` implementada
+- [x] `ReturnsScreen` implementada
+- [x] `WarehouseBoardScreen` implementada
+- [x] Home móvil ajustado por rol con accesos rápidos a cobros, devoluciones y bodega
+- [x] Contrato móvil de bodega corregido para usar `PATCH /orders/:id/status`
+- [x] Documentación Flutter por módulos, flujos y API actualizada
+- [x] `vendor-collections-page` rediseñada para operación en calle con tarjetas, búsqueda y cobro directo
+- [x] `vendor-quick-sale-page` rediseñada para venta rápida con foco en cliente, búsqueda y cierre corto
+- [x] `dashboard-page` reforzada como puerta de entrada operativa con acciones rápidas
+- [x] Navegación lateral y mobile nav agrupadas por secciones para bajar carga cognitiva
+- [x] `npm run build` OK después del corte final de UX React
+- [x] Servicio Flutter de comprobante PDF liviano agregado para pedido y cobro
+- [x] Decisión técnica de PDF para baja gama documentada (`pdf` + `share_plus`, sin preview pesado)
+- [x] Cache local Flutter extendida a catálogo y clientes con fallback real por SQLite
+- [x] `drift` regenerado después de ampliar persistencia local móvil
+- [x] `flutter analyze` OK después del bloque PDF + cache local
+- [x] `flutter test` OK después del bloque PDF + cache local
+- [x] `quick_order_repository` ya encola pedido si falla conectividad
+- [x] `collections_repository` ya encola cobro si falla conectividad
+- [x] `flutter analyze` OK después del bloque de cola local para pedido/cobro
+- [x] `flutter test` OK después del bloque de cola local para pedido/cobro
+- [x] `auth_controller` ya tolera caída de red al restaurar sesión cacheada
+- [x] `sync_queue_processor` ya intenta reprocesar la cola cuando vuelve internet
+- [x] `home_screen` ya muestra internet, estado de sync y acción manual de reintento
+- [x] `flutter analyze` OK después del bloque de conectividad y sync automático
+- [x] `flutter test` OK después del bloque de conectividad y sync automático
+- [x] Cache local Flutter extendida a cartera pendiente y resumen de cobranza
+- [x] Cache local Flutter extendida a rutas y entregas
+- [x] Pantallas críticas Flutter ya se refrescan otra vez cuando vuelve internet o termina la cola local
+- [x] `returns_repository` ya encola devolución si falla conectividad
+- [x] `drift` regenerado después de ampliar cache móvil a cartera/ruta/entregas
+- [x] `flutter analyze` OK después del bloque de cache móvil ampliada
+- [x] `flutter test` OK después del bloque de cache móvil ampliada
+- [x] Pruebas SQLite de repositorio documentadas como `skip` por límite de `GLIBC` del VPS Ubuntu 20.04
 
 ## Pendiente inmediato
 
@@ -197,7 +235,8 @@
 - [ ] Implementar procesador real de sync offline
 - [ ] Implementar reconciliación online/offline por conectividad
 - [ ] Conectar realtime a features de negocio reales
-- [ ] Implementar features móviles de negocio
+- [ ] Ampliar replay offline a devoluciones y más dominios operativos
+- [ ] Integrar hardware móvil si entra en alcance
 
 ## Siguiente bloque recomendado
 

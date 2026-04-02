@@ -2,11 +2,12 @@
 
 ## 1. Arquitectura general
 
-La arquitectura actual es de 3 capas:
+La arquitectura actual es de 4 frentes:
 
 1. frontend web SPA
 2. backend REST + websocket
 3. base de datos PostgreSQL
+4. app móvil Flutter con SQLite local
 
 ## 2. Frontend web
 
@@ -172,11 +173,37 @@ Archivos clave:
 
 ## 9. Flutter
 
-`flutter/` existe como carpeta de destino futuro.
+`flutter/` ya es una app móvil real dentro del repo.
 
 Hoy:
 
-- no hay implementacion real
-- no debe asumirse como fuente de verdad
-- cualquier analisis de producto debe concentrarse en `backend/` y `web/`
+- sí hay implementación real
+- sí puede tomarse como fuente de verdad del alcance móvil actual
+- la app se apoya en:
+  - `go_router`
+  - `flutter_riverpod`
+  - `dio`
+  - `drift`
+  - `socket_io_client`
+- módulos activos:
+  - auth
+  - home
+  - catalog
+  - clients
+  - orders
+  - deliveries
+  - collections
+  - returns
+  - warehouse
+- persistencia local actual:
+  - `drift` con SQLite real
+  - cache de tiendas asignadas
+  - log local de eventos realtime
+  - cola offline base
 
+Lo que sigue fuera del alcance actual:
+
+- offline completo
+- integración de hardware
+- reconciliación automática por mala señal
+- operación 100% offline en todas las pantallas

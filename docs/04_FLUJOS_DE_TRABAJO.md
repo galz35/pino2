@@ -24,7 +24,19 @@ Secuencia recomendada:
 5. validar build de frontend
 6. actualizar el mapa API si cambian endpoints
 
-### 1.3 Cuando se toca base de datos
+### 1.3 Cuando se toca Flutter
+
+Secuencia recomendada:
+
+1. revisar `flutter/docs/00_INDEX.md`
+2. revisar `flutter/lib/app/router/app_router.dart`
+3. revisar feature implicada en `flutter/lib/features/`
+4. revisar si el dato depende de API en vivo o de cache local
+5. validar `flutter analyze`
+6. validar `flutter test`
+7. actualizar documentación móvil si cambia flujo, API o persistencia local
+
+### 1.4 Cuando se toca base de datos
 
 Secuencia recomendada:
 
@@ -202,3 +214,24 @@ Archivos clave:
 
 - `backend/src/database/database.service.ts`
 
+### 2.10 Flujo móvil actual
+
+Paso funcional:
+
+1. usuario inicia sesión
+2. la app restaura o guarda sesión segura
+3. carga tiendas asignadas desde API y las cachea localmente
+4. conecta realtime base por Socket.IO
+5. entra al módulo móvil según rol
+6. opera preventa, cobros, devoluciones, entregas o bodega
+
+Persistencia local real hoy:
+
+- cache de tiendas asignadas
+- log local de eventos realtime
+- cola offline base
+
+Regla importante:
+
+- hoy la app no debe describirse como offline-first completa
+- con mala señal aguanta mejor que un scaffold puro online, pero todavía no resuelve sync total de negocio

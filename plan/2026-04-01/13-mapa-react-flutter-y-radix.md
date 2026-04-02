@@ -6,7 +6,7 @@
 ## 1. Resumen corto
 
 - `React web` sí existe como aplicación real y ya tiene bastante negocio implementado.
-- `Flutter` hoy no existe en código dentro del repo; solo existe el plan funcional.
+- `Flutter` sí existe como código real y ya cubre el alcance móvil actual.
 - El frontend usa `Radix UI` porque fue montado con base `shadcn/ui`: Radix pone la lógica accesible de componentes y Tailwind define el look.
 
 ## 2. Estado real de React
@@ -107,33 +107,29 @@ React ya no está verde, pero todavía no está cerrado al `100%`. Falta:
 
 ### 3.1 Qué existe hoy
 
-En el repo actual:
+En el repo actual sí existe una app Flutter real en [flutter](/opt/apps/pino/flutter) con:
 
-- no hay `pubspec.yaml`
-- no hay archivos `.dart`
-- la carpeta [flutter](/opt/apps/pino/flutter) está vacía
+- `pubspec.yaml`
+- `lib/main.dart`
+- `lib/app`
+- `lib/core`
+- `lib/features`
+- sesión real y router
+- preventa, catálogo, clientes, ruta, cobros, devoluciones y bodega
 
 ### 3.2 Qué significa eso
 
-Flutter en este repo está hoy en estado de **planificación**, no de implementación.
+Flutter en este repo ya está en estado de **implementación operativa** dentro del alcance actual.
 
-Sí existe diseño funcional en:
+La referencia correcta ahora es:
 
-- [03-analisis-gap-flutter.md](/opt/apps/pino/plan/2026-04-01/03-analisis-gap-flutter.md)
-- [07-plan-flutter-movil.md](/opt/apps/pino/plan/2026-04-01/07-plan-flutter-movil.md)
-
-Pero no existe todavía:
-
-- arquitectura Flutter real
-- providers reales
-- repositorios reales
-- models en Dart
-- pantallas móviles implementadas
+- [00_INDEX.md](/opt/apps/pino/flutter/docs/00_INDEX.md)
+- [02_MAPA_MODULOS_Y_FLUJOS.md](/opt/apps/pino/flutter/docs/02_MAPA_MODULOS_Y_FLUJOS.md)
+- [03_MAPA_API_MOVIL.md](/opt/apps/pino/flutter/docs/03_MAPA_API_MOVIL.md)
 
 ### 3.3 Conclusión sobre Flutter
 
-Hoy Flutter no se puede “analizar a nivel de código” porque no hay código que revisar.  
-Lo que sí hay es una especificación bastante clara de lo que debería construirse después.
+Hoy Flutter sí se puede analizar a nivel de código y ya forma parte de la fuente de verdad del proyecto para el frente móvil.
 
 ## 4. Por qué usa Radix
 
@@ -205,5 +201,5 @@ Pero en este proyecto el beneficio fue mayor que el costo, porque aceleró la ba
 ## 5. Lectura final
 
 - `React` ya es un producto real y sí vale la pena seguirlo endureciendo.
-- `Flutter` todavía no arrancó como código; hoy solo existe como especificación.
+- `Flutter` ya es código real y ya tiene un alcance móvil operativo.
 - `Radix` está aquí porque esta base fue levantada como stack `shadcn/ui + Tailwind + Radix`, que es una forma rápida y bastante sólida de construir un panel rico en componentes sin inventar toda la accesibilidad desde cero.

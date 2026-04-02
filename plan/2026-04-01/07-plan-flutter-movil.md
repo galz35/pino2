@@ -2,6 +2,14 @@
 
 Fecha de corte: 2026-04-01
 
+> Nota 2026-04-02:
+> Este documento queda como plan histórico.
+> El estado vigente de Flutter ya no es “pausa”.
+> La referencia actual correcta está en:
+> - `docs/07_FLUTTER_ESTRATEGIA_Y_PAUSA.md`
+> - `flutter/docs/00_INDEX.md`
+> - `flutter/docs/04_ALCANCE_ACTUAL_100.md`
+
 ## 1. Decision actual
 
 Flutter queda en pausa por ahora.

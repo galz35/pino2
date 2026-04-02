@@ -55,22 +55,29 @@
 - ✅ Authorizations, ControlTower, Suppliers, Help
 - ✅ **Master Admin:** Dashboard, Stores, Chains, Users, Zones, SubZones, Config, Licenses, SyncMonitor
 
-### 1.3 Flutter (Corte inicial activo)
+### 1.3 Flutter (Corte operativo activo)
 
 | Aspecto | Estado |
 |---------|--------|
-| **Arquitectura** | Bootstrap real con `ProviderScope`, `go_router` y Riverpod |
-| **Estado** | Corte inicial móvil implementado dentro de `flutter/` |
+| **Arquitectura** | Flutter + Riverpod + go_router + dio + drift + Socket.IO |
+| **Estado** | App móvil operativa dentro de `flutter/` |
 | **Paquetes base** | Riverpod, go_router, dio, secure_storage, drift, socket_io_client |
-| **BD local** | Pendiente |
-| **Sync** | Pendiente |
+| **BD local** | Base local con `drift` activa |
+| **Sync** | Base realtime y cola offline inicial |
 
 **Estado real hoy:**
 - existe `flutter/pubspec.yaml` con el stack tecnico elegido
 - existe login real conectado al backend actual
 - existe sesion persistida y router base
 - existen `SplashScreen`, `LoginScreen` y `HomeScreen`
-- no existen todavia features moviles de negocio completas
+- existen features móviles de negocio del alcance actual:
+  - preventa
+  - catálogo
+  - clientes
+  - ruta y entregas
+  - cobros
+  - devoluciones
+  - bodega
 - la referencia correcta esta en `docs/07_FLUTTER_ESTRATEGIA_Y_PAUSA.md`
 
 ---
@@ -81,7 +88,7 @@
 
 | # | Brecha | Impacto |
 |---|--------|---------|
-| B1 | **Flutter solo tiene corte inicial** | Aun faltan catalogo, ruta, cobros, devoluciones y realtime movil |
+| B1 | **Flutter ya no es brecha crítica del alcance actual** | Queda fase 2 de offline/hardware, no el core móvil operativo |
 | B2 | **Inventario del rutero no tiene tabla propia en schema.sql** | `vendor_inventories` existe en servicio pero NO en schema.sql |
 | B3 | **Transferencia bodega→camión no es transaccional completa** | Falta flujo: preparar→alistar→cargar→transferir inventario |
 | B4 | **Estados del pedido no coinciden con requerimiento** | BD usa solo `PENDING`, requerimiento pide: recibido, en_preparación, cargado_camión, en_entrega |

@@ -4,10 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_config.dart';
 
 class ApiFailure implements Exception {
-  const ApiFailure(this.message, {this.statusCode});
+  const ApiFailure(
+    this.message, {
+    this.statusCode,
+    this.isConnectivityIssue = false,
+  });
 
   final String message;
   final int? statusCode;
+  final bool isConnectivityIssue;
 
   factory ApiFailure.fromDio(DioException error) {
     final statusCode = error.response?.statusCode;
@@ -42,17 +47,20 @@ class ApiFailure implements Exception {
     }
 
     if (error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.connectionError ||
         error.type == DioExceptionType.sendTimeout ||
         error.type == DioExceptionType.receiveTimeout) {
       return ApiFailure(
         'La API tardó demasiado en responder.',
         statusCode: statusCode,
+        isConnectivityIssue: true,
       );
     }
 
     return ApiFailure(
       error.message ?? 'No se pudo completar la petición.',
       statusCode: statusCode,
+      isConnectivityIssue: error.type == DioExceptionType.connectionError,
     );
   }
 
@@ -119,6 +127,25 @@ class AppApiClient {
   }) async {
     try {
       final response = await _dio.post<dynamic>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: _options(bearerToken),
+      );
+      return Map<String, dynamic>.from(response.data as Map);
+    } on DioException catch (error) {
+      throw ApiFailure.fromDio(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> patchMap(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    String? bearerToken,
+  }) async {
+    try {
+      final response = await _dio.patch<dynamic>(
         path,
         data: data,
         queryParameters: queryParameters,

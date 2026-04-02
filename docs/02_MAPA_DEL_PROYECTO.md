@@ -6,7 +6,7 @@ Directorios principales:
 
 - `backend/`: API REST, logica de negocio, websocket y acceso a PostgreSQL
 - `web/`: SPA React para POS, administracion y operacion comercial
-- `flutter/`: reservado para la futura app movil
+- `flutter/`: app móvil Flutter para operación rápida de calle y bodega
 - `plan/`: bitacora de analisis, hallazgos, decisiones y checklist de avance
 - `docs/`: referencia consolidada de arquitectura y operacion
 
@@ -124,6 +124,10 @@ Documentos mas importantes del historial:
 - `15-mapa-consumo-api-react.md`
 - `17-barrido-backend-vs-requerimiento.md`
 
+Documento consolidado para leer cumplimiento real:
+
+- `docs/12_CUMPLIMIENTO_REQUERIMIENTO_2026-04-02.md`
+
 ## 5. Mapa de despliegue logico
 
 Backend:
@@ -142,3 +146,35 @@ Base de datos:
 - contenedor: `postgres_alacaja`
 - BD: `multitienda_db`
 
+## 6. Mapa Flutter
+
+Punto de entrada:
+
+- `flutter/lib/main.dart`
+- `flutter/lib/app/app.dart`
+
+Capas clave:
+
+- `flutter/lib/app/`: shell, router y tema
+- `flutter/lib/core/`: config, red, storage, realtime y base local
+- `flutter/lib/features/`: auth, home, catalog, clients, orders, deliveries, collections, returns, warehouse y startup
+
+Documentación móvil:
+
+- `flutter/docs/00_INDEX.md`
+- `flutter/docs/02_MAPA_MODULOS_Y_FLUJOS.md`
+- `flutter/docs/03_MAPA_API_MOVIL.md`
+- `flutter/docs/04_ALCANCE_ACTUAL_100.md`
+- `flutter/docs/05_PDF_FACTURA_MOVIL_Y_DISPOSITIVOS_BAJA_GAMA.md`
+
+Persistencia local Flutter hoy:
+
+- SQLite real vía `drift`
+- cache de tiendas asignadas
+- bitácora local de eventos realtime
+- cola offline base
+
+No existe todavía:
+
+- cache completa de catálogo, clientes, pedidos, cobros y ruta
+- sync offline integral con reconciliación automática

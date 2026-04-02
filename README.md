@@ -21,6 +21,20 @@ Si vas a retomar el proyecto o darselo a una IA local:
 3. leer [docs/06_BASE_DE_DATOS_ESTADO_ACTUAL.md](./docs/06_BASE_DE_DATOS_ESTADO_ACTUAL.md)
 4. usar `plan/2026-04-01/` como historial detallado del corte actual
 
+## Actualización manual en este VPS
+
+Para actualizar backend y republicar React en este mismo servidor:
+
+1. revisar `docs/00_INDEX.md`
+2. usar `./manual_update_dev.sh`
+
+Modos útiles:
+
+- `./manual_update_dev.sh all`
+- `./manual_update_dev.sh backend`
+- `./manual_update_dev.sh web`
+- `./manual_update_dev.sh local-all`
+
 ## Decisiones Técnicas
 
 - **Base de datos:** PostgreSQL para asegurar integridad referencial y cumplir requisitos financieros de Kárdex y Caja.

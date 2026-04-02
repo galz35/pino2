@@ -182,3 +182,58 @@ Perfiles administrativos pueden:
 
 El sistema tambien puede mostrar alertas globales y campana de notificaciones.
 
+## 12. App móvil Flutter
+
+La app móvil está pensada para usuario de calle y bodega:
+
+- acciones rápidas
+- pocas pantallas
+- botones grandes
+- menos escritura manual
+
+### Vendedor / Preventa móvil
+
+Flujo típico:
+
+1. iniciar sesión
+2. elegir tienda
+3. abrir preventa
+4. seleccionar cliente
+5. buscar producto
+6. ajustar cantidades
+7. guardar pedido
+
+### Rutero móvil
+
+Flujo típico:
+
+1. iniciar sesión
+2. abrir ruta y entregas
+3. revisar pedidos/paradas
+4. cobrar si aplica
+5. registrar devolución si aplica
+
+### Bodega móvil
+
+Flujo típico:
+
+1. abrir tablero de bodega
+2. ver pedido por estado
+3. moverlo a preparación
+4. alistarlo
+5. cargarlo al camión con responsable
+
+### Nota importante sobre señal
+
+Hoy la app sí tiene base local y sesión persistida, pero todavía no se debe asumir que toda la operación funciona sin internet.
+
+Existe:
+
+- SQLite local
+- cache base
+- cola offline base
+
+Todavía falta:
+
+- sincronización completa de negocio
+- reconciliación automática por mala señal

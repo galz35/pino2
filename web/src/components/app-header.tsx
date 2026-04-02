@@ -14,12 +14,13 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import type { Notification } from './app-layout';
+import type { NavItem } from './app-layout';
 import { Link, useParams, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { NetworkStatusIndicator } from './network-status-indicator';
 
 interface AppHeaderProps {
-  navItems: { name: string; href: string; icon: React.ElementType }[];
+  navItems: NavItem[];
   language: 'es' | 'en';
   onLanguageChange: (lang: string) => void;
   exchangeRate?: number;
@@ -47,23 +48,31 @@ export function AppHeader({
 
   const location = useLocation();
 
-  const clonedNav = navItems.map((item) => {
+  const clonedNav = navItems.map((item, index) => {
     const Icon = item.icon;
     const isActive = location.pathname.startsWith(item.href) && item.href !== '/' || (location.pathname === '/' && item.href === '/');
+    const showSectionTitle =
+      index === 0 || item.section !== navItems[index - 1]?.section;
 
     return (
-      <Link
-        key={item.name}
-        to={item.href}
-        onClick={() => setIsSheetOpen(false)}
-        className={cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
-          isActive && 'bg-muted text-primary'
-        )}
-      >
-        <Icon className="h-4 w-4" />
-        {item.name}
-      </Link>
+      <div key={item.name} className={cn(showSectionTitle && index !== 0 && 'mt-4')}>
+        {showSectionTitle && item.section ? (
+          <p className="mb-2 px-3 text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground/80">
+            {item.section}
+          </p>
+        ) : null}
+        <Link
+          to={item.href}
+          onClick={() => setIsSheetOpen(false)}
+          className={cn(
+            'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
+            isActive && 'bg-muted text-primary'
+          )}
+        >
+          <Icon className="h-4 w-4" />
+          {item.name}
+        </Link>
+      </div>
     );
   });
 

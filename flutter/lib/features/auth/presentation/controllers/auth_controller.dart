@@ -72,7 +72,12 @@ class AuthController extends Notifier<AuthState> {
       await _storage.saveSession(refreshedSession);
       state = AuthState.authenticated(refreshedSession);
       return;
-    } catch (_) {
+    } catch (error) {
+      if (error is ApiFailure && error.isConnectivityIssue) {
+        state = AuthState.authenticated(cachedSession);
+        return;
+      }
+
       if (cachedSession.refreshToken.isNotEmpty) {
         try {
           final refreshedSession = await _repository.refresh(
@@ -82,6 +87,10 @@ class AuthController extends Notifier<AuthState> {
           state = AuthState.authenticated(refreshedSession);
           return;
         } catch (error) {
+          if (error is ApiFailure && error.isConnectivityIssue) {
+            state = AuthState.authenticated(cachedSession);
+            return;
+          }
           await _storage.clear();
           state = AuthState.unauthenticated(message: _mapError(error));
           return;

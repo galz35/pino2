@@ -8,14 +8,14 @@ Este documento esta escrito para que una IA local entienda rapido como esta `pin
 
 - backend NestJS + Fastify + Socket.IO + PostgreSQL
 - frontend React + Vite + Tailwind + Radix UI
-- una carpeta `flutter/` reservada para la futura app movil
+- una app Flutter móvil real dentro de `flutter/`
 
 Hoy el alcance realmente implementado es:
 
 - backend REST operativo
 - frontend React operativo
 - tiempo real por Socket.IO
-- Flutter con corte inicial de bootstrap, auth y shell
+- Flutter con módulos móviles operativos del alcance actual
 
 ## 2. Como debes leer el proyecto
 
@@ -28,8 +28,9 @@ Orden recomendado:
 5. `docs/06_BASE_DE_DATOS_ESTADO_ACTUAL.md`
 6. `docs/07_FLUTTER_ESTRATEGIA_Y_PAUSA.md`
 7. `docs/08_VALIDACION_GEMINI_WAREHOUSE.md`
-8. `plan/2026-04-01/15-mapa-consumo-api-react.md`
-9. `plan/2026-04-01/17-barrido-backend-vs-requerimiento.md`
+8. `docs/12_CUMPLIMIENTO_REQUERIMIENTO_2026-04-02.md`
+9. `plan/2026-04-01/15-mapa-consumo-api-react.md`
+10. `plan/2026-04-01/17-barrido-backend-vs-requerimiento.md`
 
 ## 3. Fuentes de verdad
 
@@ -47,6 +48,7 @@ Notas importantes:
 - la carpeta `plan/` contiene historia, hallazgos y decisiones; `docs/` contiene la referencia consolidada.
 - el frontend ya no usa `localhost` hardcodeado; usa configuracion por entorno.
 - no asumas que `plan/2026-04-01/03-analisis-gap-flutter.md` describe codigo Flutter existente; hoy es una referencia de estrategia, no de implementacion.
+- no asumas que `100% del alcance actual` equivale a `100% del requerimiento global`; para eso revisar `docs/12_CUMPLIMIENTO_REQUERIMIENTO_2026-04-02.md`
 
 ## 4. Donde empezar segun la tarea
 
@@ -65,10 +67,11 @@ Si la tarea es frontend:
 
 Si la tarea es Flutter:
 
-- entra por `docs/07_FLUTTER_ESTRATEGIA_Y_PAUSA.md`
+- entra por `flutter/docs/00_INDEX.md`
 - luego `flutter/pubspec.yaml`
 - despues `flutter/README.md`
-- no supongas que ya existen features de negocio; hoy existe base tecnica, auth y shell inicial
+- despues `flutter/docs/02_MAPA_MODULOS_Y_FLUJOS.md`
+- y `flutter/docs/03_MAPA_API_MOVIL.md`
 
 Si la tarea es base de datos:
 
@@ -78,7 +81,8 @@ Si la tarea es base de datos:
 
 ## 5. Reglas practicas para tocar el proyecto
 
-- no asumas que Flutter ya tiene preventa, ruta o cobros; hoy solo existe el corte inicial
+- no asumas offline completo ni hardware integrado; eso sigue como fase 2
+- no asumas que Flutter ya opera completo sin internet; hoy hay SQLite, cache útil de operación, cola base y refresh online-first, pero no sync offline integral
 - si cambias contratos de API, revisa `plan/2026-04-01/15-mapa-consumo-api-react.md`
 - si cambias rutas o guards de roles, revisa `web/src/App.tsx`, `web/src/lib/user-role.ts` y `web/src/lib/redirect-logic.ts`
 - si cambias flujos financieros, revisa tanto backend como `web/src/services/finance-service.ts`
@@ -121,5 +125,5 @@ Este corte deja fuerte:
 
 Pendiente deliberado:
 
-- features de negocio en Flutter
+- offline avanzado y hardware móvil
 - integraciones fisicas de hardware

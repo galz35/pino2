@@ -1,11 +1,11 @@
-# Flutter: Estrategia y Corte Inicial
+# Flutter: Estrategia y Alcance Actual
 Fecha de corte: 2026-04-02
 
 ## 1. Estado real hoy
 
 Flutter ya no está solo en investigación.
 
-Hoy existe un corte inicial operativo del proyecto móvil, pero todavía no existen las features de negocio completas.
+Hoy existe una app móvil operativa dentro del alcance actual.
 
 Lo que si existe hoy:
 
@@ -19,16 +19,26 @@ Lo que si existe hoy:
 - sesión persistida con `flutter_secure_storage`
 - router base con `go_router`
 - splash screen y home inicial por rol
+- home móvil orientado a acción rápida por rol
+- preventa rápida de una sola pantalla
+- catálogo operativo móvil
+- clientes móvil
+- ruta y entregas móvil
+- cobros móviles
+- devoluciones móviles
+- bodega móvil por estados
 - `flutter analyze` limpio
-- `flutter test` limpio en el corte inicial
+- `flutter test` limpio
 
 Lo que no existe todavia:
 
 - procesador de sync offline completo
-- features de negocio móviles
-- pantallas de negocio
+- conectividad con reconciliación automática
+- hardware específico de impresión / escaneo
+- bodega móvil especializada de escaneo/carga
+- factura fiscal móvil completa con impresión/hardware real
 
-En otras palabras: la carpeta `flutter/` ya es una app base real, pero todavía no es la app móvil completa de `pino`.
+En otras palabras: la carpeta `flutter/` ya es una app móvil útil y operativa, aunque todavía no es la versión final offline/hardware-heavy.
 
 ## 2. Stack recomendado para este proyecto
 
@@ -123,6 +133,13 @@ Archivos relevantes hoy:
 - `flutter/lib/core/`
 - `flutter/lib/features/auth/`
 - `flutter/lib/features/home/`
+- `flutter/lib/features/catalog/`
+- `flutter/lib/features/clients/`
+- `flutter/lib/features/deliveries/`
+- `flutter/lib/features/orders/`
+- `flutter/lib/features/collections/`
+- `flutter/lib/features/returns/`
+- `flutter/lib/features/warehouse/`
 - `flutter/lib/features/startup/`
 
 Observacion importante:
@@ -130,7 +147,14 @@ Observacion importante:
 - `flutter/lib/main.dart` ya no es el template roto inicial
 - existe un primer corte funcional con auth y navegación
 - existe base local `drift`, cache offline y realtime base
-- todavía faltan features reales de preventa, ruta, cobros, devoluciones y procesamiento offline completo
+- hoy la cache local ya cubre tiendas, catálogo, clientes, cartera, resumen de cobranza, rutas y entregas
+- pedido rápido, cobro y devolución ya pueden caer a cola local si falla conectividad
+- la cola ya intenta reprocesarse cuando vuelve internet
+- la sesión ya puede restaurarse con tolerancia a caída de red
+- las pantallas críticas móviles ya se refrescan otra vez cuando vuelve internet o termina la cola local
+- ya existe comprobante PDF liviano y opcional para pedido/cobro
+- ya existe el primer corte real de preventa, catálogo, clientes, ruta, cobros, devoluciones y bodega
+- todavía falta procesamiento offline completo
 
 ## 6. Reparacion de versionado
 
@@ -147,19 +171,16 @@ El orden correcto desde este corte es:
 
 1. procesador real de sync offline
 2. reconciliación de conectividad
-3. integrar realtime en features
-4. catálogo móvil
-5. preventa
-6. ruta y entrega
-7. cartera y cobros
-8. devoluciones
-9. módulo logístico móvil opcional
+3. integrar realtime más profundo en features
+4. cache offline de más dominios críticos y replay más fino
+5. bodega especializada con escaneo
+6. reconciliación y sync offline completo
 
 No conviene saltar directo a features pesadas sin cerrar primero persistencia local y sincronización.
 
 ## 8. Decision actual
 
-Flutter quedó reactivado y ya tiene corte inicial.
+Flutter quedó reactivado y ya cubre el alcance móvil actual.
 
 Fuente de verdad actual del producto:
 
@@ -167,6 +188,38 @@ Fuente de verdad actual del producto:
 - frontend React
 
 Para continuar, este documento y `plan/2026-04-01/19-flutter-corte-inicial-2026-04-02.md` son el punto de partida correcto.
+
+## 10. Regla UX ya fijada
+
+La regla operativa del móvil queda así:
+
+- el usuario de calle y bodega no debe pelear con la app
+- la app debe seguir el ritmo de trabajo del usuario
+- la acción principal debe resolverse en segundos
+- se prioriza una pantalla fuerte con acciones grandes antes que flujos largos de muchas vistas
+- la captura rápida de pedido es prioritaria sobre una navegación bonita pero lenta
+
+Por eso el corte actual quedó así:
+
+- `Preventa rápida` como acción principal para venta/gestión
+- `Ruta y entregas` como acción principal para rutero/despacho
+- `Bodega` como acción principal para inventario/almacén
+- `Cobros` y `Devoluciones` como flujos de apoyo rápidos
+- `Catálogo` y `Clientes` como apoyo inmediato, no como laberinto
+
+## 11. Decisión actual sobre PDF móvil
+
+Si entra factura o comprobante PDF en Flutter:
+
+- debe ser opcional
+- no debe bloquear la operación principal
+- no debe depender de visor embebido pesado
+- se recomienda `pdf` + `share_plus`
+- no se recomienda arrancar con `printing` como flujo principal en baja gama
+
+Referencia:
+
+- `flutter/docs/05_PDF_FACTURA_MOVIL_Y_DISPOSITIVOS_BAJA_GAMA.md`
 
 ## 9. Fuentes oficiales revisadas
 

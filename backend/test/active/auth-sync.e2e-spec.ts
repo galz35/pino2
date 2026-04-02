@@ -5,10 +5,13 @@ import {
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
 import request from 'supertest';
-import { AppModule } from './../src/app.module';
+import { AppModule } from '../../src/app.module';
+import { DatabaseService } from '../../src/database/database.service';
 
 describe('Auth & Sync Flow (e2e)', () => {
   let app: INestApplication;
+  let db: DatabaseService;
+  let createdEmail: string | null = null;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -28,9 +31,13 @@ describe('Auth & Sync Flow (e2e)', () => {
 
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
+    db = app.get<DatabaseService>(DatabaseService);
   });
 
   afterAll(async () => {
+    if (createdEmail) {
+      await db.query('DELETE FROM users WHERE email = $1', [createdEmail]);
+    }
     await app.close();
   });
 
@@ -50,6 +57,7 @@ describe('Auth & Sync Flow (e2e)', () => {
         .send(testUser)
         .expect(201)
         .then(res => {
+          createdEmail = testUser.email;
           expect(res.body.user.email).toBe(testUser.email);
         });
     });

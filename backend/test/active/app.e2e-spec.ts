@@ -1,27 +1,34 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import request from 'supertest';
-import { AppModule } from './../src/app.module';
+import { AppModule } from '../../src/app.module';
 
-describe('AppController (e2e)', () => {
+describe('App Routing Smoke (e2e)', () => {
   let app: NestFastifyApplication;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+    app.setGlobalPrefix('api');
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
   });
 
-  it('/ (GET)', () => {
+  it('rejects root path when API prefix is enabled', () => {
     return request(app.getHttpServer())
       .get('/')
-      .expect(200)
-      .expect('Hola Mundo! (Los Pinos API - Fastify Edition)');
+      .expect(404);
+  });
+
+  it('protects private routes with JWT', () => {
+    return request(app.getHttpServer())
+      .get('/api/users')
+      .expect(401);
   });
 
   afterAll(async () => {
