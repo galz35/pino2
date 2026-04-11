@@ -1,6 +1,6 @@
 # Documentacion Principal
 
-Fecha de corte: 2026-04-02
+Fecha de corte: 2026-04-11
 
 Estado del proyecto en este corte:
 
@@ -26,6 +26,7 @@ Orden recomendado de lectura:
 12. [11_AUDITORIA_DISENO_REACT_2026-04-02.md](./11_AUDITORIA_DISENO_REACT_2026-04-02.md)
 13. [12_CUMPLIMIENTO_REQUERIMIENTO_2026-04-02.md](./12_CUMPLIMIENTO_REQUERIMIENTO_2026-04-02.md)
 14. [13_GITHUB_VERIFICACION_Y_DESCARGA.md](./13_GITHUB_VERIFICACION_Y_DESCARGA.md)
+15. [2026-04-11_gemini_handoff_vps/00_LEEME.md](./2026-04-11_gemini_handoff_vps/00_LEEME.md)
 
 Script operativo manual de este VPS:
 
