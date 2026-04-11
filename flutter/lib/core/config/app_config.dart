@@ -6,13 +6,13 @@ class AppConfig {
   // Base URL for API REST
   static const apiBaseUrl = String.fromEnvironment(
     'PINO_API_BASE_URL',
-    defaultValue: 'http://190.56.16.85:3010/api',
+    defaultValue: 'https://www.rhclaroni.com/api-dev',
   );
 
   // Socket base URL
   static const socketBaseUrl = String.fromEnvironment(
     'PINO_SOCKET_BASE_URL',
-    defaultValue: 'http://190.56.16.85:3010',
+    defaultValue: 'https://www.rhclaroni.com/api-dev',
   );
 
   // Path for socket.io
