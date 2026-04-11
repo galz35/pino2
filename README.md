@@ -8,7 +8,7 @@ El proyecto sigue una estructura de monorepo lógico dividido en 3 pilares princ
 
 - `/backend`: API REST, Lógica de Negocio y WebSockets (NestJS + TypeORM + PostgreSQL).
 - `/web`: Aplicación de Punto de Venta PWA SPA (Vite + React + Tailwind + Radix UI).
-- `/flutter`: [Futuro] Aplicación móvil conectada a esta API (Clean Architecture).
+- `/flutter`: Aplicación móvil conectada a esta API (Flutter + Riverpod + Drift).
 - `/docs`: Documentación consolidada para humanos y para IA local.
 - `/plan`: Bitácora histórica de análisis, decisiones y avances.
 
@@ -26,14 +26,14 @@ Si vas a retomar el proyecto o darselo a una IA local:
 Para actualizar backend y republicar React en este mismo servidor:
 
 1. revisar `docs/00_INDEX.md`
-2. usar `./manual_update_dev.sh`
+2. usar `./manual_update.sh`
 
 Modos útiles:
 
-- `./manual_update_dev.sh all`
-- `./manual_update_dev.sh backend`
-- `./manual_update_dev.sh web`
-- `./manual_update_dev.sh local-all`
+- `./manual_update.sh all`
+- `./manual_update.sh backend`
+- `./manual_update.sh web`
+- `./manual_update.sh local-all`
 
 ## Decisiones Técnicas
 

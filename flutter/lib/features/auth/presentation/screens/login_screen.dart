@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/config/app_config.dart';
 import '../controllers/auth_controller.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -94,7 +93,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Conecta la app Flutter a la misma API operativa de pino. Este corte ya valida login real, sesión persistida y navegación por rol.',
+                          'Ingresa con tu usuario para empezar a trabajar rápido en calle, ruta o bodega.',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: Colors.black54,
                             height: 1.45,
@@ -197,38 +196,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 20),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Runtime actual',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              _InfoRow(
-                                label: 'API',
-                                value: AppConfig.apiBaseUrl,
-                              ),
-                              const SizedBox(height: 8),
-                              _InfoRow(
-                                label: 'Socket',
-                                value:
-                                    '${AppConfig.socketBaseUrl}${AppConfig.socketPath}',
-                              ),
-                            ],
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -238,39 +205,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 62,
-          child: Text(
-            label,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black54),
-          ),
-        ),
-      ],
     );
   }
 }

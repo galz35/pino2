@@ -53,8 +53,18 @@ deploy_backend() {
   [ -f "$entry" ] || die "No se generó $entry"
 
   if pm2 describe "$PM2_NAME" >/dev/null 2>&1; then
-    log "Reiniciando PM2 $PM2_NAME"
-    pm2 restart "$PM2_NAME" --update-env
+    local description
+    description="$(pm2 describe "$PM2_NAME" 2>/dev/null || true)"
+
+    if [[ "$description" == *"script path       │ $entry"* ]] &&
+      [[ "$description" == *"exec cwd          │ $BACKEND_DIR"* ]]; then
+      log "Reiniciando PM2 $PM2_NAME"
+      pm2 restart "$PM2_NAME" --update-env
+    else
+      log "PM2 $PM2_NAME apunta a otra carpeta. Recreando proceso con $BACKEND_DIR"
+      pm2 delete "$PM2_NAME"
+      pm2 start "$entry" --name "$PM2_NAME" --cwd "$BACKEND_DIR"
+    fi
   else
     log "Creando PM2 $PM2_NAME"
     pm2 start "$entry" --name "$PM2_NAME" --cwd "$BACKEND_DIR"

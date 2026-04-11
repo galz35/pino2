@@ -131,7 +131,7 @@ class _ReturnsScreenState extends ConsumerState<ReturnsScreen> {
         SnackBar(
           content: Text(
             queuedOffline
-                ? 'Devolución guardada en cola local para ticket ${sale.ticketNumber}.'
+                ? 'Devolución guardada temporalmente para ticket ${sale.ticketNumber}. Se enviará cuando vuelva la señal.'
                 : 'Devolución guardada para ticket ${sale.ticketNumber}.',
           ),
         ),

@@ -29,7 +29,10 @@ Orden recomendado de lectura:
 
 Script operativo manual de este VPS:
 
+- `./manual_update.sh`
+  - wrapper principal recomendado
 - `./manual_update_dev.sh`
+  - script interno conservado por compatibilidad
   - `all`: pull + backend + web + pm2 save
   - `backend`: pull + backend
   - `web`: pull + web

@@ -176,7 +176,7 @@ class _DailyClosingScreenState extends ConsumerState<DailyClosingScreen> {
         SnackBar(
           content: Text(
             queued
-                ? 'Cierre guardado en cola offline.'
+                ? 'Cierre guardado temporalmente. Se enviará cuando vuelva la señal.'
                 : 'Caja cerrada. Efectivo: C\$ ${_cashTotal.toStringAsFixed(2)}',
           ),
         ),

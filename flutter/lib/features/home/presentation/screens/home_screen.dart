@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/config/app_config.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/local_cache_repository.dart';
@@ -10,7 +9,6 @@ import '../../../../core/network/connectivity_service.dart';
 import '../../../../core/network/sync_queue_processor.dart';
 import '../../../../core/realtime/realtime_controller.dart';
 import '../../../../core/realtime/realtime_event.dart';
-import '../../../../core/realtime/websocket_service.dart';
 import '../../../../core/utils/role_utils.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../data/home_repository.dart';
@@ -205,10 +203,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             const SizedBox(height: 18),
             _BackendRuntimeCard(
-              apiBaseUrl: AppConfig.apiBaseUrl,
-              socketBaseUrl:
-                  '${AppConfig.socketBaseUrl}${AppConfig.socketPath}',
-              namespace: AppConfig.socketNamespace,
               networkStatus: networkStatusAsync.asData?.value,
               syncQueueState: syncQueueState,
               realtimeState: realtimeState,
@@ -342,7 +336,7 @@ class _QuickPulseBar extends ConsumerWidget {
             const SizedBox(width: 8),
             _PulseChip(
               icon: Icons.attach_money_rounded,
-              value: 'Q$salesTotal',
+              value: 'C\$$salesTotal',
               color: const Color(0xFF10B981),
               flex: 2,
             ),
@@ -937,9 +931,6 @@ class _ActionCard extends StatelessWidget {
 
 class _BackendRuntimeCard extends StatelessWidget {
   const _BackendRuntimeCard({
-    required this.apiBaseUrl,
-    required this.socketBaseUrl,
-    required this.namespace,
     required this.networkStatus,
     required this.syncQueueState,
     required this.realtimeState,
@@ -952,9 +943,6 @@ class _BackendRuntimeCard extends StatelessWidget {
     required this.onDiscardEntry,
   });
 
-  final String apiBaseUrl;
-  final String socketBaseUrl;
-  final String namespace;
   final NetworkStatus? networkStatus;
   final SyncQueueState syncQueueState;
   final RealtimeState realtimeState;
@@ -981,72 +969,60 @@ class _BackendRuntimeCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Estado',
+            'Estado de trabajo',
             style: theme.textTheme.titleMedium?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w800,
             ),
           ),
+          const SizedBox(height: 6),
+          Text(
+            'Si algo no se puede enviar por falta de señal, la app lo guarda y luego lo reintenta.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: Colors.white.withValues(alpha: 0.82),
+              height: 1.35,
+            ),
+          ),
           const SizedBox(height: 12),
-          _RuntimeLine(label: 'API', value: apiBaseUrl),
-          const SizedBox(height: 8),
-          _RuntimeLine(label: 'Socket', value: socketBaseUrl),
-          const SizedBox(height: 8),
-          _RuntimeLine(label: 'Namespace', value: namespace),
-          const SizedBox(height: 8),
           _RuntimeLine(
-            label: 'Internet',
+            label: 'Señal',
             value: networkStatus == null
-                ? 'Verificando'
+                ? 'Verificando...'
                 : networkStatus == NetworkStatus.online
                     ? 'Disponible'
                     : 'Sin conexión',
           ),
           const SizedBox(height: 8),
           _RuntimeLine(
-            label: 'Sync',
-            value: _syncStatusLabel(syncQueueState.status),
-          ),
-          const SizedBox(height: 8),
-          _RuntimeLine(
-            label: 'Realtime',
-            value: _statusLabel(realtimeState.status),
+            label: 'Envío',
+            value: _syncStatusLabel(syncQueueState.status, pendingSyncCount),
           ),
           const SizedBox(height: 8),
           _RuntimeLine(
             label: 'Pendientes',
-            value: '$pendingSyncCount',
+            value: pendingSyncCount == 1
+                ? '1 operación'
+                : '$pendingSyncCount operaciones',
           ),
           const SizedBox(height: 8),
           _RuntimeLine(
-            label: 'Fallidas',
-            value: '$failedSyncCount',
+            label: 'Requieren atención',
+            value: failedSyncCount == 1
+                ? '1 operación'
+                : '$failedSyncCount operaciones',
           ),
-          if (realtimeState.lastEvent != null) ...[
+          if (syncQueueState.status == SyncQueueStatus.error &&
+              failedSyncCount == 0) ...[
             const SizedBox(height: 8),
-            _RuntimeLine(
-              label: 'Último evento',
-              value: realtimeState.lastEvent!.label,
-            ),
-          ],
-          if (latestCachedEvent != null) ...[
-            const SizedBox(height: 8),
-            _RuntimeLine(
-              label: 'Último evento cache',
-              value: latestCachedEvent!.label,
-            ),
-          ],
-          if (syncQueueState.lastError != null) ...[
-            const SizedBox(height: 8),
-            _RuntimeLine(
-              label: 'Error sync',
-              value: syncQueueState.lastError!,
+            const _RuntimeLine(
+              label: 'Aviso',
+              value: 'Revisa tu señal y vuelve a intentar.',
             ),
           ],
           if (recentSyncEntries.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
-              'Operaciones recientes',
+              'Últimos movimientos guardados',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
@@ -1070,11 +1046,11 @@ class _BackendRuntimeCard extends StatelessWidget {
             children: [
               FilledButton.tonal(
                 onPressed: pendingSyncCount > 0 ? onRetrySync : null,
-                child: const Text('Sincronizar ahora'),
+                child: const Text('Enviar pendientes'),
               ),
               FilledButton.tonal(
                 onPressed: failedSyncCount > 0 ? onRetryFailed : null,
-                child: const Text('Reintentar fallidas'),
+                child: const Text('Reintentar'),
               ),
             ],
           ),
@@ -1083,29 +1059,16 @@ class _BackendRuntimeCard extends StatelessWidget {
     );
   }
 
-  String _statusLabel(RealtimeConnectionStatus status) {
-    switch (status) {
-      case RealtimeConnectionStatus.disconnected:
-        return 'Desconectado';
-      case RealtimeConnectionStatus.connecting:
-        return 'Conectando';
-      case RealtimeConnectionStatus.connected:
-        return 'Conectado';
-      case RealtimeConnectionStatus.error:
-        return 'Error';
-    }
-  }
-
-  String _syncStatusLabel(SyncQueueStatus status) {
+  String _syncStatusLabel(SyncQueueStatus status, int pendingCount) {
     switch (status) {
       case SyncQueueStatus.idle:
-        return 'En espera';
+        return pendingCount > 0 ? 'Listo para enviar' : 'Todo al día';
       case SyncQueueStatus.syncing:
-        return 'Sincronizando';
+        return 'Enviando información';
       case SyncQueueStatus.offline:
-        return 'Offline';
+        return 'Guardando temporalmente';
       case SyncQueueStatus.error:
-        return 'Con error';
+        return 'Necesita revisión';
     }
   }
 }
@@ -1126,7 +1089,7 @@ class _SyncEntryTile extends StatelessWidget {
 
     final title = entry.operationType?.trim().isNotEmpty == true
         ? entry.operationType!
-        : '${entry.method} ${entry.endpoint}';
+        : 'Operación pendiente';
 
     return Container(
       width: double.infinity,
@@ -1163,7 +1126,7 @@ class _SyncEntryTile extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '${entry.method} ${entry.endpoint}',
+            _entryStatusText(entry.status),
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.72),
               fontSize: 12,
@@ -1171,7 +1134,7 @@ class _SyncEntryTile extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Estado: ${entry.status} · Intentos: ${entry.attemptCount}',
+            'Intentos: ${entry.attemptCount}',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.72),
               fontSize: 12,
@@ -1194,6 +1157,17 @@ class _SyncEntryTile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _entryStatusText(String status) {
+    switch (status) {
+      case 'completed':
+        return 'Enviado correctamente';
+      case 'failed':
+        return 'Requiere reintento';
+      default:
+        return 'Pendiente de envío';
+    }
   }
 }
 

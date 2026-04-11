@@ -210,7 +210,7 @@ class _QuickOrderScreenState extends ConsumerState<QuickOrderScreen> {
         SnackBar(
           content: Text(
             queuedOffline
-                ? 'Pedido guardado en cola local para ${client.name}.'
+                ? 'Pedido guardado temporalmente para ${client.name}. Se enviará cuando vuelva la señal.'
                 : 'Pedido enviado para ${client.name}.',
           ),
           action: SnackBarAction(

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/config/app_config.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -63,7 +62,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   ),
                   const SizedBox(height: 22),
                   Text(
-                    AppConfig.appName,
+                    'Pino Mobile',
                     style: theme.textTheme.headlineMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
@@ -71,7 +70,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Bootstrap móvil conectado al backend real de pino.',
+                    'Preparando tu jornada...',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyLarge?.copyWith(
                       color: Colors.white.withValues(alpha: 0.82),
@@ -84,14 +83,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                     child: CircularProgressIndicator(
                       strokeWidth: 2.4,
                       color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    AppConfig.apiBaseUrl,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.72),
                     ),
                   ),
                 ],

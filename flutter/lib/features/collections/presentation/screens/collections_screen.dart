@@ -120,7 +120,7 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
         SnackBar(
           content: Text(
             queuedOffline
-                ? 'Cobro guardado en cola local para ${account.clientName}.'
+                ? 'Cobro guardado temporalmente para ${account.clientName}. Se enviará cuando vuelva la señal.'
                 : 'Cobro guardado para ${account.clientName}.',
           ),
           action: SnackBarAction(
