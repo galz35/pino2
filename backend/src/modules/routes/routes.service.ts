@@ -1,9 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class RoutesService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async findAll(storeId: string, vendorId?: string) {
     let sql = 'SELECT * FROM routes WHERE store_id = $1';
@@ -31,7 +35,27 @@ export class RoutesService {
       [dto.storeId, dto.vendorId, JSON.stringify(dto.clientIds || []),
        routeDate, dto.notes || null, dto.status || 'pending'],
     );
-    return this.mapRow(res.rows[0]);
+    const route = this.mapRow(res.rows[0]);
+
+    // NOTIFICACIÓN: Avisar al vendedor sobre la nueva ruta
+    try {
+      await this.notifications.create({
+        storeId: dto.storeId,
+        userId: dto.vendorId,
+        type: 'ROUTE_ASSIGNMENT',
+        title: '📦 Nueva Ruta Asignada',
+        message: `Se te ha asignado una nueva ruta para el ${parsedDate.toLocaleDateString()}`,
+        metadata: {
+          type: 'ROUTE_ASSIGNMENT',
+          routeId: route.id,
+          date: routeDate,
+        }
+      });
+    } catch (e) {
+      console.error('Error enviando notificación de ruta:', e);
+    }
+
+    return route;
   }
 
   async update(id: string, dto: { status?: string; notes?: string }) {

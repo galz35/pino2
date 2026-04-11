@@ -42,7 +42,7 @@ interface Movement {
   timestamp: Date | string;
   productDescription: string;
   movement: string;
-  type: 'ENTRADA' | 'SALIDA' | 'DEVOLUCION' | 'AJUSTE' | 'IN' | 'OUT';
+  type: string;
   had: number;
   quantity: number;
   has: number;
@@ -128,17 +128,31 @@ export default function InventoryMovementsPage() {
   }, [movements, searchTerm]);
 
 
+  const getTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      'IN': 'ENTRADA', 'OUT': 'SALIDA', 'MERMA': 'MERMA',
+      'AJUSTE_POSITIVO': 'AJUSTE (+)', 'AJUSTE_NEGATIVO': 'AJUSTE (-)',
+      'TRASLADO_IN': 'TRASLADO ↓', 'TRASLADO_OUT': 'TRASLADO ↑',
+      'DEVOLUCION': 'DEVOLUCIÓN', 'AJUSTE': 'AJUSTE',
+    };
+    return labels[type] || type;
+  };
+
   const getBadgeVariant = (type: string) => {
     switch (type) {
-      case 'SALIDA':
       case 'OUT':
+      case 'TRASLADO_OUT':
         return 'bg-blue-500 text-white hover:bg-blue-500';
-      case 'ENTRADA':
       case 'IN':
+      case 'TRASLADO_IN':
         return 'bg-green-600 text-white hover:bg-green-600';
       case 'DEVOLUCION':
         return 'bg-purple-600 text-white hover:bg-purple-600';
+      case 'MERMA':
+        return 'bg-red-600 text-white hover:bg-red-600';
       case 'AJUSTE':
+      case 'AJUSTE_POSITIVO':
+      case 'AJUSTE_NEGATIVO':
         return 'bg-orange-500 text-white hover:bg-orange-500';
       default:
         return 'secondary';
@@ -240,7 +254,7 @@ export default function InventoryMovementsPage() {
                 <TableCell>{item.movement}</TableCell>
                 <TableCell>
                   <Badge variant="default" className={cn("pointer-events-none", getBadgeVariant(item.type))}>
-                    {item.type}
+                    {getTypeLabel(item.type)}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">{item.had.toFixed(3)}</TableCell>
@@ -305,8 +319,12 @@ export default function InventoryMovementsPage() {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="IN">Entradas</SelectItem>
                 <SelectItem value="OUT">Salidas</SelectItem>
+                <SelectItem value="MERMA">Mermas</SelectItem>
+                <SelectItem value="AJUSTE_POSITIVO">Ajuste (+)</SelectItem>
+                <SelectItem value="AJUSTE_NEGATIVO">Ajuste (-)</SelectItem>
+                <SelectItem value="TRASLADO_IN">Traslado (Entrada)</SelectItem>
+                <SelectItem value="TRASLADO_OUT">Traslado (Salida)</SelectItem>
                 <SelectItem value="DEVOLUCION">Devoluciones</SelectItem>
-                <SelectItem value="AJUSTE">Ajustes</SelectItem>
               </SelectContent>
             </Select>
           </div>

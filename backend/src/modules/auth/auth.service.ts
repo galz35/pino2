@@ -53,30 +53,35 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
-    const resUser = await this.db.query(
-      'SELECT * FROM users WHERE email = $1 AND is_active = true',
-      [email],
-    );
-    if ((resUser.rowCount ?? 0) === 0) throw new UnauthorizedException('Credenciales inválidas');
-
-    const user = resUser.rows[0];
-
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) throw new UnauthorizedException('Credenciales inválidas');
-
-    // Obtener sus tiendas
-    const resStores = await this.db.query(
-      'SELECT store_id FROM user_stores WHERE user_id = $1',
-      [user.id]
-    );
-    user.userStores = resStores.rows.map(r => ({ storeId: r.store_id }));
-
-    // Reutilizamos el pool principal para generar tokens
-    const client = await this.db.getClient();
     try {
-      return await this.generateTokens(client, user);
-    } finally {
-      client.release();
+      const resUser = await this.db.query(
+        'SELECT * FROM users WHERE email = $1 AND is_active = true',
+        [email],
+      );
+      if ((resUser.rowCount ?? 0) === 0) throw new UnauthorizedException('Credenciales inválidas');
+
+      const user = resUser.rows[0];
+
+      const isMatch = await bcrypt.compare(password, user.password_hash);
+      if (!isMatch) throw new UnauthorizedException('Credenciales inválidas');
+
+      // Obtener sus tiendas
+      const resStores = await this.db.query(
+        'SELECT store_id FROM user_stores WHERE user_id = $1',
+        [user.id]
+      );
+      user.userStores = resStores.rows.map(r => ({ storeId: r.store_id }));
+
+      // Reutilizamos el pool principal para generar tokens
+      const client = await this.db.getClient();
+      try {
+        return await this.generateTokens(client, user);
+      } finally {
+        client.release();
+      }
+    } catch (e) {
+      require('fs').writeFileSync('d:/pino/login_err.txt', e.stack || e.message);
+      throw e;
     }
   }
 

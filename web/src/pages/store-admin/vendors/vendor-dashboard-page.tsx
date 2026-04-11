@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { MapPinned, Users, CheckCircle, History, Loader2, ScrollText } from "lucide-react";
+import { MapPinned, Users, CheckCircle, History, Loader2, ScrollText, Search } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { es } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import apiClient from '@/services/api-client';
 
 interface Client { id: string; name: string; address: string; zoneId: string; }
@@ -26,6 +27,8 @@ export default function VendorDashboardPage() {
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [visitNotes, setVisitNotes] = useState('');
     const [isSavingVisit, setIsSavingVisit] = useState(false);
+    const [todaySearch, setTodaySearch] = useState('');
+    const [pendingSearch, setPendingSearch] = useState('');
 
     const { storeId } = useParams<{ storeId: string }>();
     const navigate = useNavigate();
@@ -58,17 +61,27 @@ export default function VendorDashboardPage() {
 
     const getVisitStatus = (clientId: string, date: Date) => visitLogs.find(log => log.clientId === clientId && isSameDay(new Date(log.date), date));
 
-    const todayVisits = useMemo(() => clients.filter(client => {
-        const zone = zones[client.zoneId];
-        if (!zone) return false;
-        return zone.visitDay === capitalizedToday && !getVisitStatus(client.id, new Date());
-    }), [clients, zones, visitLogs, capitalizedToday]);
+    const todayVisits = useMemo(() => {
+        const filtered = clients.filter(client => {
+            const zone = zones[client.zoneId];
+            if (!zone) return false;
+            return zone.visitDay === capitalizedToday && !getVisitStatus(client.id, new Date());
+        });
+        if (!todaySearch) return filtered;
+        const lowSearch = todaySearch.toLowerCase();
+        return filtered.filter(c => c.name.toLowerCase().includes(lowSearch) || c.address.toLowerCase().includes(lowSearch));
+    }, [clients, zones, visitLogs, capitalizedToday, todaySearch]);
 
-    const pendingVisits = useMemo(() => clients.filter(client => {
-        const zone = zones[client.zoneId];
-        if (!zone || zone.visitDay === 'Ninguno' || zone.visitDay === capitalizedToday) return false;
-        return !visitLogs.some(log => log.clientId === client.id);
-    }), [clients, zones, visitLogs, capitalizedToday]);
+    const pendingVisits = useMemo(() => {
+        const filtered = clients.filter(client => {
+            const zone = zones[client.zoneId];
+            if (!zone || zone.visitDay === 'Ninguno' || zone.visitDay === capitalizedToday) return false;
+            return !visitLogs.some(log => log.clientId === client.id);
+        });
+        if (!pendingSearch) return filtered;
+        const lowSearch = pendingSearch.toLowerCase();
+        return filtered.filter(c => c.name.toLowerCase().includes(lowSearch) || c.address.toLowerCase().includes(lowSearch));
+    }, [clients, zones, visitLogs, capitalizedToday, pendingSearch]);
 
     const handleMarkVisited = async () => {
         if (!selectedClient) return;
@@ -88,7 +101,7 @@ export default function VendorDashboardPage() {
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div><h1 className="text-3xl font-bold tracking-tight">Mi Ruta - {storeName}</h1><p className="text-muted-foreground capitalize">Hoy es {format(new Date(), "EEEE d 'de' MMMM", { locale: es })}</p></div>
+                <div><h1 className="text-3xl font-bold tracking-tight">Panel Comercial - {storeName}</h1><p className="text-muted-foreground capitalize">Hoy es {format(new Date(), "EEEE d 'de' MMMM", { locale: es })}</p></div>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Clientes de Hoy</CardTitle><MapPinned className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{todayVisits.length}</div><p className="text-xs text-muted-foreground">Programados para {capitalizedToday}</p></CardContent></Card>
@@ -96,7 +109,12 @@ export default function VendorDashboardPage() {
             </div>
             <div className="grid gap-6 md:grid-cols-2">
                 <Card>
-                    <CardHeader><CardTitle className="flex items-center gap-2"><CheckCircle className="h-5 w-5 text-green-500" />Visitas para Hoy</CardTitle><CardDescription>Clientes del {capitalizedToday}</CardDescription></CardHeader>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div><CardTitle className="flex items-center gap-2"><CheckCircle className="h-5 w-5 text-green-500" />Visitas para Hoy</CardTitle><CardDescription>Clientes del {capitalizedToday}</CardDescription></div>
+                            <Input placeholder="Filtrar..." className="w-32 h-8 text-xs" value={todaySearch} onChange={e => setTodaySearch(e.target.value)} />
+                        </div>
+                    </CardHeader>
                     <CardContent><div className="space-y-4">
                         {todayVisits.length === 0 ? (<p className="text-sm text-muted-foreground text-center py-4">No hay visitas programadas.</p>) : todayVisits.map(client => (
                             <div key={client.id} className="flex items-center justify-between p-3 border rounded-lg bg-card">
@@ -110,7 +128,12 @@ export default function VendorDashboardPage() {
                     </div></CardContent>
                 </Card>
                 <Card>
-                    <CardHeader><CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-orange-500" />Visitas Pendientes</CardTitle><CardDescription>Clientes sin visitar esta semana</CardDescription></CardHeader>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div><CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-orange-500" />Visitas Pendientes</CardTitle><CardDescription>Clientes sin visitar esta semana</CardDescription></div>
+                            <Input placeholder="Filtrar..." className="w-32 h-8 text-xs" value={pendingSearch} onChange={e => setPendingSearch(e.target.value)} />
+                        </div>
+                    </CardHeader>
                     <CardContent><div className="space-y-4">
                         {pendingVisits.length === 0 ? (<p className="text-sm text-muted-foreground text-center py-4">¡Buen trabajo!</p>) : pendingVisits.map(client => (
                             <div key={client.id} className="flex items-center justify-between p-3 border rounded-lg bg-destructive/5 border-destructive/20">

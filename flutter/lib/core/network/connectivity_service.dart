@@ -22,8 +22,8 @@ class ConnectivityService {
     return (await getCurrentStatus()) == NetworkStatus.online;
   }
 
-  NetworkStatus _mapResults(List<ConnectivityResult> results) {
-    if (results.length == 1 && results.first == ConnectivityResult.none) {
+  NetworkStatus _mapResults(ConnectivityResult result) {
+    if (result == ConnectivityResult.none) {
       return NetworkStatus.offline;
     }
     return NetworkStatus.online;

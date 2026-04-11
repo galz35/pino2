@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, Param } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SyncService } from './sync.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -14,6 +14,12 @@ export class SyncController {
   @ApiOperation({ summary: 'Obtener el estado de sincronización de todas las tiendas' })
   getStatuses() {
     return this.service.getStatuses();
+  }
+
+  @Get('idempotency-logs')
+  @ApiOperation({ summary: 'Obtener logs de idempotencia para auditoría' })
+  getIdempotencyLogs(@Query('storeId') storeId?: string) {
+    return this.service.getIdempotencyLogs(storeId);
   }
 
   @Post('batch')

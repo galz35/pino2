@@ -1,9 +1,11 @@
+import 'dart:developer';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../data/auth_repository.dart';
 import '../../domain/models/auth_session.dart';
+import '../../../../core/services/push_notification_service.dart';
 
 enum AuthStage { initial, loading, authenticated, unauthenticated }
 
@@ -71,6 +73,12 @@ class AuthController extends Notifier<AuthState> {
       final refreshedSession = cachedSession.copyWith(user: profile);
       await _storage.saveSession(refreshedSession);
       state = AuthState.authenticated(refreshedSession);
+      
+      // Register push token
+      PushNotificationService.instance.registerTokenWithBackend().catchError((e) {
+        log('Error registering push token on restore: $e');
+      });
+      
       return;
     } catch (error) {
       if (error is ApiFailure && error.isConnectivityIssue) {
@@ -85,6 +93,12 @@ class AuthController extends Notifier<AuthState> {
           );
           await _storage.saveSession(refreshedSession);
           state = AuthState.authenticated(refreshedSession);
+          
+          // Register push token
+          PushNotificationService.instance.registerTokenWithBackend().catchError((e) {
+            log('Error registering push token on refresh: $e');
+          });
+          
           return;
         } catch (error) {
           if (error is ApiFailure && error.isConnectivityIssue) {
@@ -111,6 +125,12 @@ class AuthController extends Notifier<AuthState> {
       final session = await _repository.login(email, password);
       await _storage.saveSession(session);
       state = AuthState.authenticated(session);
+
+      // Register push token
+      PushNotificationService.instance.registerTokenWithBackend().catchError((e) {
+        log('Error registering push token on login: $e');
+      });
+
       return true;
     } catch (error) {
       state = AuthState.unauthenticated(message: _mapError(error));
@@ -119,6 +139,11 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
+    // Unregister push token before clearing storage
+    PushNotificationService.instance.unregisterTokenWithBackend().catchError((e) {
+      log('Error unregistering push token on logout: $e');
+    });
+
     await _storage.clear();
     state = AuthState.unauthenticated();
   }

@@ -21,7 +21,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         return JSON.parse(savedUser);
       } catch (e) {
-        localStorage.clear();
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
         return null;
       }
     }
@@ -32,11 +33,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
-    setLoading(false);
+    const initAuth = async () => {
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        try {
+          const res = await apiClient.get('/auth/profile');
+          setUser(res.data);
+        } catch (error) {
+          console.error("Token expirado o inválido");
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('user');
+          setUser(null);
+        }
+      }
+      setLoading(false);
+    };
+    initAuth();
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -61,7 +74,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = () => {
-    localStorage.clear();
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
     setUser(null);
     navigate('/login');
   };

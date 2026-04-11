@@ -1,0 +1,226 @@
+
+> web@0.0.0 lint
+> eslint . --quiet
+
+
+D:\pino\sistema_final\web\src\components\app-layout.tsx
+  409:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\pino\sistema_final\web\src\components\app-layout.tsx:409:5
+  407 |   useEffect(() => {
+  408 |     seenNotificationIds.current.clear();
+> 409 |     setNotifications([]);
+      |     ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  410 |   }, [storeId, user?.id]);
+  411 |
+  412 |   useEffect(() => {                                                                             react-hooks/set-state-in-effect
+  425:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\pino\sistema_final\web\src\components\app-layout.tsx:425:5
+  423 |
+  424 |     seenNotificationIds.current.add(notification.id);
+> 425 |     setNotifications((prev) => [notification, ...prev].slice(0, 12));
+      |     ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  426 |   }, [lastEvent, storeId, user?.id, user?.role]);
+  427 |
+  428 |   const navItems = useMemo(() => {  react-hooks/set-state-in-effect
+
+D:\pino\sistema_final\web\src\components\pos\cashier-billing-view.tsx
+  85:17  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\pino\sistema_final\web\src\components\pos\cashier-billing-view.tsx:85:17
+  83 |         if (stored) {
+  84 |             try {
+> 85 |                 setHeldOrders(JSON.parse(stored));
+     |                 ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  86 |             } catch (e) {
+  87 |                 console.error("Failed to parse held orders", e);
+  88 |             }  react-hooks/set-state-in-effect
+
+D:\pino\sistema_final\web\src\components\pos\cashier-layout.tsx
+  38:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\pino\sistema_final\web\src\components\pos\cashier-layout.tsx:38:13
+  36 |     useEffect(() => {
+  37 |         if (isPosView) {
+> 38 |             setIsCollapsed(true);
+     |             ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  39 |         } else {
+  40 |             setIsCollapsed(false);
+  41 |         }  react-hooks/set-state-in-effect
+
+D:\pino\sistema_final\web\src\components\pos\payment-dialog.tsx
+  37:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\pino\sistema_final\web\src\components\pos\payment-dialog.tsx:37:13
+  35 |     useEffect(() => {
+  36 |         if (open) {
+> 37 |             setAmountStr('');
+     |             ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  38 |             setCurrency('NIO');
+  39 |             setMethod('Efectivo');
+  40 |         }  react-hooks/set-state-in-effect
+
+D:\pino\sistema_final\web\src\components\printable-ticket.tsx
+  57:23  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\pino\sistema_final\web\src\components\ui\badge.tsx
+  36:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\pino\sistema_final\web\src\components\ui\button.tsx
+  56:18  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\pino\sistema_final\web\src\components\ui\command.tsx
+  25:11  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+D:\pino\sistema_final\web\src\components\ui\form.tsx
+  169:3  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\pino\sistema_final\web\src\components\ui\sidebar.tsx
+  654:26  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+D:\pino\sistema_final\web\src\components\ui\sidebar.tsx:654:26
+  652 |   // Random width between 50 to 90%.
+  653 |   const width = React.useMemo(() => {
+> 654 |     return `${Math.floor(Math.random() * 40) + 50}%`
+      |                          ^^^^^^^^^^^^^ Cannot call impure function
+  655 |   }, [])
+  656 |
+  657 |   return (  react-hooks/purity
+  761:3   error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   react-refresh/only-export-components
+
+D:\pino\sistema_final\web\src\contexts\auth-context.tsx
+  39:5   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\pino\sistema_final\web\src\contexts\auth-context.tsx:39:5
+  37 |       apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  38 |     }
+> 39 |     setLoading(false);
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  40 |   }, []);
+  41 |
+  42 |   const login = async (email: string, password: string) => {  react-hooks/set-state-in-effect
+  43:5   error  Unnecessary try/catch wrapper                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         no-useless-catch
+  76:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        react-refresh/only-export-components
+
+D:\pino\sistema_final\web\src\contexts\pos-context.tsx
+  129:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\pino\sistema_final\web\src\hooks\use-real-time-events.ts
+  71:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\pino\sistema_final\web\src\hooks\use-real-time-events.ts:71:5
+  69 |     newSocket.on('store_update', handleRealtimeEvent);
+  70 |
+> 71 |     setSocket(newSocket);
+     |     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  72 |
+  73 |     return () => {
+  74 |       newSocket.off('sync_update', handleRealtimeEvent);  react-hooks/set-state-in-effect
+
+D:\pino\sistema_final\web\src\lib\swalert.ts
+  9:15  error  Empty block statement  no-empty
+
+D:\pino\sistema_final\web\src\pages\master-admin\master-dashboard-page.tsx
+  27:21  error  Empty block statement  no-empty
+
+D:\pino\sistema_final\web\src\pages\master-admin\master-sync-monitor-page.tsx
+  26:117  error  Empty block statement  no-empty
+
+D:\pino\sistema_final\web\src\pages\store-admin\billing\billing-page.tsx
+  203:5  error  'intervalId' is never reassigned. Use 'const' instead  prefer-const
+
+D:\pino\sistema_final\web\src\pages\store-admin\cash-register\cash-register-page.tsx
+  316:89  error  Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong  @typescript-eslint/no-non-null-asserted-optional-chain
+
+D:\pino\sistema_final\web\src\pages\store-admin\control-tower\control-tower-page.tsx
+  43:21  error  Empty block statement  no-empty
+
+D:\pino\sistema_final\web\src\pages\store-admin\products\products-page.tsx
+  79:9  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\pino\sistema_final\web\src\pages\store-admin\products\products-page.tsx:79:9
+  77 |
+  78 |         let isMounted = true;
+> 79 |         setLoading(true);
+     |         ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  80 |
+  81 |         const fetchData = async () => {
+  82 |             try {  react-hooks/set-state-in-effect
+
+D:\pino\sistema_final\web\src\pages\store-admin\users\users-page.tsx
+  48:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\pino\sistema_final\web\src\pages\store-admin\users\users-page.tsx:48:5
+  46 |   useEffect(() => {
+  47 |     if (!storeId) return;
+> 48 |     fetchUsers();
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  49 |   }, [storeId]);
+  50 |
+  51 |   const renderContent = () => {  react-hooks/set-state-in-effect
+
+D:\pino\sistema_final\web\src\pages\store-admin\vendors\vendor-inventory-page.tsx
+  42:21  error  Empty block statement  no-empty
+
+D:\pino\sistema_final\web\src\pages\store-admin\vendors\vendor-zones-page.tsx
+  27:146  error  Empty block statement  no-empty
+
+✖ 27 problems (27 errors, 0 warnings)
+

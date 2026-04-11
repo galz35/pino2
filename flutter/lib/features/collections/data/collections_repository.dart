@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/database/local_cache_repository.dart';
 import '../../../core/network/api_client.dart';
@@ -105,6 +106,7 @@ class CollectionsRepository {
       'amount': amount,
       'paymentMethod': paymentMethod,
       'vendorId': collectorId,
+      'externalId': const Uuid().v4(),
       if (collectorName?.trim().isNotEmpty ?? false)
         'vendorName': collectorName!.trim(),
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),

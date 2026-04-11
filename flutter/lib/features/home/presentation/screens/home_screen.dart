@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/app_config.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/local_cache_repository.dart';
 import '../../../../core/network/connectivity_service.dart';
@@ -31,6 +32,60 @@ final assignedStoresProvider = FutureProvider<List<StoreSummary>>((ref) async {
     userId: session.user.id,
     accessToken: session.accessToken,
   );
+});
+
+// ── Quick Pulse: números clave al abrir ──
+final quickPulseProvider =
+    FutureProvider.family<Map<String, int>, String>((ref, storeId) async {
+  final authState = ref.watch(authControllerProvider);
+  final session = authState.session;
+  if (session == null) return {};
+
+  final client = ref.read(appApiClientProvider);
+  final token = session.accessToken;
+  final userId = session.user.id;
+
+  int pendingOrders = 0;
+  int todaySalesCount = 0;
+  double todaySalesTotal = 0;
+  int vendorStockItems = 0;
+
+  try {
+    final orders = await client.getList(
+      '/orders?storeId=$storeId&status=RECIBIDO',
+      bearerToken: token,
+    );
+    pendingOrders = orders.length;
+  } catch (_) {}
+
+  try {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final sales = await client.getList(
+      '/sales?storeId=$storeId&startDate=${today}T00:00:00&endDate=${today}T23:59:59',
+      bearerToken: token,
+    );
+    todaySalesCount = sales.length;
+    for (final s in sales) {
+      todaySalesTotal += (s['total'] as num?)?.toDouble() ?? 0;
+    }
+  } catch (_) {}
+
+  try {
+    final inv = await client.getList(
+      '/vendor-inventories/$userId',
+      bearerToken: token,
+    );
+    for (final v in inv) {
+      vendorStockItems += (v['currentQuantity'] as num?)?.toInt() ?? 0;
+    }
+  } catch (_) {}
+
+  return {
+    'pendingOrders': pendingOrders,
+    'todaySalesCount': todaySalesCount,
+    'todaySalesTotal': todaySalesTotal.round(),
+    'vendorStock': vendorStockItems,
+  };
 });
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -133,7 +188,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             .connect(session, storeId: storeId);
                       },
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 14),
+                    if (currentStoreId != null)
+                      _QuickPulseBar(storeId: currentStoreId),
+                    const SizedBox(height: 14),
                     _RoleActionGrid(role: role, store: currentStore),
                   ],
                 );
@@ -162,6 +220,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ref.read(syncQueueProcessorProvider.notifier).processPendingQueue(),
               onRetryFailed: () =>
                   ref.read(syncQueueProcessorProvider.notifier).retryFailedQueue(),
+              onDiscardEntry: (id) =>
+                  ref.read(syncQueueProcessorProvider.notifier).discardFailedEntry(id),
             ),
           ],
         ),
@@ -247,6 +307,126 @@ class _HeroSessionCard extends StatelessWidget {
   }
 }
 
+class _QuickPulseBar extends ConsumerWidget {
+  const _QuickPulseBar({required this.storeId});
+
+  final String storeId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pulseAsync = ref.watch(quickPulseProvider(storeId));
+
+    return pulseAsync.when(
+      data: (pulse) {
+        if (pulse.isEmpty) return const SizedBox.shrink();
+
+        final pending = pulse['pendingOrders'] ?? 0;
+        final salesCount = pulse['todaySalesCount'] ?? 0;
+        final salesTotal = pulse['todaySalesTotal'] ?? 0;
+        final stock = pulse['vendorStock'] ?? 0;
+
+        return Row(
+          children: [
+            _PulseChip(
+              icon: Icons.inbox_rounded,
+              value: '$pending',
+              color: pending > 0 ? const Color(0xFFEF4444) : const Color(0xFF6B7280),
+              highlight: pending > 0,
+            ),
+            const SizedBox(width: 8),
+            _PulseChip(
+              icon: Icons.receipt_long_rounded,
+              value: '$salesCount',
+              color: const Color(0xFF3B82F6),
+            ),
+            const SizedBox(width: 8),
+            _PulseChip(
+              icon: Icons.attach_money_rounded,
+              value: 'Q$salesTotal',
+              color: const Color(0xFF10B981),
+              flex: 2,
+            ),
+            const SizedBox(width: 8),
+            _PulseChip(
+              icon: Icons.inventory_2_rounded,
+              value: '$stock',
+              color: const Color(0xFFF59E0B),
+            ),
+          ],
+        );
+      },
+      loading: () => Row(
+        children: List.generate(
+          4,
+          (_) => Expanded(
+            child: Container(
+              height: 48,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _PulseChip extends StatelessWidget {
+  const _PulseChip({
+    required this.icon,
+    required this.value,
+    required this.color,
+    this.highlight = false,
+    this.flex = 1,
+  });
+
+  final IconData icon;
+  final String value;
+  final Color color;
+  final bool highlight;
+  final int flex;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: flex,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: highlight ? color.withValues(alpha: 0.12) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: highlight ? color.withValues(alpha: 0.3) : Colors.grey.shade200,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                value,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: highlight ? color : Colors.grey.shade800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _StoreScopeCard extends StatelessWidget {
   const _StoreScopeCard({
     required this.stores,
@@ -274,18 +454,19 @@ class _StoreScopeCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Alcance operativo',
+            'Tienda activa',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            stores.isEmpty
-                ? 'Este usuario no tiene tiendas asignadas todavía.'
-                : 'Selecciona la tienda de trabajo activa para el siguiente corte móvil.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black54),
-          ),
+          if (stores.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Sin tiendas asignadas.',
+                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black54),
+              ),
+            ),
           if (stores.isNotEmpty) ...[
             const SizedBox(height: 14),
             Wrap(
@@ -324,17 +505,10 @@ class _RoleActionGrid extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Modo rápido',
+          'Acciones',
           style: Theme.of(
             context,
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Un usuario de calle o bodega no debería perder tiempo navegando.',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: Colors.black54),
         ),
         const SizedBox(height: 12),
         _ActionCard(
@@ -382,32 +556,32 @@ class _RoleActionGrid extends StatelessWidget {
       case AppRole.owner:
         return const [
           _ActionDescriptor(
-            title: 'Capturar pedido',
-            subtitle: 'Cliente pide, tú apuntas y guardas sin salir del flujo.',
+            title: 'Nuevo pedido',
+            subtitle: 'Capturar pedido de cliente.',
             icon: Icons.flash_on_rounded,
             routeKey: _RouteKey.quickOrder,
           ),
           _ActionDescriptor(
             title: 'Bodega',
-            subtitle: 'Recibir, alistar y cargar pedidos sin vueltas extras.',
+            subtitle: 'Recibir, alistar y cargar.',
             icon: Icons.warehouse_rounded,
             routeKey: _RouteKey.warehouse,
           ),
           _ActionDescriptor(
             title: 'Cobros',
-            subtitle: 'Revisar cartera y registrar cobros rápidos.',
+            subtitle: 'Cartera y pagos pendientes.',
             icon: Icons.payments_rounded,
             routeKey: _RouteKey.collections,
           ),
           _ActionDescriptor(
-            title: 'Catálogo operativo',
-            subtitle: 'Stock, precio y bultos visibles al instante.',
+            title: 'Catálogo',
+            subtitle: 'Stock, precios y bultos.',
             icon: Icons.inventory_2_rounded,
             routeKey: _RouteKey.catalog,
           ),
           _ActionDescriptor(
-            title: 'Ruta y entregas',
-            subtitle: 'Seguimiento vivo de pedidos y entregas por tienda.',
+            title: 'Entregas',
+            subtitle: 'Estado de pedidos y rutas.',
             icon: Icons.route_rounded,
             routeKey: _RouteKey.routeBoard,
           ),
@@ -415,32 +589,32 @@ class _RoleActionGrid extends StatelessWidget {
       case AppRole.storeAdmin:
         return const [
           _ActionDescriptor(
-            title: 'Capturar pedido',
-            subtitle: 'Pantalla rápida para tomar pedido sin pelear con la app.',
+            title: 'Nuevo pedido',
+            subtitle: 'Capturar pedido de cliente.',
             icon: Icons.flash_on_rounded,
             routeKey: _RouteKey.quickOrder,
           ),
           _ActionDescriptor(
             title: 'Bodega',
-            subtitle: 'Tomar pedidos y moverlos rápido en operación.',
+            subtitle: 'Recibir, alistar y cargar.',
             icon: Icons.warehouse_rounded,
             routeKey: _RouteKey.warehouse,
           ),
           _ActionDescriptor(
             title: 'Cobros',
-            subtitle: 'Ver pendientes y registrar pagos sin perder tiempo.',
+            subtitle: 'Pendientes y registrar pagos.',
             icon: Icons.payments_rounded,
             routeKey: _RouteKey.collections,
           ),
           _ActionDescriptor(
             title: 'Clientes',
-            subtitle: 'Buscar cartera y contacto en segundos.',
+            subtitle: 'Buscar contacto y cartera.',
             icon: Icons.people_alt_rounded,
             routeKey: _RouteKey.clients,
           ),
           _ActionDescriptor(
-            title: 'Ruta y entregas',
-            subtitle: 'Despacho, pendientes y seguimiento operativo.',
+            title: 'Entregas',
+            subtitle: 'Despacho y seguimiento.',
             icon: Icons.route_rounded,
             routeKey: _RouteKey.routeBoard,
           ),
@@ -449,19 +623,19 @@ class _RoleActionGrid extends StatelessWidget {
         return const [
           _ActionDescriptor(
             title: 'Bodega',
-            subtitle: 'Recibir, preparar y cargar en una sola vista.',
+            subtitle: 'Recibir, preparar y cargar.',
             icon: Icons.warehouse_rounded,
             routeKey: _RouteKey.warehouse,
           ),
           _ActionDescriptor(
-            title: 'Catálogo operativo',
-            subtitle: 'Revisar stock, bultos y precio rápido.',
+            title: 'Catálogo',
+            subtitle: 'Stock, bultos y precios.',
             icon: Icons.inventory_2_rounded,
             routeKey: _RouteKey.catalog,
           ),
           _ActionDescriptor(
-            title: 'Ruta y entregas',
-            subtitle: 'Ver lo que sale hoy y a quién se despacha.',
+            title: 'Entregas',
+            subtitle: 'Despachos del día.',
             icon: Icons.local_shipping_rounded,
             routeKey: _RouteKey.routeBoard,
           ),
@@ -469,20 +643,20 @@ class _RoleActionGrid extends StatelessWidget {
       case AppRole.dispatcher:
         return const [
           _ActionDescriptor(
-            title: 'Ruta y entregas',
-            subtitle: 'Asignación viva, pendientes y estado de cumplimiento.',
+            title: 'Entregas',
+            subtitle: 'Asignación y pendientes.',
             icon: Icons.alt_route_rounded,
             routeKey: _RouteKey.routeBoard,
           ),
           _ActionDescriptor(
             title: 'Clientes',
-            subtitle: 'Datos rápidos para coordinar despacho.',
+            subtitle: 'Datos de contacto.',
             icon: Icons.people_alt_rounded,
             routeKey: _RouteKey.clients,
           ),
           _ActionDescriptor(
-            title: 'Catálogo operativo',
-            subtitle: 'Apoyo rápido para confirmar artículos.',
+            title: 'Catálogo',
+            subtitle: 'Confirmar artículos.',
             icon: Icons.inventory_2_rounded,
             routeKey: _RouteKey.catalog,
           ),
@@ -490,28 +664,40 @@ class _RoleActionGrid extends StatelessWidget {
       case AppRole.rutero:
         return const [
           _ActionDescriptor(
-            title: 'Ruta y entrega',
-            subtitle: 'Paradas, entregas y cobro en una sola vista móvil.',
+            title: 'Ruta de hoy',
+            subtitle: 'Entregas y cobro actual.',
             icon: Icons.map_rounded,
             routeKey: _RouteKey.routeBoard,
           ),
           _ActionDescriptor(
             title: 'Cobros',
-            subtitle: 'Llegar, cobrar y guardar sin perder el ritmo.',
+            subtitle: 'Registrar pagos.',
             icon: Icons.payments_rounded,
             routeKey: _RouteKey.collections,
           ),
           _ActionDescriptor(
             title: 'Devoluciones',
-            subtitle: 'Marcar devoluciones por ticket en la misma jornada.',
+            subtitle: 'Marcar devolución por ticket.',
             icon: Icons.assignment_return_rounded,
             routeKey: _RouteKey.returns,
           ),
           _ActionDescriptor(
             title: 'Clientes',
-            subtitle: 'Ubicar contacto y dirección sin perder ritmo.',
+            subtitle: 'Contacto y dirección.',
             icon: Icons.people_alt_rounded,
             routeKey: _RouteKey.clients,
+          ),
+          _ActionDescriptor(
+            title: 'Stock Actual',
+            subtitle: 'Carga en mi poder.',
+            icon: Icons.inventory_rounded,
+            routeKey: _RouteKey.vendorInventory,
+          ),
+          _ActionDescriptor(
+            title: 'Cierre de Caja',
+            subtitle: 'Consolidar y liquidar el día.',
+            icon: Icons.wallet_rounded,
+            routeKey: _RouteKey.dailyClosing,
           ),
         ];
       case AppRole.vendor:
@@ -519,46 +705,70 @@ class _RoleActionGrid extends StatelessWidget {
         return const [
           _ActionDescriptor(
             title: 'Preventa',
-            subtitle: 'Cliente pide, tú capturas y guardas en segundos.',
+            subtitle: 'Capturar pedido de cliente.',
             icon: Icons.flash_on_rounded,
             routeKey: _RouteKey.quickOrder,
           ),
           _ActionDescriptor(
+            title: 'Cobros',
+            subtitle: 'Registrar pagos de clientes.',
+            icon: Icons.payments_rounded,
+            routeKey: _RouteKey.collections,
+          ),
+          _ActionDescriptor(
             title: 'Devoluciones',
-            subtitle: 'Registrar devolución rápida si el pedido regresa.',
+            subtitle: 'Registrar devolución.',
             icon: Icons.assignment_return_rounded,
             routeKey: _RouteKey.returns,
           ),
           _ActionDescriptor(
             title: 'Clientes',
-            subtitle: 'Buscar cliente rápido sin salir del trabajo.',
+            subtitle: 'Buscar contacto.',
             icon: Icons.people_alt_rounded,
             routeKey: _RouteKey.clients,
           ),
           _ActionDescriptor(
-            title: 'Catálogo operativo',
-            subtitle: 'Precio, stock y bultos sin abrir varias pantallas.',
+            title: 'Catálogo',
+            subtitle: 'Precios, stock y bultos.',
             icon: Icons.inventory_2_rounded,
             routeKey: _RouteKey.catalog,
+          ),
+          _ActionDescriptor(
+            title: 'Stock Actual',
+            subtitle: 'Carga asignada.',
+            icon: Icons.inventory_rounded,
+            routeKey: _RouteKey.vendorInventory,
+          ),
+          _ActionDescriptor(
+            title: 'Ventas del Día',
+            subtitle: 'Tickets emitidos hoy.',
+            icon: Icons.receipt_long_rounded,
+            routeKey: _RouteKey.salesHistory,
+          ),
+          _ActionDescriptor(
+            title: 'Cierre de Caja',
+            subtitle: 'Cuadrar el día.',
+            icon: Icons.wallet_rounded,
+            routeKey: _RouteKey.dailyClosing,
           ),
         ];
       case AppRole.cashier:
         return const [
           _ActionDescriptor(
             title: 'Devoluciones',
-            subtitle: 'Buscar ticket y devolver unidades sin rodeos.',
+            subtitle: 'Buscar ticket y devolver.',
             icon: Icons.assignment_return_rounded,
             routeKey: _RouteKey.returns,
           ),
           _ActionDescriptor(
-            title: 'Catálogo operativo',
-            subtitle: 'Confirmar producto y precio rápidamente.',
+            title: 'Catálogo',
+            subtitle: 'Confirmar producto y precio.',
             icon: Icons.inventory_2_rounded,
             routeKey: _RouteKey.catalog,
           ),
           _ActionDescriptor(
             title: 'Clientes',
-            subtitle: 'Consultar datos del cliente sin fricción.',
+            subtitle: 'Datos del cliente.',
             icon: Icons.people_alt_rounded,
             routeKey: _RouteKey.clients,
           ),
@@ -566,21 +776,20 @@ class _RoleActionGrid extends StatelessWidget {
       case AppRole.unknown:
         return const [
           _ActionDescriptor(
-            title: 'Catálogo operativo',
-            subtitle:
-                'La sesión existe; este acceso puede apoyarse con catálogo rápido.',
+            title: 'Catálogo',
+            subtitle: 'Ver productos y precios.',
             icon: Icons.inventory_2_rounded,
             routeKey: _RouteKey.catalog,
           ),
           _ActionDescriptor(
             title: 'Clientes',
-            subtitle: 'Consulta básica por cliente y dirección.',
+            subtitle: 'Consultar datos.',
             icon: Icons.people_alt_rounded,
             routeKey: _RouteKey.clients,
           ),
           _ActionDescriptor(
-            title: 'Ruta y entregas',
-            subtitle: 'Vista general de operación.',
+            title: 'Entregas',
+            subtitle: 'Vista de operación.',
             icon: Icons.lock_open_rounded,
             routeKey: _RouteKey.routeBoard,
           ),
@@ -602,6 +811,9 @@ class _RoleActionGrid extends StatelessWidget {
       _RouteKey.collections => '/collections/$storeId',
       _RouteKey.returns => '/returns/$storeId',
       _RouteKey.warehouse => '/warehouse/$storeId',
+      _RouteKey.dailyClosing => '/daily-closing/$storeId',
+      _RouteKey.vendorInventory => '/vendor-inventory/$storeId',
+      _RouteKey.salesHistory => '/sales-history/$storeId',
     };
 
     context.push(
@@ -737,6 +949,7 @@ class _BackendRuntimeCard extends StatelessWidget {
     required this.latestCachedEvent,
     required this.onRetrySync,
     required this.onRetryFailed,
+    required this.onDiscardEntry,
   });
 
   final String apiBaseUrl;
@@ -751,6 +964,7 @@ class _BackendRuntimeCard extends StatelessWidget {
   final RealtimeEvent? latestCachedEvent;
   final Future<void> Function() onRetrySync;
   final Future<void> Function() onRetryFailed;
+  final Future<void> Function(int) onDiscardEntry;
 
   @override
   Widget build(BuildContext context) {
@@ -767,7 +981,7 @@ class _BackendRuntimeCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Runtime técnico',
+            'Estado',
             style: theme.textTheme.titleMedium?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w800,
@@ -800,13 +1014,13 @@ class _BackendRuntimeCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           _RuntimeLine(
-            label: 'Cola offline',
-            value: '$pendingSyncCount pendientes',
+            label: 'Pendientes',
+            value: '$pendingSyncCount',
           ),
           const SizedBox(height: 8),
           _RuntimeLine(
             label: 'Fallidas',
-            value: '$failedSyncCount requieren reintento',
+            value: '$failedSyncCount',
           ),
           if (realtimeState.lastEvent != null) ...[
             const SizedBox(height: 8),
@@ -832,7 +1046,7 @@ class _BackendRuntimeCard extends StatelessWidget {
           if (recentSyncEntries.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
-              'Últimas operaciones locales',
+              'Operaciones recientes',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
@@ -842,7 +1056,10 @@ class _BackendRuntimeCard extends StatelessWidget {
             ...recentSyncEntries.take(4).map(
               (entry) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: _SyncEntryTile(entry: entry),
+                child: _SyncEntryTile(
+                    entry: entry,
+                    onDiscard: () => onDiscardEntry(entry.id),
+                ),
               ),
             ),
           ],
@@ -894,9 +1111,10 @@ class _BackendRuntimeCard extends StatelessWidget {
 }
 
 class _SyncEntryTile extends StatelessWidget {
-  const _SyncEntryTile({required this.entry});
+  const _SyncEntryTile({required this.entry, this.onDiscard});
 
   final SyncQueueEntry entry;
+  final VoidCallback? onDiscard;
 
   @override
   Widget build(BuildContext context) {
@@ -959,6 +1177,20 @@ class _SyncEntryTile extends StatelessWidget {
               fontSize: 12,
             ),
           ),
+          if (entry.status == 'failed' && onDiscard != null) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: onDiscard,
+                style: TextButton.styleFrom(
+                   minimumSize: Size.zero,
+                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+                child: const Text('Descartar', style: TextStyle(color: Colors.redAccent, fontSize: 13)),
+              )
+            )
+          ]
         ],
       ),
     );
@@ -1094,4 +1326,7 @@ enum _RouteKey {
   collections,
   returns,
   warehouse,
+  dailyClosing,
+  vendorInventory,
+  salesHistory,
 }

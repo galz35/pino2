@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import apiClient from '@/services/api-client';
+import { normalizeUserRole } from '@/lib/user-role';
 
 interface Product { id: string; barcode?: string; description: string; currentStock: number; vendorStock?: number; }
 interface Vendor { uid: string; name: string; }
@@ -33,11 +34,12 @@ export default function VendorInventoryPage() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [vendorsRes, productsRes] = await Promise.all([
-                    apiClient.get('/users', { params: { storeId, role: 'Vendedor Ambulante' } }),
+                const [usersRes, productsRes] = await Promise.all([
+                    apiClient.get('/users', { params: { storeId } }),
                     apiClient.get('/products', { params: { storeId, usesInventory: true } }),
                 ]);
-                setVendors((vendorsRes.data || []).map((v: any) => ({ uid: v.id || v.uid, name: v.name })));
+                const vendorUsers = (usersRes.data || []).filter((u: any) => ['vendor', 'rutero'].includes(normalizeUserRole(u.role)));
+                setVendors(vendorUsers.map((v: any) => ({ uid: v.id || v.uid, name: v.name })));
                 setProducts(productsRes.data || []);
             } catch { }
             finally { setLoading(false); }

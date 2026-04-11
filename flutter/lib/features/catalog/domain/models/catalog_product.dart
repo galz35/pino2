@@ -13,6 +13,12 @@ class CatalogProduct {
     this.department,
     this.subDepartment,
     this.minStock = 0,
+    this.wholesalePrice = 0,
+    this.price1 = 0,
+    this.price2 = 0,
+    this.price3 = 0,
+    this.price4 = 0,
+    this.price5 = 0,
   });
 
   final String id;
@@ -28,6 +34,12 @@ class CatalogProduct {
   final String? department;
   final String? subDepartment;
   final int minStock;
+  final double wholesalePrice;
+  final double price1;
+  final double price2;
+  final double price3;
+  final double price4;
+  final double price5;
 
   bool get isLowStock => currentStock <= minStock;
 
@@ -38,12 +50,23 @@ class CatalogProduct {
     return '$stockBulks bultos • $stockUnits sueltas';
   }
 
+  /// Returns the price for a given level (1-5). Falls back to salePrice.
+  double priceForLevel(int level) {
+    final prices = [price1, price2, price3, price4, price5];
+    if (level >= 1 && level <= 5) {
+      final p = prices[level - 1];
+      return p > 0 ? p : salePrice;
+    }
+    return salePrice;
+  }
+
   factory CatalogProduct.fromJson(Map<String, dynamic> json) {
+    final sp = double.tryParse('${json['salePrice'] ?? 0}') ?? 0;
     return CatalogProduct(
       id: json['id']?.toString() ?? '',
       storeId: json['storeId']?.toString() ?? '',
       description: json['description']?.toString() ?? 'Producto',
-      salePrice: double.tryParse('${json['salePrice'] ?? 0}') ?? 0,
+      salePrice: sp,
       currentStock: int.tryParse('${json['currentStock'] ?? 0}') ?? 0,
       unitsPerBulk: int.tryParse('${json['unitsPerBulk'] ?? 1}') ?? 1,
       stockBulks: int.tryParse('${json['stockBulks'] ?? 0}') ?? 0,
@@ -53,6 +76,13 @@ class CatalogProduct {
       department: json['departmentName']?.toString() ?? json['department']?.toString(),
       subDepartment: json['subDepartment']?.toString(),
       minStock: int.tryParse('${json['minStock'] ?? 0}') ?? 0,
+      wholesalePrice: double.tryParse('${json['wholesalePrice'] ?? 0}') ?? 0,
+      price1: double.tryParse('${json['price1'] ?? sp}') ?? sp,
+      price2: double.tryParse('${json['price2'] ?? sp}') ?? sp,
+      price3: double.tryParse('${json['price3'] ?? sp}') ?? sp,
+      price4: double.tryParse('${json['price4'] ?? sp}') ?? sp,
+      price5: double.tryParse('${json['price5'] ?? sp}') ?? sp,
     );
   }
 }
+

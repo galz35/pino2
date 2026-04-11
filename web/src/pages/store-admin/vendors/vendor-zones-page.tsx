@@ -21,6 +21,7 @@ export default function VendorZonesPage() {
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [headerFilters, setHeaderFilters] = useState({ name: '', visitDay: '' });
     const [currentZone, setCurrentZone] = useState<Partial<StoreZone>>({});
     const { toast } = useToast();
 
@@ -42,6 +43,12 @@ export default function VendorZonesPage() {
     const handleDelete = async (id: string) => { if (!confirm("¿Eliminar zona?")) return; try { await apiClient.delete(`/store-zones/${id}`); toast({ title: "Zona eliminada" }); fetchZones(); } catch { toast({ title: "Error", variant: "destructive" }); } };
 
     if (loading) return (<div className="flex h-[400px] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>);
+
+    const filteredZones = zones.filter((z) => {
+        const fName = headerFilters.name.toLowerCase();
+        const fVisit = headerFilters.visitDay.toLowerCase();
+        return (z.name.toLowerCase().includes(fName) && (z.visitDay || 'ninguno').toLowerCase().includes(fVisit));
+    });
 
     return (
         <div className="space-y-6">
@@ -68,9 +75,22 @@ export default function VendorZonesPage() {
             <Card>
                 <CardHeader><CardTitle>Zonas Configuradas</CardTitle><CardDescription>Listado de zonas.</CardDescription></CardHeader>
                 <CardContent><div className="overflow-x-auto"><Table>
-                    <TableHeader><TableRow><TableHead>Nombre</TableHead><TableHead>Descripción</TableHead><TableHead>Día de Visita</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow></TableHeader>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>
+                                Nombre
+                                <Input placeholder="Filtrar..." className="h-6 mt-1 text-xs font-normal" value={headerFilters.name} onChange={e => setHeaderFilters({...headerFilters, name: e.target.value})} />
+                            </TableHead>
+                            <TableHead className="align-top pt-4">Descripción</TableHead>
+                            <TableHead>
+                                Día de Visita
+                                <Input placeholder="Filtrar..." className="h-6 mt-1 text-xs font-normal" value={headerFilters.visitDay} onChange={e => setHeaderFilters({...headerFilters, visitDay: e.target.value})} />
+                            </TableHead>
+                            <TableHead className="text-right align-top pt-4">Acciones</TableHead>
+                        </TableRow>
+                    </TableHeader>
                     <TableBody>
-                        {zones.map((zone) => (<TableRow key={zone.id}>
+                        {filteredZones.map((zone) => (<TableRow key={zone.id}>
                             <TableCell className="font-medium"><div className="flex items-center gap-2"><Map className="h-4 w-4 text-muted-foreground" />{zone.name}</div></TableCell>
                             <TableCell>{zone.description || 'Sin descripción'}</TableCell>
                             <TableCell><Badge variant="outline" className={zone.visitDay && zone.visitDay !== 'Ninguno' ? 'bg-primary/10 text-primary border-primary/20' : ''}>{zone.visitDay || 'No definido'}</Badge></TableCell>

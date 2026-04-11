@@ -51,4 +51,90 @@ export class InventoryController {
   getVendorInventory(@Query('vendorId') vendorId: string) {
     return this.service.getVendorInventory(vendorId);
   }
+
+  @Post('transfer')
+  @ApiOperation({ summary: 'Trasladar producto entre tiendas/bodegas' })
+  transferBetweenStores(
+    @Body()
+    dto: {
+      fromStoreId: string;
+      toStoreId: string;
+      productId: string;
+      quantity: number;
+      reference?: string;
+    },
+    @Req() req: any,
+  ) {
+    return this.service.transferBetweenStores({
+      ...dto,
+      userId: req.user?.sub,
+    });
+  }
+
+  @Post('quick-entry')
+  @ApiOperation({ summary: 'Entrada rápida de producto sin factura ni proveedor' })
+  quickEntry(
+    @Body()
+    dto: {
+      storeId: string;
+      productId: string;
+      quantity: number;
+      reference?: string;
+    },
+    @Req() req: any,
+  ) {
+    return this.service.adjustStock({
+      storeId: dto.storeId,
+      productId: dto.productId,
+      userId: req.user?.sub,
+      type: 'IN',
+      quantity: dto.quantity,
+      reference: dto.reference || 'Entrada Rápida de Mercancía',
+    });
+  }
+
+  @Post('merma')
+  @ApiOperation({ summary: 'Registrar merma (producto dañado, vencido o perdido)' })
+  registerMerma(
+    @Body()
+    dto: {
+      storeId: string;
+      productId: string;
+      quantity: number;
+      reason: string;
+    },
+    @Req() req: any,
+  ) {
+    return this.service.adjustStock({
+      storeId: dto.storeId,
+      productId: dto.productId,
+      userId: req.user?.sub,
+      type: 'MERMA',
+      quantity: dto.quantity,
+      reference: `Merma: ${dto.reason || 'Sin detalle'}`,
+    });
+  }
+
+  @Post('ajuste')
+  @ApiOperation({ summary: 'Ajuste de inventario (positivo o negativo)' })
+  registerAjuste(
+    @Body()
+    dto: {
+      storeId: string;
+      productId: string;
+      quantity: number;
+      direction: 'positive' | 'negative';
+      reference?: string;
+    },
+    @Req() req: any,
+  ) {
+    return this.service.adjustStock({
+      storeId: dto.storeId,
+      productId: dto.productId,
+      userId: req.user?.sub,
+      type: dto.direction === 'positive' ? 'AJUSTE_POSITIVO' : 'AJUSTE_NEGATIVO',
+      quantity: dto.quantity,
+      reference: dto.reference || `Ajuste Manual ${dto.direction === 'positive' ? '(+)' : '(-)'}`,
+    });
+  }
 }

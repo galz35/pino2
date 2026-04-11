@@ -199,6 +199,10 @@ class SyncQueueProcessor extends Notifier<SyncQueueState> {
     await _localCache.retryFailedSyncEntries();
     await processPendingQueue();
   }
+
+  Future<void> discardFailedEntry(int id) async {
+    await _localCache.discardSyncEntry(id);
+  }
 }
 
 final syncQueueProcessorProvider =

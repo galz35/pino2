@@ -15,7 +15,8 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Package, FileText, Shapes, Library, ChevronRight, Wrench } from "lucide-react";
+import { Package, Shapes, Library, ChevronRight, Wrench, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState, useMemo } from 'react';
 import apiClient from '@/services/api-client';
@@ -167,6 +168,32 @@ export default function ProductsPage() {
         return counts;
     }, [products]);
 
+    const handleExport = () => {
+        const dataToExport = products.map((p: any) => ({
+            'Código de Barras': p.barcode || '',
+            'Descripción': p.description,
+            'Precio de Costo': p.costPrice || 0,
+            'Precio de Venta': p.salePrice || 0,
+            'Precio Mayorista': p.wholesalePrice || 0,
+            'Precio 1': p.price1 || 0,
+            'Precio 2': p.price2 || 0,
+            'Precio 3': p.price3 || 0,
+            'Precio 4': p.price4 || 0,
+            'Precio 5': p.price5 || 0,
+            'Departamento': p.department || '',
+            'Subdepartamento': p.subDepartment || '',
+            'Proveedor': p.supplierName || '',
+            'Usa Inventario': p.usesInventory ? 'SI' : 'NO',
+            'Stock Actual': p.currentStock || 0,
+            'Stock Mínimo': p.minStock || 0,
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Productos");
+        XLSX.writeFile(workbook, "productos.xlsx");
+    };
+
     const renderBreadcrumb = () => (
         <div className="flex items-center text-sm text-muted-foreground mb-4">
             <button onClick={resetSelection} className="hover:underline">Inicio</button>
@@ -317,7 +344,7 @@ export default function ProductsPage() {
 
         // View Departments
         if (departments.length === 0) {
-            return <Alert><Shapes className="h-4 w-4" /><AlertTitle>No hay departamentos</AlertTitle><AlertDescription>No has creado ningún departamento. Empieza por crear uno para organizar tus productos.</AlertDescription></Alert>
+            return <Alert><Shapes className="h-4 w-4" /><AlertTitle>Sin departamentos</AlertTitle><AlertDescription>Crea un departamento para organizar productos.</AlertDescription></Alert>
         }
 
         return (
@@ -340,10 +367,7 @@ export default function ProductsPage() {
     return (
         <div>
             <div className="mb-6">
-                <h1 className="text-2xl font-bold tracking-tight">Gestión de Productos</h1>
-                <p className="text-muted-foreground">
-                    Administra el inventario, precios y categorías de tus productos.
-                </p>
+                <h1 className="text-2xl font-bold tracking-tight">Productos</h1>
             </div>
             <div className="flex flex-wrap gap-2 mb-6">
                 <Button variant="outline" asChild>
@@ -368,9 +392,9 @@ export default function ProductsPage() {
                     )}
                 </Button>
                 <ImportProductsDialog storeId={storeId} departments={departments} />
-                <Button variant="outline" disabled>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Factura
+                <Button variant="outline" onClick={handleExport} disabled={products.length === 0} className="border-green-600/30 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950">
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar Excel
                 </Button>
             </div>
 

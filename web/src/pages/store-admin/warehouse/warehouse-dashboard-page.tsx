@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import apiClient from '@/services/api-client';
+import { User as UserType } from '@/types';
+import { useRealTimeEvents } from '@/hooks/use-real-time-events';
 import { ArrowRight, PackageOpen, Truck, CheckCircle2, User } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import {
@@ -43,6 +45,7 @@ interface OrderDetail extends Order {
 export default function WarehouseDashboardPage() {
   const { storeId } = useParams<{ storeId: string }>();
   const { toast } = useToast();
+  const { lastEvent } = useRealTimeEvents(storeId);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,7 +54,7 @@ export default function WarehouseDashboardPage() {
   const [loadingModal, setLoadingModal] = useState(false);
   
   const [loadingOrder, setLoadingOrder] = useState<Order | null>(null);
-  const [vendors, setVendors] = useState<any[]>([]);
+  const [vendors, setVendors] = useState<UserType[]>([]);
   const [selectedVendorId, setSelectedVendorId] = useState<string>('');
 
   const fetchOrders = async () => {
@@ -75,6 +78,12 @@ export default function WarehouseDashboardPage() {
       return () => clearInterval(interval);
     }
   }, [storeId]);
+
+  useEffect(() => {
+    if (lastEvent && lastEvent.type !== 'PING') {
+      fetchOrders();
+    }
+  }, [lastEvent]);
 
   const updateOrderStatus = async (id: string, status: string, additionalPayload: any = {}) => {
     try {
@@ -115,7 +124,7 @@ export default function WarehouseDashboardPage() {
     // Fetch users for selector
     try {
       const usersRes = await apiClient.get('/users', { params: { storeId } });
-      const ruterUsers = usersRes.data.filter((u: any) => u.role === 'rutero' || u.role === 'vendor' || u.role === 'store-admin');
+      const ruterUsers = (usersRes.data || []).filter((u: UserType) => u.role === 'rutero' || u.role === 'vendor' || u.role === 'store-admin');
       setVendors(ruterUsers);
     } catch (err) {
       console.error(err);
@@ -132,7 +141,7 @@ export default function WarehouseDashboardPage() {
     if (success) setLoadingOrder(null);
   };
 
-  const renderColumn = (title: string, status: string, icon: any, colorClass: string) => {
+  const renderColumn = (title: string, status: string, icon: React.ReactNode, colorClass: string) => {
     const colOrders = orders.filter(o => o.status === status);
     return (
       <div className="flex flex-col flex-1 bg-muted/30 rounded-lg p-4 min-w-[300px]">
@@ -202,10 +211,7 @@ export default function WarehouseDashboardPage() {
   return (
     <div className="h-full flex flex-col">
       <div className="mb-6 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Tablero de Bodega Logística</h1>
-          <p className="text-muted-foreground">Gestión en vivo de preparación, alistamiento y carga de camiones.</p>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Bodega</h1>
         <Button onClick={fetchOrders} variant="outline" className="gap-2">
           <ArrowRight className="h-4 w-4 rotate-180" /> Actualizar
         </Button>
@@ -217,10 +223,10 @@ export default function WarehouseDashboardPage() {
         </div>
       ) : (
         <div className="flex flex-1 gap-4 overflow-x-auto pb-4">
-            {renderColumn('1. Nuevos', 'RECIBIDO', <ArrowRight className="h-5 w-5 text-amber-600" />, 'bg-amber-100 text-amber-700 border border-amber-200')}
-            {renderColumn('2. Picking', 'EN_PREPARACION', <PackageOpen className="h-5 w-5 text-blue-600" />, 'bg-blue-100 text-blue-700 border border-blue-200')}
-            {renderColumn('3. Validado', 'ALISTADO', <CheckCircle2 className="h-5 w-5 text-emerald-600" />, 'bg-emerald-100 text-emerald-700 border border-emerald-200')}
-            {renderColumn('4. Despachado', 'CARGADO_CAMION', <Truck className="h-5 w-5 text-gray-600" />, 'bg-gray-100 text-gray-700 border border-gray-200')}
+            {renderColumn('Nuevos', 'RECIBIDO', <ArrowRight className="h-5 w-5 text-amber-600" />, 'bg-amber-100 text-amber-700 border border-amber-200')}
+            {renderColumn('Picking', 'EN_PREPARACION', <PackageOpen className="h-5 w-5 text-blue-600" />, 'bg-blue-100 text-blue-700 border border-blue-200')}
+            {renderColumn('Listo', 'ALISTADO', <CheckCircle2 className="h-5 w-5 text-emerald-600" />, 'bg-emerald-100 text-emerald-700 border border-emerald-200')}
+            {renderColumn('Despachado', 'CARGADO_CAMION', <Truck className="h-5 w-5 text-gray-600" />, 'bg-gray-100 text-gray-700 border border-gray-200')}
         </div>
       )}
 

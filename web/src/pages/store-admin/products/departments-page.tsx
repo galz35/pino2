@@ -155,9 +155,6 @@ export default function DepartmentsPage() {
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Departamentos</CardTitle>
-            <CardDescription>
-              Gestiona los departamentos para organizar tus productos.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -197,7 +194,7 @@ export default function DepartmentsPage() {
             <Separator className="my-6" />
 
             <div>
-              <h3 className="text-lg font-medium mb-4">Departamentos Existentes</h3>
+              <h3 className="text-lg font-medium mb-4">Lista</h3>
               {loading ? (
                 <div className="space-y-2">
                   <Skeleton className="h-10 w-full" />

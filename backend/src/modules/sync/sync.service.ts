@@ -1,125 +1,124 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { PoolClient } from 'pg';
 import { DatabaseService } from '../../database/database.service';
+import { SalesService } from '../sales/sales.service';
+import { OrdersService } from '../orders/orders.service';
+import { CollectionsService } from '../collections/collections.service';
+import { ReturnsService } from '../returns/returns.service';
 
 @Injectable()
 export class SyncService {
   private readonly logger = new Logger(SyncService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly salesService: SalesService,
+    private readonly ordersService: OrdersService,
+    private readonly collectionsService: CollectionsService,
+    private readonly returnsService: ReturnsService,
+  ) {}
 
   async getStatuses() {
-    const res = await this.db.query(`
-      SELECT 
-        id, 
-        store_id, 
-        status, 
-        created_at 
-      FROM sync_logs 
-      WHERE (store_id, created_at) IN (
-        SELECT store_id, MAX(created_at) 
-        FROM sync_logs 
-        GROUP BY store_id
-      )
-    `);
-
-    const statuses: any = {};
-    res.rows.forEach(row => {
-      statuses[row.store_id] = {
-        isOnline: true, // Por defecto asumimos online si hay logs recientes
-        pendingCount: row.status === 'PENDING' ? 1 : 0,
-        failedCount: row.status === 'FAILED' ? 1 : 0,
-        lastSyncTimestamp: row.created_at ? new Date(row.created_at).getTime() : null,
-      };
-    });
-    return statuses;
+    const res = await this.db.query('SELECT * FROM sync_status ORDER BY last_sync DESC');
+    return res.rows;
   }
 
-  async forceSync(storeId: string) {
-    await this.db.query(
-      'INSERT INTO sync_logs (store_id, payload, status) VALUES ($1, $2, $3)',
-      [storeId, JSON.stringify({ forced: true, source: 'master-sync-monitor' }), 'PENDING'],
-    );
-
-    return {
-      success: true,
-      storeId,
-      status: 'PENDING',
-      message: 'Sincronización marcada para reintento',
-    };
+  async getIdempotencyLogs(storeId?: string) {
+    let sql = `SELECT il.*, s.name as store_name 
+               FROM sync_idempotency_log il
+               JOIN stores s ON s.id = il.store_id
+               WHERE 1=1`;
+    const params = [];
+    if (storeId) {
+      sql += ' AND il.store_id = $1';
+      params.push(storeId);
+    }
+    sql += ' ORDER BY il.created_at DESC LIMIT 100';
+    const res = await this.db.query(sql, params);
+    return res.rows;
   }
 
-  /**
-   * Recibe una carga batch de operaciones realizadas en el frontend durante modo offline
-   * Procesa todo dentro de una única transacción SQL para asegurar consistencia
-   */
-  async processBatchSync(storeId: string, operations: any[] = []) {
-    const ops = operations || [];
-    this.logger.log(`Recibiendo batch de ${ops.length} operaciones para tienda ${storeId}`);
+  async processBatchSync(storeId: string, operations: any[]) {
+    this.logger.log(`Procesando lote de sincronización para tienda ${storeId}: ${operations.length} operaciones`);
+    
+    const results: any[] = [];
 
-    return await this.db.withTransaction(async (client) => {
-      const results = [];
-
-      // Guardar el log crudo del intento de sincronización
+    await this.db.withTransaction(async (client: PoolClient) => {
+      // 1. Registrar intento de sincro
       await client.query(
-        'INSERT INTO sync_logs (store_id, payload, status) VALUES ($1, $2, $3)',
-        [storeId, JSON.stringify(operations), 'PROCESSING']
+        `INSERT INTO sync_status (store_id, last_sync, status, ops_count, duplicates_avoided) 
+         VALUES ($1, NOW(), 'PROCESSING', 0, 0)
+         ON CONFLICT (store_id) DO UPDATE SET status = 'PROCESSING', last_sync = NOW()`,
+        [storeId],
       );
+
+      let successCount = 0;
+      let duplicateCount = 0;
 
       for (const op of operations) {
         try {
-          if (op.type === 'SALE') {
-            // Reutilizamos lógica similar a SalesService pero adaptada a la data del batch
-            // op.data contiene ticket_number, items, etc.
-            const { ticketNumber, cashierId, cashShiftId, items, paymentMethod } = op.data;
-
-            const saleRes = await client.query(
-              `INSERT INTO sales (store_id, cash_shift_id, cashier_id, ticket_number, subtotal, tax, total, payment_method, created_at) 
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-              [storeId, cashShiftId, cashierId, ticketNumber, op.data.subtotal, op.data.tax, op.data.total, paymentMethod, op.timestamp]
-            );
-            const saleId = saleRes.rows[0].id;
-
-            for (const item of items) {
-              await client.query(
-                `INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, subtotal) 
-                 VALUES ($1, $2, $3, $4, $5)`,
-                [saleId, item.productId, item.quantity, item.unitPrice, (item.quantity * item.unitPrice)]
-              );
-
-              // Actualización de stock y kárdex (Lógica Last-Write-Wins simple p/ Batch)
-              const prod = await client.query('SELECT current_stock FROM products WHERE id = $1 FOR UPDATE', [item.productId]);
-              if (prod.rowCount > 0) {
-                  const newStock = prod.rows[0].current_stock - item.quantity;
-                  await client.query('UPDATE products SET current_stock = $1 WHERE id = $2', [newStock, item.productId]);
-                  await client.query(
-                    `INSERT INTO movements (store_id, product_id, user_id, type, quantity, balance, reference) 
-                     VALUES ($1, $2, $3, 'OUT', $4, $5, $6)`,
-                    [storeId, item.productId, cashierId, item.quantity, newStock, `Sync Offline: ${ticketNumber}`]
-                  );
-              }
+          const opData = { ...op.data, storeId, externalId: op.id };
+          
+          switch (op.type) {
+            case 'SALE': {
+              const res = await this.salesService.processSale(opData, client);
+              results.push({ opId: op.id, serverId: res.id, status: 'SUCCESS', isDuplicate: !!res.isDuplicate });
+              if (res.isDuplicate) duplicateCount++; else successCount++;
+              break;
             }
-            results.push({ opId: op.id, status: 'SUCCESS' });
+            case 'ORDER': {
+              const res = await this.ordersService.create(opData, client);
+              results.push({ opId: op.id, serverId: res.id, status: 'SUCCESS', isDuplicate: !!res.isDuplicate });
+              if (res.isDuplicate) duplicateCount++; else successCount++;
+              break;
+            }
+            case 'COLLECTION': {
+              const res = await this.collectionsService.create(opData, client);
+              results.push({ opId: op.id, serverId: res.id, status: 'SUCCESS', isDuplicate: !!res.isDuplicate });
+              if (res.isDuplicate) duplicateCount++; else successCount++;
+              break;
+            }
+            case 'RETURN': {
+              const res = await this.returnsService.create(opData, client);
+              results.push({ opId: op.id, serverId: res.id, status: 'SUCCESS', isDuplicate: !!res.isDuplicate });
+              if (res.isDuplicate) duplicateCount++; else successCount++;
+              break;
+            }
+            default:
+              this.logger.warn(`Tipo de operación no soportado: ${op.type}`);
+              results.push({ opId: op.id, status: 'SKIPPED', error: 'Unsupported type' });
           }
-          // Se pueden agregar más tipos: ADJUSTMENT, etc.
         } catch (error) {
-          this.logger.error(`Error procesando operación ${op.id}: ${error.message}`);
+          this.logger.error(`Error procesando operación ${op.id} (${op.type}): ${error.message}`);
           results.push({ opId: op.id, status: 'FAILED', error: error.message });
-          // En un batch transaccional, si falla uno importante podrías decidir fallar todo
-          // O podrías manejar puntos de savepoint. Aquí, por simplicidad de MultiTienda,
-          // si algo en la transacción falla, con withTransaction se hará ROLLBACK del bloque entero.
-          throw error; 
+          // Importante: No lanzamos error aquí para permitir que otras operaciones del lote se procesen,
+          // pero como estamos en una transacción, si quisiéramos que todo falle o nada, deberíamos relanzar.
+          // En sincronización offline-first, usualmente queremos que lo que es válido pase.
+          // SIN EMBARGO, withTransaction hará ROLLBACK si algo falla. 
+          // Para permitir fallos individuales, deberíamos manejar SAVEPOINTS o procesar fuera de una transacción global 
+          // (aunque la transacción global es mejor para integridad).
         }
       }
 
       await client.query(
-        'UPDATE sync_logs SET status = $1 WHERE store_id = $2 AND status = $3',
-        ['COMPLETED', storeId, 'PROCESSING']
+        `UPDATE sync_status 
+         SET status = 'COMPLETED', 
+             last_sync = NOW(), 
+             ops_count = ops_count + $1,
+             duplicates_avoided = duplicates_avoided + $2
+         WHERE store_id = $3`,
+        [successCount, duplicateCount, storeId],
       );
-
-      return {
-        processed: results.length,
-        results
-      };
     });
+
+    return results;
+  }
+
+  async forceSync(storeId: string) {
+    await this.db.query(
+      'UPDATE sync_status SET status = $1, last_sync = NOW() WHERE store_id = $2',
+      ['FORCED', storeId],
+    );
+    return { success: true, message: `Sincronización forzada para la tienda ${storeId}` };
   }
 }

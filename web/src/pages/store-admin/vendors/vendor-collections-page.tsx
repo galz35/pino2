@@ -174,17 +174,10 @@ export default function VendorCollectionsPage() {
       <section className="rounded-3xl bg-gradient-to-br from-emerald-950 via-emerald-900 to-lime-700 p-6 text-white shadow-xl">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="space-y-3">
-            <Badge className="w-fit border border-white/20 bg-white/10 text-white hover:bg-white/10">
-              Ruta y cobranza
-            </Badge>
-            <div className="space-y-2">
-              <h1 className="text-3xl font-black tracking-tight">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-bold tracking-tight">
                 Cobranza en ruta
               </h1>
-              <p className="max-w-2xl text-sm text-emerald-50/85">
-                Ver cliente, saldo y cobrar sin entrar a una tabla fría. Esta
-                pantalla está pensada para llegar, registrar y seguir la ruta.
-              </p>
             </div>
           </div>
 
@@ -207,23 +200,15 @@ export default function VendorCollectionsPage() {
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="relative">
+        <div className="mt-5">
+          <div className="relative max-w-md">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/65" />
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Buscar cliente o referencia..."
-              className="h-12 rounded-2xl border-white/10 bg-white/10 pl-11 text-white placeholder:text-white/65"
+              className="h-12 rounded-xl border-white/20 bg-white/10 pl-11 text-white placeholder:text-white/65"
             />
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm text-white/90">
-            <p className="font-semibold">Flujo ideal</p>
-            <p className="mt-1 text-white/70">
-              1. Busca cliente. 2. Cobra total o parcial. 3. Confirma. 4.
-              Sigue la ruta.
-            </p>
           </div>
         </div>
       </section>
@@ -300,32 +285,6 @@ export default function VendorCollectionsPage() {
           )}
         </div>
 
-        <Card className="rounded-3xl border-slate-200 bg-slate-50/70">
-          <CardHeader>
-            <CardTitle className="text-lg font-black text-slate-900">
-              Regla operativa
-            </CardTitle>
-            <CardDescription>
-              Esta vista debe ayudarte a cobrar, no a navegar.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm text-slate-700">
-            <div className="rounded-2xl border bg-white p-4">
-              <p className="font-semibold">Prioriza por saldo</p>
-              <p className="mt-1 text-muted-foreground">
-                Las cuentas se ordenan de mayor a menor para atacar primero lo
-                más importante.
-              </p>
-            </div>
-            <div className="rounded-2xl border bg-white p-4">
-              <p className="font-semibold">No pidas más pasos</p>
-              <p className="mt-1 text-muted-foreground">
-                El cobro debe quedar en el modal, con monto total o parcial, y
-                seguir la ruta.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

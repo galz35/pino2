@@ -12,6 +12,9 @@ import '../../features/orders/presentation/screens/quick_order_screen.dart';
 import '../../features/returns/presentation/screens/returns_screen.dart';
 import '../../features/startup/presentation/screens/splash_screen.dart';
 import '../../features/warehouse/presentation/screens/warehouse_board_screen.dart';
+import '../../features/daily_closing/presentation/screens/daily_closing_screen.dart';
+import '../../features/vendor_inventory/presentation/screens/vendor_inventory_screen.dart';
+import '../../features/sales_history/presentation/screens/sales_history_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authControllerProvider);
@@ -67,6 +70,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/warehouse/:storeId',
         builder: (context, state) => WarehouseBoardScreen(
+          storeId: state.pathParameters['storeId'] ?? '',
+          storeName: state.uri.queryParameters['storeName'],
+        ),
+      ),
+      GoRoute(
+        path: '/daily-closing/:storeId',
+        builder: (context, state) => DailyClosingScreen(
+          storeId: state.pathParameters['storeId'] ?? '',
+          storeName: state.uri.queryParameters['storeName'],
+        ),
+      ),
+      GoRoute(
+        path: '/vendor-inventory/:storeId',
+        builder: (context, state) => VendorInventoryScreen(
+          storeId: state.pathParameters['storeId'] ?? '',
+          storeName: state.uri.queryParameters['storeName'],
+        ),
+      ),
+      GoRoute(
+        path: '/sales-history/:storeId',
+        builder: (context, state) => SalesHistoryScreen(
           storeId: state.pathParameters['storeId'] ?? '',
           storeName: state.uri.queryParameters['storeName'],
         ),

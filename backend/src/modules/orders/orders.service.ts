@@ -1,13 +1,17 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { PoolClient } from 'pg';
 import { DatabaseService } from '../../database/database.service';
 import { EventsGateway } from '../../common/gateways/events.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class OrdersService {
   constructor(
     private readonly db: DatabaseService,
     private readonly eventsGateway: EventsGateway,
+    private readonly notifications: NotificationsService,
   ) {}
+
 
   async create(dto: {
     storeId: string;
@@ -19,16 +23,54 @@ export class OrdersService {
     priceLevel?: number;
     items: { productId: string; quantity: number; unitPrice: number; presentation?: string; priceLevel?: number }[];
     notes?: string;
-  }) {
-    return this.db.withTransaction(async (client) => {
+    externalId?: string;
+    type?: 'pedido' | 'venta_directa'; // Nuevo campo
+  }, transactionalClient?: PoolClient) {
+    const execute = async (client: PoolClient) => {
+      // Check idempotency
+      if (dto.externalId) {
+        const existing = await client.query('SELECT * FROM orders WHERE external_id = $1', [dto.externalId]);
+        if (existing.rowCount > 0) {
+          await client.query(
+            'INSERT INTO sync_idempotency_log (store_id, external_id, entity_type) VALUES ($1, $2, $3)',
+            [dto.storeId, dto.externalId, 'ORDER'],
+          );
+          return {
+            ...this.mapRow(existing.rows[0]),
+            message: 'Operación ya procesada anteriormente (Idempotencia)',
+            isDuplicate: true,
+          };
+        }
+      }
+
       const total = dto.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
 
+      const orderType = dto.type || 'pedido';
+      const initialStatus = orderType === 'venta_directa' ? 'ENTREGADO' : 'RECIBIDO';
+
       const res = await client.query(
-        `INSERT INTO orders (store_id, client_id, client_name, vendor_id, sales_manager_name, total, notes, status, payment_type, price_level)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'RECIBIDO', $8, $9) RETURNING *`,
-        [dto.storeId, dto.clientId || null, dto.clientName || null, dto.vendorId || null, dto.salesManagerName || null, total, dto.notes || null, dto.paymentType || 'CONTADO', dto.priceLevel || 1],
+        `INSERT INTO orders (store_id, client_id, client_name, vendor_id, sales_manager_name, total, notes, status, payment_type, price_level, external_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        [
+          dto.storeId, 
+          dto.clientId || null, 
+          dto.clientName || null, 
+          dto.vendorId || null, 
+          dto.salesManagerName || null, 
+          total, 
+          dto.notes || null, 
+          initialStatus, 
+          dto.paymentType || 'CONTADO', 
+          dto.priceLevel || 1, 
+          dto.externalId
+        ],
       );
       const order = res.rows[0];
+
+      await client.query(
+        `INSERT INTO order_status_history (order_id, status, user_id) VALUES ($1, $2, $3)`,
+        [order.id, 'RECIBIDO', dto.vendorId || null]
+      );
 
       if ((dto.paymentType || 'CONTADO').toUpperCase() === 'CREDITO') {
         await client.query(
@@ -52,6 +94,35 @@ export class OrdersService {
         );
       }
 
+      // Si es venta directa, descontar del inventario del Vendedor inmediatamente
+      if (orderType === 'venta_directa' && dto.vendorId) {
+        for (const item of dto.items) {
+          // Descontar del stock del vendedor
+          await client.query(`
+            UPDATE vendor_inventories 
+            SET current_quantity = GREATEST(current_quantity - $1, 0),
+                sold_quantity = sold_quantity + $1,
+                updated_at = NOW()
+            WHERE vendor_id = $2 AND product_id = $3
+          `, [item.quantity, dto.vendorId, item.productId]);
+        }
+      }
+
+      // IMPORTANTE: Crear el registro en pending_deliveries para que aparezca en "Asignar Ruta"
+      // Solo si es un 'pedido' normal
+      if (orderType === 'pedido') {
+        const clientAddressRes = dto.clientId 
+          ? await client.query('SELECT address FROM clients WHERE id = $1', [dto.clientId])
+          : { rows: [] };
+        const address = clientAddressRes.rows[0]?.address || 'Entrega en tienda / Calle';
+
+        await client.query(
+          `INSERT INTO pending_deliveries (store_id, order_id, client_id, address, status)
+           VALUES ($1, $2, $3, $4, 'Pendiente')`,
+          [dto.storeId, order.id, dto.clientId || null, address]
+        );
+      }
+
       const finalOrder = this.mapRow(order);
       
       // Notify Web Dashboards in Real-Time
@@ -62,13 +133,19 @@ export class OrdersService {
       });
 
       return finalOrder;
-    });
+    };
+
+    if (transactionalClient) {
+      return execute(transactionalClient);
+    }
+    return this.db.withTransaction(execute);
   }
 
   async findAll(filters: {
     storeId?: string;
     status?: string;
     vendorId?: string;
+    clientId?: string;
     fromDate?: string;
     toDate?: string;
   }) {
@@ -87,6 +164,10 @@ export class OrdersService {
     if (filters.vendorId) {
       sql += ` AND vendor_id = $${idx++}`;
       params.push(filters.vendorId);
+    }
+    if (filters.clientId) {
+      sql += ` AND client_id = $${idx++}`;
+      params.push(filters.clientId);
     }
     if (filters.fromDate) {
       sql += ` AND created_at >= $${idx++}`;
@@ -127,6 +208,21 @@ export class OrdersService {
       unitsPerBulk: parseInt(r.units_per_bulk || 1, 10),
       unitPrice: parseFloat(r.unit_price),
       subtotal: parseFloat(r.subtotal),
+    }));
+
+    const historyRes = await this.db.query(
+      `SELECT h.*, u.name as user_name 
+       FROM order_status_history h 
+       LEFT JOIN users u ON u.id = h.user_id 
+       WHERE h.order_id = $1 
+       ORDER BY h.created_at ASC`,
+      [id]
+    );
+
+    order.history = historyRes.rows.map((r) => ({
+      status: r.status,
+      userName: r.user_name || 'Sistema',
+      createdAt: r.created_at,
     }));
 
     return order;
@@ -175,9 +271,10 @@ export class OrdersService {
         if (!effectiveVendorId) throw new NotFoundException('El pedido requiere un vendor_id para cargar al camión.');
         const itemsRes = await client.query('SELECT oi.*, p.units_per_bulk FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1', [id]);
         for (const item of itemsRes.rows) {
-          const upb = item.units_per_bulk || 1;
+          const upb = parseInt(item.units_per_bulk, 10) || 1;
           const isBulk = item.presentation === 'BULTO';
-          const totalUnits = isBulk ? item.quantity * upb : item.quantity;
+          const rawQty = parseInt(item.quantity, 10) || 0;
+          const totalUnits = isBulk ? rawQty * upb : rawQty;
           const qtyBulks = Math.floor(totalUnits / upb);
           const qtyUnits = totalUnits % upb;
 
@@ -225,9 +322,10 @@ export class OrdersService {
         if (!effectiveVendorId) throw new NotFoundException('El pedido requiere un vendor_id para la entrega.');
         const itemsRes = await client.query('SELECT oi.*, p.units_per_bulk FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1', [id]);
         for (const item of itemsRes.rows) {
-          const upb = item.units_per_bulk || 1;
+          const upb = parseInt(item.units_per_bulk, 10) || 1;
           const isBulk = item.presentation === 'BULTO';
-          const totalUnits = isBulk ? item.quantity * upb : item.quantity;
+          const rawQty = parseInt(item.quantity, 10) || 0;
+          const totalUnits = isBulk ? rawQty * upb : rawQty;
           
           await client.query(`
             UPDATE vendor_inventories 
@@ -246,6 +344,11 @@ export class OrdersService {
         [targetStatus, updatedBy || null, id],
       );
       
+      await client.query(
+        `INSERT INTO order_status_history (order_id, status, user_id) VALUES ($1, $2, $3)`,
+        [id, targetStatus, updatedBy || null]
+      );
+      
       const order = this.mapRow(updateRes.rows[0]);
 
       // Produce precise realtime event for web dashboards logic tracking
@@ -254,6 +357,27 @@ export class OrdersService {
         storeId: storeId,
         payload: { orderId: id, status: targetStatus, previousStatus: currentStatus, updatedBy },
       });
+
+      // NOTIFICACIÓN: Si el pedido fue cargado al camión o entregado, avisar al stakeholder
+      if (effectiveVendorId && (targetStatus === 'CARGADO_CAMION' || targetStatus === 'ENTREGADO')) {
+        try {
+          await this.notifications.create({
+            storeId: storeId,
+            userId: effectiveVendorId,
+            type: 'ORDER_UPDATE',
+            title: `📋 Pedido #${id.substring(0, 8)}: ${targetStatus.replace('_', ' ')}`,
+            message: `El pedido ha pasado a estado ${targetStatus.toLowerCase()}`,
+            metadata: {
+              type: 'ORDER_UPDATE',
+              orderId: id,
+              status: targetStatus,
+            }
+          });
+        } catch (e) {
+          this.db['logger'].error(`Error enviando notificación de pedido: ${e.message}`);
+        }
+      }
+
 
       if (targetStatus === 'CARGADO_CAMION' && currentStatus !== 'CARGADO_CAMION') {
         this.eventsGateway.emitSyncUpdate({

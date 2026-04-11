@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import {
   DollarSign,
   Loader2,
   MinusCircle,
-  PackageSearch,
   PlusCircle,
   Search,
   ShoppingBag,
   User,
+  ListOrdered,
 } from 'lucide-react';
 
 import apiClient from '@/services/api-client';
@@ -17,42 +17,22 @@ import { useToast } from '@/hooks/use-toast';
 import { AddClientDialog } from '@/components/pos/add-client-dialog';
 import { ClientSelectionDialog } from '@/components/pos/client-selection-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Client, Product as GlobalProduct } from '@/types';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 
-interface Product {
-  id: string;
-  description: string;
-  salePrice: number;
-  costPrice?: number;
-  barcode?: string;
-  unitsPerBulto?: number;
-}
-
-interface CartItem extends Product {
+interface CartItem extends GlobalProduct {
   quantity: number;
-}
-
-interface Client {
-  id: string;
-  name: string;
-  phone?: string;
-  address?: string;
 }
 
 const genericClient: Client = {
   id: 'generic',
+  storeId: '',
   name: 'Cliente Genérico',
   phone: '',
   address: '',
+  email: '',
 };
 
 export default function VendorQuickSalePage() {
@@ -67,8 +47,9 @@ export default function VendorQuickSalePage() {
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [allProducts, setAllProducts] = useState<GlobalProduct[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const { storeId } = useParams<{ storeId: string }>();
   const [searchParams] = useSearchParams();
@@ -76,6 +57,7 @@ export default function VendorQuickSalePage() {
   const { toast } = useToast();
   const clientId = searchParams.get('clientId');
 
+  // Load store settings
   useEffect(() => {
     if (!storeId) return;
     apiClient
@@ -88,55 +70,44 @@ export default function VendorQuickSalePage() {
       .catch(() => {});
   }, [storeId]);
 
+  // Load full catalog once
   useEffect(() => {
-    if (!clientId) {
-      return;
-    }
+    if (!storeId) return;
+    setCatalogLoading(true);
+    apiClient
+      .get('/products', { params: { storeId, limit: 500 } })
+      .then((res) => {
+        setAllProducts(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => setAllProducts([]))
+      .finally(() => setCatalogLoading(false));
+  }, [storeId]);
 
+  // Load pre-selected client from URL
+  useEffect(() => {
+    if (!clientId) return;
     let isMounted = true;
     apiClient
       .get(`/clients/${clientId}`)
       .then((res) => {
-        if (isMounted && res.data) {
-          setSelectedClient(res.data);
-        }
+        if (isMounted && res.data) setSelectedClient(res.data);
       })
-      .catch(() => {
-        if (isMounted) {
-          toast({
-            variant: 'destructive',
-            title: 'Cliente no disponible',
-            description: 'No se pudo cargar el cliente seleccionado.',
-          });
-        }
-      });
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, [clientId]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [clientId, toast]);
+  // Filter products locally (instant, no API call)
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm.trim()) return allProducts;
+    const term = searchTerm.toLowerCase();
+    return allProducts.filter(
+      (p) =>
+        p.description?.toLowerCase().includes(term) ||
+        p.barcode?.toLowerCase().includes(term),
+    );
+  }, [searchTerm, allProducts]);
 
-  const handleSearch = async (term: string) => {
-    setSearchTerm(term);
-    if (term.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    setSearchLoading(true);
-    try {
-      const res = await apiClient.get('/products', {
-        params: { storeId, search: term, limit: 12 },
-      });
-      setSearchResults(Array.isArray(res.data) ? res.data : []);
-    } catch {
-      setSearchResults([]);
-    } finally {
-      setSearchLoading(false);
-    }
-  };
-
-  const handleAddProduct = useCallback((product: Product) => {
+  const handleAddProduct = useCallback((product: GlobalProduct) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
       if (existing) {
@@ -148,8 +119,6 @@ export default function VendorQuickSalePage() {
       }
       return [...prev, { ...product, quantity: 1 }];
     });
-    setSearchTerm('');
-    setSearchResults([]);
   }, []);
 
   const handleQuantityChange = (productId: string, amount: number) => {
@@ -165,7 +134,7 @@ export default function VendorQuickSalePage() {
   };
 
   const subtotal = useMemo(
-    () => cart.reduce((acc, item) => acc + item.salePrice * item.quantity, 0),
+    () => cart.reduce((acc, item) => acc + (Number(item.salePrice) || 0) * item.quantity, 0),
     [cart],
   );
   const tax = useMemo(
@@ -186,20 +155,11 @@ export default function VendorQuickSalePage() {
 
   const handleFinalizeSale = async () => {
     if (!user) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'No se pudo identificar al vendedor.',
-      });
+      toast({ variant: 'destructive', title: 'Error', description: 'No se pudo identificar al vendedor.' });
       return;
     }
-
     if (cart.length === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Agrega al menos un producto.',
-      });
+      toast({ variant: 'destructive', title: 'Error', description: 'Agrega al menos un producto.' });
       return;
     }
 
@@ -209,358 +169,197 @@ export default function VendorQuickSalePage() {
         storeId,
         vendorId: user.id,
         cashierName: user.name,
-        clientId:
-          selectedClient.id !== 'generic' ? selectedClient.id : undefined,
+        clientId: selectedClient.id !== 'generic' ? selectedClient.id : undefined,
         clientName: selectedClient.name,
-        items: cart.map(
-          ({ id, description, quantity, salePrice, costPrice }) => ({
-            productId: id,
-            description,
-            quantity,
-            unitPrice: salePrice,
-            costPrice: costPrice || 0,
-          }),
-        ),
-        subtotal,
-        tax,
-        total,
-        paymentType,
+        items: cart.map(({ id, description, quantity, salePrice, costPrice }) => ({
+          productId: id, description, quantity, unitPrice: salePrice, costPrice: costPrice || 0,
+        })),
+        subtotal, tax, total, paymentType,
         status: paymentType === 'Crédito' ? 'Pendiente de Pago' : 'Pagada',
         type: 'venta_directa',
       });
 
-      toast({
-        title: 'Venta registrada',
-        description: 'El pedido quedó guardado y listo para seguir.',
-      });
+      toast({ title: 'Venta registrada', description: `C$ ${total.toFixed(2)} — ${selectedClient.name}` });
       resetSale();
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description:
-          error?.response?.data?.message || 'No se pudo registrar la venta.',
-      });
+      toast({ variant: 'destructive', title: 'Error', description: error?.response?.data?.message || 'No se pudo registrar la venta.' });
     } finally {
       setIsProcessing(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl bg-gradient-to-br from-slate-950 via-sky-900 to-cyan-600 p-6 text-white shadow-xl">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div className="space-y-3">
-            <Badge className="w-fit border border-white/20 bg-white/10 text-white hover:bg-white/10">
-              Venta en calle
-            </Badge>
-            <div className="space-y-2">
-              <h1 className="text-3xl font-black tracking-tight">
-                Venta rápida
-              </h1>
-              <p className="max-w-2xl text-sm text-sky-50/85">
-                Cliente pide, tú apuntas y guardas. Esta pantalla prioriza ritmo
-                de venta antes que navegación de oficina.
-              </p>
+    <div className="flex flex-col gap-4 h-full">
+      {/* TOP BAR: cliente + pago + link a historial */}
+      <div className="flex flex-wrap items-center gap-3">
+        <ClientSelectionDialog
+          currentClient={selectedClient}
+          onSelectClient={setSelectedClient}
+          trigger={
+            <Button variant="outline" className="gap-2 rounded-xl">
+              <User className="h-4 w-4" />
+              {selectedClient.name}
+            </Button>
+          }
+        />
+        <AddClientDialog
+          onClientAdded={setSelectedClient}
+          trigger={<Button variant="ghost" size="sm">+ Cliente</Button>}
+        />
+
+        <div className="flex gap-1 ml-auto">
+          {(['Contado', 'Crédito'] as const).map((mode) => (
+            <Button
+              key={mode}
+              size="sm"
+              variant={paymentType === mode ? 'default' : 'outline'}
+              className="rounded-xl"
+              onClick={() => setPaymentType(mode)}
+            >
+              {mode}
+            </Button>
+          ))}
+        </div>
+
+        <Button variant="outline" size="sm" className="gap-2 rounded-xl" asChild>
+          <Link to={`/store/${storeId}/vendors/sales`}>
+            <ListOrdered className="h-4 w-4" /> Historial
+          </Link>
+        </Button>
+      </div>
+
+      {/* MAIN BODY: catalog left + cart right */}
+      <div className="flex-1 grid gap-4 xl:grid-cols-[1fr_380px] min-h-0">
+        {/* CATALOG */}
+        <div className="flex flex-col min-h-0 rounded-2xl border bg-white">
+          <div className="p-3 border-b">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                ref={searchRef}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Filtrar productos..."
+                className="h-10 rounded-xl pl-10"
+              />
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <QuickMetric
-              label="Cliente"
-              value={selectedClient.name}
-              tone="bg-white/10"
-            />
-            <QuickMetric
-              label="Items"
-              value={`${totalItems}`}
-              tone="bg-white/10"
-            />
-            <QuickMetric
-              label="Total"
-              value={`C$ ${total.toFixed(2)}`}
-              tone="bg-white/10"
-            />
-          </div>
-        </div>
-      </section>
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_420px]">
-        <div className="space-y-6">
-          <Card className="rounded-3xl border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-xl font-black">
-                Cliente activo
-              </CardTitle>
-              <CardDescription>
-                Busca uno existente o crea uno nuevo sin salir del flujo.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-3">
-                <ClientSelectionDialog
-                  currentClient={selectedClient as any}
-                  onSelectClient={setSelectedClient as any}
-                  trigger={
-                    <Button
-                      variant="outline"
-                      className="min-w-[220px] flex-1 justify-between rounded-2xl"
-                    >
-                      Buscar o seleccionar cliente
-                    </Button>
-                  }
-                />
-                <AddClientDialog
-                  onClientAdded={setSelectedClient as any}
-                  trigger={<Button variant="outline">Nuevo cliente</Button>}
-                />
+          <div className="flex-1 overflow-y-auto p-3">
+            {catalogLoading ? (
+              <div className="flex items-center justify-center h-40">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
-
-              <div className="flex items-center gap-4 rounded-2xl border bg-slate-50 p-4">
-                <div className="rounded-2xl bg-slate-900 p-3 text-white">
-                  <User className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-lg font-black">
-                    {selectedClient.name}
-                  </p>
-                  <p className="truncate text-sm text-muted-foreground">
-                    {selectedClient.phone || 'Sin telefono registrado'}
-                  </p>
-                </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center text-sm text-muted-foreground py-10">
+                Sin resultados.
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-3xl border-slate-200 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-xl font-black">
-                Buscar producto
-              </CardTitle>
-              <CardDescription>
-                Busca por nombre o código y agrega con un toque.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={searchTerm}
-                  onChange={(event) => handleSearch(event.target.value)}
-                  placeholder="Nombre o codigo del producto..."
-                  className="h-12 rounded-2xl pl-11"
-                />
-              </div>
-
-              {searchLoading ? (
-                <div className="flex min-h-28 items-center justify-center rounded-2xl border border-dashed">
-                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                </div>
-              ) : searchTerm.length >= 2 && searchResults.length === 0 ? (
-                <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                  No se encontraron productos para este filtro.
-                </div>
-              ) : searchResults.length > 0 ? (
-                <div className="grid gap-3 md:grid-cols-2">
-                  {searchResults.map((product) => (
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {filteredProducts.map((product) => {
+                  const inCart = cart.find((c) => c.id === product.id);
+                  return (
                     <button
                       key={product.id}
                       type="button"
                       onClick={() => handleAddProduct(product)}
-                      className="rounded-2xl border bg-white p-4 text-left transition-all hover:border-primary hover:bg-primary/5"
+                      className={`relative rounded-xl border p-3 text-left transition-all hover:border-primary hover:bg-primary/5 ${
+                        inCart ? 'border-primary bg-primary/5' : 'bg-white'
+                      }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <p className="font-black text-slate-900">
-                            {product.description}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {product.barcode || 'Sin codigo'}
-                          </p>
-                        </div>
-                        <Badge variant="secondary">Agregar</Badge>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between">
-                        <p className="text-lg font-black text-primary">
-                          C$ {product.salePrice.toFixed(2)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {product.unitsPerBulto
-                            ? `${product.unitsPerBulto} u/bulto`
-                            : 'Unidad'}
-                        </p>
-                      </div>
+                      {inCart && (
+                        <Badge className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 flex items-center justify-center text-xs">
+                          {inCart.quantity}
+                        </Badge>
+                      )}
+                      <p className="font-semibold text-sm truncate text-slate-900">
+                        {product.description}
+                      </p>
+                      <p className="text-primary font-bold mt-1">
+                        C$ {product.salePrice.toFixed(2)}
+                      </p>
                     </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed bg-slate-50/70 p-8 text-center">
-                  <PackageSearch className="mx-auto h-10 w-10 text-muted-foreground/60" />
-                  <p className="mt-3 text-sm font-medium text-slate-700">
-                    Empieza escribiendo para traer productos.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="xl:sticky xl:top-20 xl:self-start">
-          <Card className="overflow-hidden rounded-3xl border-slate-200 shadow-lg">
-            <CardHeader className="border-b bg-slate-950 text-white">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <CardTitle className="text-xl font-black text-white">
-                    Pedido actual
-                  </CardTitle>
-                  <CardDescription className="text-slate-300">
-                    Ajusta cantidades y registra sin abrir otra pantalla.
-                  </CardDescription>
-                </div>
-                <Badge className="bg-white/10 text-white hover:bg-white/10">
-                  {totalItems} items
-                </Badge>
+        {/* CART PANEL */}
+        <div className="flex flex-col min-h-0 rounded-2xl border bg-white">
+          <div className="p-3 border-b flex items-center justify-between">
+            <span className="font-bold text-sm">Pedido</span>
+            {cart.length > 0 && (
+              <Button variant="ghost" size="sm" className="text-xs text-destructive" onClick={() => setCart([])}>
+                Vaciar
+              </Button>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {cart.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                <ShoppingBag className="h-10 w-10 mb-2 opacity-40" />
+                <p className="text-sm">Toca un producto para agregar.</p>
               </div>
-            </CardHeader>
-
-            <CardContent className="space-y-5 p-5">
-              <div className="grid gap-2 sm:grid-cols-2">
-                {(['Contado', 'Crédito'] as const).map((mode) => (
-                  <Button
-                    key={mode}
-                    type="button"
-                    variant={paymentType === mode ? 'default' : 'outline'}
-                    className="rounded-2xl"
-                    onClick={() => setPaymentType(mode)}
-                  >
-                    {mode}
-                  </Button>
-                ))}
-              </div>
-
-              <Separator />
-
-              {cart.length > 0 ? (
-                <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
-                  {cart.map((item) => (
-                    <div
-                      key={item.id}
-                      className="rounded-2xl border bg-slate-50 p-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-black text-slate-900">
-                            {item.description}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            C$ {item.salePrice.toFixed(2)} c/u
-                          </p>
-                        </div>
-                        <p className="text-right text-lg font-black text-slate-950">
-                          C$ {(item.salePrice * item.quantity).toFixed(2)}
-                        </p>
-                      </div>
-
-                      <div className="mt-4 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-10 w-10 rounded-full"
-                            onClick={() => handleQuantityChange(item.id, -1)}
-                          >
-                            <MinusCircle className="h-4 w-4" />
-                          </Button>
-                          <div className="min-w-12 text-center text-lg font-black">
-                            {item.quantity}
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-10 w-10 rounded-full"
-                            onClick={() => handleQuantityChange(item.id, 1)}
-                          >
-                            <PlusCircle className="h-4 w-4" />
-                          </Button>
-                        </div>
-
-                        <Badge variant="outline">Linea activa</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed bg-slate-50/70 p-10 text-center">
-                  <ShoppingBag className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                  <p className="mt-4 text-base font-semibold text-slate-800">
-                    Venta vacía
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Busca un producto y agrégalo para empezar.
-                  </p>
-                </div>
-              )}
-
-              <Separator />
-
-              <div className="space-y-3 rounded-2xl bg-slate-50 p-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-semibold">
-                    C$ {subtotal.toFixed(2)}
+            ) : (
+              cart.map((item) => (
+                <div key={item.id} className="flex items-center gap-3 rounded-xl border p-3 bg-slate-50">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate">{item.description}</p>
+                    <p className="text-xs text-muted-foreground">C$ {item.salePrice.toFixed(2)}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleQuantityChange(item.id, -1)}>
+                      <MinusCircle className="h-4 w-4" />
+                    </Button>
+                    <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleQuantityChange(item.id, 1)}>
+                      <PlusCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <span className="font-bold text-sm w-20 text-right">
+                    C$ {(item.salePrice * item.quantity).toFixed(2)}
                   </span>
                 </div>
-                {settings.applyVAT ? (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">IVA</span>
-                    <span className="font-semibold">C$ {tax.toFixed(2)}</span>
-                  </div>
-                ) : null}
-                <div className="flex items-center justify-between text-xl font-black text-slate-950">
-                  <span>Total</span>
-                  <span>C$ {total.toFixed(2)}</span>
-                </div>
-              </div>
+              ))
+            )}
+          </div>
 
-              <Button
-                size="lg"
-                className="h-14 w-full rounded-2xl text-base font-black"
-                disabled={cart.length === 0 || isProcessing}
-                onClick={handleFinalizeSale}
-              >
-                {isProcessing ? (
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                ) : (
-                  <DollarSign className="mr-2 h-5 w-5" />
-                )}
-                Registrar pedido
-              </Button>
-            </CardContent>
-          </Card>
+          {/* FOOTER: totals + register button */}
+          <div className="border-t p-3 space-y-3 bg-slate-50">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Subtotal ({totalItems} items)</span>
+              <span className="font-semibold">C$ {subtotal.toFixed(2)}</span>
+            </div>
+            {settings.applyVAT && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">IVA</span>
+                <span className="font-semibold">C$ {tax.toFixed(2)}</span>
+              </div>
+            )}
+            <Separator />
+            <div className="flex justify-between text-lg font-black">
+              <span>Total</span>
+              <span>C$ {total.toFixed(2)}</span>
+            </div>
+            <Button
+              size="lg"
+              className="h-12 w-full rounded-xl font-bold"
+              disabled={cart.length === 0 || isProcessing}
+              onClick={handleFinalizeSale}
+            >
+              {isProcessing ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <DollarSign className="mr-2 h-5 w-5" />
+              )}
+              Registrar
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function QuickMetric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: string;
-}) {
-  return (
-    <div className={`rounded-2xl border border-white/10 p-4 ${tone}`}>
-      <p className="text-xs uppercase tracking-[0.18em] text-white/70">
-        {label}
-      </p>
-      <p className="mt-3 truncate text-2xl font-black tracking-tight text-white">
-        {value}
-      </p>
     </div>
   );
 }

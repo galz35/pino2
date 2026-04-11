@@ -420,6 +420,10 @@ class LocalCacheRepository {
     return _database.markSyncEntryCompleted(id);
   }
 
+  Future<void> discardSyncEntry(int id) {
+    return _database.discardSyncEntry(id);
+  }
+
   Future<void> registerSyncAttempt(
     int id, {
     required String errorMessage,

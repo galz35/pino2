@@ -1,15 +1,19 @@
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Activity, ShieldAlert, ShoppingBag, Truck, Lock, History, ClipboardCheck } from 'lucide-react';
+import { Activity, ShieldAlert, ShoppingBag, Truck, Lock, History, ClipboardCheck, Server, RefreshCw, Zap, ShieldCheck } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import apiClient from '@/services/api-client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 export default function ControlTowerPage() {
     const { storeId } = useParams<{ storeId: string }>();
     const [stats, setStats] = useState({ pendingOrders: 0, pendingDeliveries: 0, pendingAuths: 0, openShifts: 0 });
+    const [syncStatuses, setSyncStatuses] = useState<any[]>([]);
+    const [idempotencyLogs, setIdempotencyLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Mock data for the chart - In a real scenario, this would come from an endpoint
@@ -28,11 +32,13 @@ export default function ControlTowerPage() {
         if (!storeId) return;
         const fetchStats = async () => {
             try {
-                const [orders, deliveries, auths, shifts] = await Promise.all([
+                const [orders, deliveries, auths, shifts, sync, logs] = await Promise.all([
                     apiClient.get('/pending-orders', { params: { storeId } }).catch(() => ({ data: [] })),
                     apiClient.get('/pending-deliveries', { params: { storeId } }).catch(() => ({ data: [] })),
                     apiClient.get('/authorizations', { params: { storeId, status: 'PENDING' } }).catch(() => ({ data: [] })),
                     apiClient.get('/cash-shifts', { params: { storeId, status: 'open' } }).catch(() => ({ data: [] })),
+                    apiClient.get('/sync/statuses').catch(() => ({ data: [] })),
+                    apiClient.get('/sync/idempotency-logs', { params: { storeId } }).catch(() => ({ data: [] })),
                 ]);
                 setStats({
                     pendingOrders: orders.data?.length || 0,
@@ -40,6 +46,8 @@ export default function ControlTowerPage() {
                     pendingAuths: auths.data?.length || 0,
                     openShifts: shifts.data?.length || 0,
                 });
+                setSyncStatuses(sync.data || []);
+                setIdempotencyLogs(logs.data || []);
             } catch { }
             setLoading(false);
         };
@@ -136,38 +144,125 @@ export default function ControlTowerPage() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-white">
                             <ShieldAlert className="h-5 w-5 text-rose-500" />
-                            Alertas de Sistema
+                            Alarmas de Sincronización
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {stats.pendingAuths > 0 ? (
-                            <div className="p-4 rounded-xl bg-white/10 backdrop-blur-md border border-white/10">
-                                <p className="text-rose-400 font-bold">¡Atención!</p>
-                                <p className="text-sm">Hay {stats.pendingAuths} autorizaciones de precio bloqueando pedidos.</p>
+                        {idempotencyLogs.length > 0 ? (
+                            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                {idempotencyLogs.slice(0, 5).map((log) => (
+                                    <div key={log.id} className="p-3 rounded-lg bg-white/5 border border-white/10 flex items-start gap-3">
+                                        <div className="mt-1 p-1.5 rounded-md bg-emerald-500/20 text-emerald-400">
+                                            <ShieldCheck className="h-3 w-3" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold text-emerald-400">Duplicado evitado</p>
+                                            <p className="text-[10px] opacity-70">Tipo: {log.entity_type}</p>
+                                            <p className="text-[9px] opacity-50">{format(new Date(log.created_at), 'HH:mm:ss', { locale: es })}</p>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         ) : (
                             <div className="text-center py-12 opacity-50">
                                 <ClipboardCheck className="h-12 w-12 mx-auto mb-4" />
-                                <p className="text-sm italic">Operación despejada.</p>
+                                <p className="text-sm italic">Sin colisiones de ID.</p>
                             </div>
                         )}
                         
                         <div className="mt-8 pt-8 border-t border-white/10">
-                            <h4 className="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-4">Estado de Sincronización</h4>
-                            <div className="space-y-3">
-                                <div className="flex justify-between text-xs">
-                                    <span>PDA Sincronizadas</span>
-                                    <span className="text-emerald-400">9/10</span>
-                                </div>
-                                <div className="w-full bg-white/10 rounded-full h-1.5">
-                                    <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: '90%' }}></div>
-                                </div>
-                                <p className="text-[10px] text-gray-400 italic">Última actualización global: Hace 2 minutos</p>
-                            </div>
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-4">Salud del Nodo Móvil</h4>
+                            {syncStatuses
+                                .filter(s => s.store_id === storeId)
+                                .map(status => (
+                                    <div key={status.store_id} className="space-y-3">
+                                        <div className="flex justify-between text-xs items-center">
+                                            <div className="flex items-center gap-2">
+                                                <Zap className="h-3 w-3 text-amber-400" />
+                                                <span>Ops Procesadas</span>
+                                            </div>
+                                            <span className="font-bold">{status.ops_count}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs items-center">
+                                            <div className="flex items-center gap-2">
+                                                <RefreshCw className="h-3 w-3 text-indigo-400" />
+                                                <span>Duplicados Capturados</span>
+                                            </div>
+                                            <span className="font-bold text-indigo-400">{status.duplicates_avoided}</span>
+                                        </div>
+                                        <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                                            <div 
+                                                className={`h-full transition-all duration-1000 ${status.status === 'PROCESSING' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} 
+                                                style={{ width: status.status === 'PROCESSING' ? '100%' : '100%' }}
+                                            ></div>
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 italic">
+                                            Última Sincro: {format(new Date(status.last_sync), 'HH:mm:ss', { locale: es })}
+                                        </p>
+                                    </div>
+                                ))
+                            }
+                            {syncStatuses.filter(s => s.store_id === storeId).length === 0 && (
+                                <p className="text-xs opacity-50 italic">Esperando primer heartbeat...</p>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
             </div>
+            
+            {/* Historial de Auditoría Expandido */}
+            <Card className="shadow-lg border-none mt-6 overflow-hidden">
+                <CardHeader className="bg-gray-50/50 dark:bg-gray-900/20 border-b">
+                    <div className="flex items-center gap-2">
+                        <History className="h-5 w-5 text-indigo-500" />
+                        <CardTitle className="text-lg">Registro de Auditoría de Idempotencia</CardTitle>
+                    </div>
+                    <CardDescription>Detalle de las operaciones reconciliadas automáticamente por el servidor</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-100 dark:bg-gray-800 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                <tr>
+                                    <th className="px-6 py-4">Evento</th>
+                                    <th className="px-6 py-4">Tipo</th>
+                                    <th className="px-6 py-4">External ID</th>
+                                    <th className="px-6 py-4 text-right">Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                {idempotencyLogs.length > 0 ? idempotencyLogs.map((log) => (
+                                    <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium">
+                                                <ShieldCheck className="h-4 w-4" />
+                                                Duplicado Neutralizado
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <Badge variant="outline" className="bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 border-indigo-200">
+                                                {log.entity_type}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-6 py-4 font-mono text-[10px] text-muted-foreground whitespace-nowrap">
+                                            {log.external_id}
+                                        </td>
+                                        <td className="px-6 py-4 text-right tabular-nums opacity-70">
+                                            {format(new Date(log.created_at), 'dd/MM HH:mm:ss', { locale: es })}
+                                        </td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground italic">
+                                            No se han registrado eventos de colisión de datos. El sistema está limpio.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }

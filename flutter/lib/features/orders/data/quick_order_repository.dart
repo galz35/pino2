@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/database/local_cache_repository.dart';
 import '../../../core/network/api_client.dart';
@@ -27,6 +28,7 @@ class QuickOrderRepository {
       'vendorId': vendorId,
       'salesManagerName': salesManagerName,
       'paymentType': paymentType,
+      'externalId': const Uuid().v4(),
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
       'items': items,
     };

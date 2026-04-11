@@ -1,6 +1,36 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { EventsGateway } from '../../common/gateways/events.gateway';
+import { CreateProductDto, UpdateProductDto, Product } from './products.dto';
+
+interface ProductRow {
+  id: string;
+  store_id: string;
+  department_id: string;
+  department_name?: string;
+  barcode: string;
+  description: string;
+  brand: string;
+  sale_price: string | number;
+  cost_price: string | number;
+  wholesale_price: string | number;
+  price1: string | number;
+  price2: string | number;
+  price3: string | number;
+  price4: string | number;
+  price5: string | number;
+  current_stock: string | number;
+  units_per_bulk: string | number;
+  stock_bulks: string | number;
+  stock_units: string | number;
+  min_stock: string | number;
+  uses_inventory: boolean;
+  supplier_id: string;
+  sub_department: string;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
 
 @Injectable()
 export class ProductsService {
@@ -9,28 +39,34 @@ export class ProductsService {
     private readonly eventsGateway: EventsGateway,
   ) {}
 
-  private normalizeInventory(dto: any) {
-    const unitsPerBulk = Math.max(1, parseInt(dto.unitsPerBulk ?? dto.units_per_bulk ?? 1, 10) || 1);
-    const hasSplitStock = dto.stockBulks !== undefined || dto.stockUnits !== undefined;
+  private normalizeInventory(dto: CreateProductDto | UpdateProductDto) {
+    const unitsPerBulk = Math.max(
+      1,
+      parseInt(String(dto.unitsPerBulk ?? 1), 10) || 1,
+    );
+    const hasSplitStock =
+      dto.stockBulks !== undefined || dto.stockUnits !== undefined;
 
     const stockBulks = hasSplitStock
-      ? Math.max(0, parseInt(dto.stockBulks ?? 0, 10) || 0)
-      : Math.floor((parseInt(dto.currentStock ?? 0, 10) || 0) / unitsPerBulk);
+      ? Math.max(0, parseInt(String(dto.stockBulks ?? 0), 10) || 0)
+      : Math.floor(
+          (parseInt(String(dto.currentStock ?? 0), 10) || 0) / unitsPerBulk,
+        );
 
     const stockUnits = hasSplitStock
-      ? Math.max(0, parseInt(dto.stockUnits ?? 0, 10) || 0)
-      : (parseInt(dto.currentStock ?? 0, 10) || 0) % unitsPerBulk;
+      ? Math.max(0, parseInt(String(dto.stockUnits ?? 0), 10) || 0)
+      : (parseInt(String(dto.currentStock ?? 0), 10) || 0) % unitsPerBulk;
 
     const currentStock = hasSplitStock
       ? stockBulks * unitsPerBulk + stockUnits
-      : Math.max(0, parseInt(dto.currentStock ?? 0, 10) || 0);
+      : Math.max(0, parseInt(String(dto.currentStock ?? 0), 10) || 0);
 
     return { unitsPerBulk, stockBulks, stockUnits, currentStock };
   }
 
-  async create(dto: any) {
+  async create(dto: CreateProductDto): Promise<Product> {
     const inventory = this.normalizeInventory(dto);
-    const res = await this.db.query(
+    const res = await this.db.query<ProductRow>(
       `INSERT INTO products (
          store_id, department_id, barcode, description, brand,
          sale_price, cost_price, wholesale_price,
@@ -44,7 +80,7 @@ export class ProductsService {
          $9, $10, $11, $12, $13,
          $14, $15, $16, $17,
          $18, $19, $20, $21
-       ) RETURNING *`,
+       ) RETURNING id`,
       [
         dto.storeId,
         dto.departmentId || null,
@@ -69,7 +105,25 @@ export class ProductsService {
         dto.subDepartment || null,
       ],
     );
-    const product = await this.findOne(res.rows[0].id);
+
+    if (res.rowCount === 0) throw new Error('Failed to create product');
+    const productId = res.rows[0].id;
+    const product = await this.findOne(productId);
+
+    // Registrar movimiento inicial si hay stock
+    if (inventory.currentStock > 0) {
+      await this.db.query(
+        `INSERT INTO movements (store_id, product_id, type, quantity, balance, reference)
+         VALUES ($1, $2, 'IN', $3, $4, $5)`,
+        [
+          product.storeId,
+          productId,
+          inventory.currentStock,
+          inventory.currentStock,
+          'Inventario Inicial (Creación)',
+        ],
+      );
+    }
 
     this.eventsGateway.emitSyncUpdate({
       type: 'PRODUCT_CREATED',
@@ -80,16 +134,23 @@ export class ProductsService {
     return product;
   }
 
-  async findAll(storeId: string, search?: string, departmentId?: string, subDepartmentId?: string, limit: number = 1000, offset: number = 0) {
+  async findAll(
+    storeId: string,
+    search?: string,
+    departmentId?: string,
+    subDepartmentId?: string,
+    limit: number = 1000,
+    offset: number = 0,
+  ): Promise<Product[]> {
     let query = `SELECT p.*, d.name as department_name 
                  FROM products p 
                  LEFT JOIN departments d ON p.department_id = d.id 
                  WHERE p.store_id = $1 AND p.is_active = true`;
-    const params: any[] = [storeId];
+    const params: (string | number)[] = [storeId];
     let pIdx = 2;
 
     if (search) {
-      query += ` AND (p.description ILIKE $${pIdx} OR p.barcode = $${pIdx+1})`;
+      query += ` AND (p.description ILIKE $${pIdx} OR p.barcode = $${pIdx + 1})`;
       params.push(`%${search}%`, search);
       pIdx += 2;
     }
@@ -104,38 +165,40 @@ export class ProductsService {
       params.push(subDepartmentId);
     }
 
-    query += ` ORDER BY p.description ASC LIMIT $${pIdx} OFFSET $${pIdx+1}`;
+    query += ` ORDER BY p.description ASC LIMIT $${pIdx} OFFSET $${pIdx + 1}`;
     params.push(limit, offset);
 
-    const res = await this.db.query(query, params);
-    return res.rows.map(this.mapRow);
+    const res = await this.db.query<ProductRow>(query, params);
+    return res.rows.map((row) => this.mapRow(row));
   }
 
-  async findOne(id: string) {
-    const res = await this.db.query(
+  async findOne(id: string): Promise<Product> {
+    const res = await this.db.query<ProductRow>(
       `SELECT p.*, d.name as department_name 
        FROM products p 
        LEFT JOIN departments d ON p.department_id = d.id 
        WHERE p.id = $1`,
       [id],
     );
-    if (res.rowCount === 0) throw new NotFoundException('Producto no encontrado');
+    if (res.rowCount === 0)
+      throw new NotFoundException('Producto no encontrado');
     return this.mapRow(res.rows[0]);
   }
 
-  async findByBarcode(storeId: string, barcode: string) {
-    const res = await this.db.query(
+  async findByBarcode(storeId: string, barcode: string): Promise<Product> {
+    const res = await this.db.query<ProductRow>(
       `SELECT p.*, d.name as department_name 
        FROM products p 
        LEFT JOIN departments d ON p.department_id = d.id 
        WHERE p.store_id = $1 AND p.barcode = $2 AND p.is_active = true`,
       [storeId, barcode],
     );
-    if (res.rowCount === 0) throw new NotFoundException('Producto con este código no encontrado');
+    if (res.rowCount === 0)
+      throw new NotFoundException('Producto con este código no encontrado');
     return this.mapRow(res.rows[0]);
   }
 
-  async update(id: string, dto: any) {
+  async update(id: string, dto: UpdateProductDto): Promise<Product> {
     const fieldMap: Record<string, string> = {
       description: 'description',
       barcode: 'barcode',
@@ -161,13 +224,14 @@ export class ProductsService {
     };
 
     const sets: string[] = [];
-    const params: any[] = [];
+    const params: (string | number | boolean | null)[] = [];
     let idx = 1;
 
     for (const [camel, snake] of Object.entries(fieldMap)) {
-      if (dto[camel] !== undefined) {
+      const val = dto[camel as keyof UpdateProductDto];
+      if (val !== undefined) {
         sets.push(`${snake} = $${idx++}`);
-        params.push(dto[camel]);
+        params.push(val);
       }
     }
 
@@ -191,13 +255,18 @@ export class ProductsService {
     return product;
   }
 
-  async remove(id: string) {
-    await this.db.query('UPDATE products SET is_active = false WHERE id = $1', [id]);
+  async remove(id: string): Promise<Product> {
+    await this.db.query('UPDATE products SET is_active = false WHERE id = $1', [
+      id,
+    ]);
     return this.findOne(id);
   }
 
-  async updateStock(id: string, quantity: number) {
-    await this.db.query('UPDATE products SET current_stock = $1 WHERE id = $2', [quantity, id]);
+  async updateStock(id: string, quantity: number): Promise<Product> {
+    await this.db.query(
+      'UPDATE products SET current_stock = $1 WHERE id = $2',
+      [quantity, id],
+    );
     return this.findOne(id);
   }
 
@@ -206,27 +275,29 @@ export class ProductsService {
    */
   async importBulk(dto: {
     storeId: string;
-    products: any[];
+    products: CreateProductDto[];
     cashierName: string;
   }) {
     return this.db.withTransaction(async (client) => {
       // 1. Pre-fetch existing departments for mapping
-      const deptsRes = await client.query(
+      const deptsRes = await client.query<{ id: string; name: string }>(
         'SELECT id, name FROM departments WHERE store_id = $1',
         [dto.storeId],
       );
-      const deptMap = new Map(deptsRes.rows.map((d) => [d.name, d.id]));
+      const deptMap = new Map<string, string>(
+        deptsRes.rows.map((d) => [d.name, d.id]),
+      );
 
       let importedCount = 0;
 
       for (const product of dto.products) {
         // Resolve department ID
-        let departmentId = null;
+        let departmentId: string | null = null;
         if (product.department) {
-          departmentId = deptMap.get(product.department);
+          departmentId = deptMap.get(product.department) || null;
           if (!departmentId) {
             // Auto-create department
-            const newDept = await client.query(
+            const newDept = await client.query<{ id: string }>(
               'INSERT INTO departments (store_id, name) VALUES ($1, $2) RETURNING id',
               [dto.storeId, product.department],
             );
@@ -236,17 +307,25 @@ export class ProductsService {
         }
 
         // Insert product
-        const prodRes = await client.query(
+        const prodRes = await client.query<{ id: string }>(
           `INSERT INTO products (store_id, department_id, barcode, description, 
             sale_price, cost_price, price1, price2, price3, price4, price5,
             current_stock, min_stock, sub_department)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
           [
-            dto.storeId, departmentId, product.barcode || null, product.description,
-            product.salePrice || 0, product.costPrice || 0,
-            product.price1 || 0, product.price2 || 0, product.price3 || 0,
-            product.price4 || 0, product.price5 || 0,
-            product.currentStock || 0, product.minStock || 0,
+            dto.storeId,
+            departmentId,
+            product.barcode || null,
+            product.description,
+            product.salePrice || 0,
+            product.costPrice || 0,
+            product.price1 || 0,
+            product.price2 || 0,
+            product.price3 || 0,
+            product.price4 || 0,
+            product.price5 || 0,
+            product.currentStock || 0,
+            product.minStock || 0,
             product.subDepartment || null,
           ],
         );
@@ -258,7 +337,13 @@ export class ProductsService {
           await client.query(
             `INSERT INTO movements (store_id, product_id, type, quantity, balance, reference)
              VALUES ($1, $2, 'IN', $3, $4, $5)`,
-            [dto.storeId, productId, stock, stock, 'Inventario Inicial (Importación)'],
+            [
+              dto.storeId,
+              productId,
+              stock,
+              stock,
+              'Inventario Inicial (Importación)',
+            ],
           );
         }
 
@@ -269,7 +354,7 @@ export class ProductsService {
     });
   }
 
-  private mapRow(row: any): any {
+  private mapRow(row: ProductRow): Product {
     return {
       id: row.id,
       storeId: row.store_id,
@@ -279,19 +364,19 @@ export class ProductsService {
       barcode: row.barcode,
       description: row.description,
       brand: row.brand || '',
-      salePrice: parseFloat(row.sale_price || 0),
-      costPrice: parseFloat(row.cost_price || 0),
-      wholesalePrice: parseFloat(row.wholesale_price || 0),
-      price1: parseFloat(row.price1 || row.sale_price || 0),
-      price2: parseFloat(row.price2 || row.sale_price || 0),
-      price3: parseFloat(row.price3 || row.sale_price || 0),
-      price4: parseFloat(row.price4 || row.sale_price || 0),
-      price5: parseFloat(row.price5 || row.sale_price || 0),
-      currentStock: parseInt(row.current_stock || 0),
-      unitsPerBulk: parseInt(row.units_per_bulk || 1),
-      stockBulks: parseInt(row.stock_bulks || 0),
-      stockUnits: parseInt(row.stock_units || 0),
-      minStock: parseInt(row.min_stock || 0),
+      salePrice: parseFloat(String(row.sale_price || 0)),
+      costPrice: parseFloat(String(row.cost_price || 0)),
+      wholesalePrice: parseFloat(String(row.wholesale_price || 0)),
+      price1: parseFloat(String(row.price1 || row.sale_price || 0)),
+      price2: parseFloat(String(row.price2 || row.sale_price || 0)),
+      price3: parseFloat(String(row.price3 || row.sale_price || 0)),
+      price4: parseFloat(String(row.price4 || row.sale_price || 0)),
+      price5: parseFloat(String(row.price5 || row.sale_price || 0)),
+      currentStock: parseInt(String(row.current_stock || 0), 10),
+      unitsPerBulk: parseInt(String(row.units_per_bulk || 1), 10),
+      stockBulks: parseInt(String(row.stock_bulks || 0), 10),
+      stockUnits: parseInt(String(row.stock_units || 0), 10),
+      minStock: parseInt(String(row.min_stock || 0), 10),
       usesInventory: row.uses_inventory !== false,
       supplierId: row.supplier_id || null,
       subDepartment: row.sub_department || '',

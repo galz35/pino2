@@ -423,6 +423,14 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  Future<void> discardSyncEntry(int id) {
+    return (update(syncQueueEntries)..where((table) => table.id.equals(id))).write(
+      const SyncQueueEntriesCompanion(
+        status: Value('discarded'),
+      ),
+    );
+  }
+
   Future<void> registerSyncAttempt(
     int id, {
     required String errorMessage,

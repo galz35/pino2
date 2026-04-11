@@ -5,6 +5,7 @@ import { toast } from '@/lib/swalert';
 import { Preloader } from '@/components/preloader';
 
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 import {
   Card,
   CardContent,
@@ -124,8 +125,9 @@ export default function LoginPage() {
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex justify-center text-center text-sm text-muted-foreground">
-            Si olvidaste tu contraseña, solicita el reinicio a un administrador.
+          <CardFooter className="flex flex-col gap-3 justify-center text-center text-sm text-muted-foreground pt-4">
+            <span>Si olvidaste tu contraseña, solicita el reinicio a un administrador.</span>
+            <Link to="/forgot-password" className="text-primary hover:underline font-medium">O usa la herramienta automatizada</Link>
           </CardFooter>
         </Card>
       </main>

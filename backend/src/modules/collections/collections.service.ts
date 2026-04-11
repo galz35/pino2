@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PoolClient } from 'pg';
 import { DatabaseService } from '../../database/database.service';
 import { EventsGateway } from '../../common/gateways/events.gateway';
 
@@ -17,7 +18,8 @@ export class CollectionsService {
     amount: number;
     paymentMethod?: string;
     notes?: string;
-  }) {
+    externalId?: string;
+  }, transactionalClient?: PoolClient) {
     if (dto.amount <= 0) {
       throw new BadRequestException('El monto del cobro debe ser mayor a 0');
     }
@@ -25,7 +27,23 @@ export class CollectionsService {
       throw new BadRequestException('El rutero es requerido para registrar un cobro');
     }
 
-    return this.db.withTransaction(async (client) => {
+    const execute = async (client: PoolClient) => {
+      // Check idempotency
+      if (dto.externalId) {
+        const existing = await client.query('SELECT * FROM collections WHERE external_id = $1', [dto.externalId]);
+        if (existing.rowCount > 0) {
+          await client.query(
+            'INSERT INTO sync_idempotency_log (store_id, external_id, entity_type) VALUES ($1, $2, $3)',
+            [dto.storeId, dto.externalId, 'COLLECTION'],
+          );
+          return {
+            ...this.mapRow(existing.rows[0]),
+            message: 'Operación ya procesada anteriormente (Idempotencia)',
+            isDuplicate: true,
+          };
+        }
+      }
+
       let account: any = null;
       if (dto.accountId) {
         const accRes = await client.query(
@@ -50,8 +68,8 @@ export class CollectionsService {
 
       // 1. Create collection record
       const colRes = await client.query(
-        `INSERT INTO collections (store_id, account_id, rutero_id, client_id, amount, payment_method, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        `INSERT INTO collections (store_id, account_id, rutero_id, client_id, amount, payment_method, notes, external_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
         [
           dto.storeId,
           dto.accountId || null,
@@ -60,6 +78,7 @@ export class CollectionsService {
           dto.amount,
           dto.paymentMethod || 'CASH',
           dto.notes || null,
+          dto.externalId || null,
         ],
       );
       const collection = colRes.rows[0];
@@ -92,7 +111,12 @@ export class CollectionsService {
       });
 
       return result;
-    });
+    };
+
+    if (transactionalClient) {
+      return execute(transactionalClient);
+    }
+    return this.db.withTransaction(execute);
   }
 
   async findAll(filters: { storeId?: string; ruteroId?: string; clientId?: string; date?: string }) {

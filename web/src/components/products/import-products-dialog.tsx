@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
-import { Upload, FileDown, Loader2 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { Upload, FileDown, Loader2, FileSpreadsheet } from 'lucide-react';
 
 import apiClient from '@/services/api-client';
 import { logError } from '@/lib/error-logger';
@@ -134,38 +135,53 @@ export function ImportProductsDialog({ storeId }: ImportProductsDialogProps) {
 
       const reader = new FileReader();
 
-      if (!file.name.endsWith('.csv')) {
-        toast({ variant: 'destructive', title: 'Formato no soportado', description: 'Por seguridad, la importación masiva acepta solo archivos CSV.' });
-        return;
-      }
+      if (file.name.endsWith('.csv')) {
+        reader.onload = (e) => {
+          const text = e.target?.result as string;
+          Papa.parse(text, {
+            header: true,
+            skipEmptyLines: true,
+            transformHeader: (header) => HEADER_MAPPING[header.trim()] || header.trim(),
+            complete: (results) => setParsedData(results.data as ProductDataRow[]),
+            error: (error: any) => toast({ variant: 'destructive', title: 'Error al leer CSV', description: error.message }),
+          });
+        };
+        reader.readAsText(file);
+      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        reader.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' }) as Record<string, any>[];
+            
+            const formattedData = json.map(row => {
+               const mappedRow: Record<string, any> = {};
+               for (const key of Object.keys(row)) {
+                 const mappedKey = HEADER_MAPPING[key.trim()] || key.trim();
+                 mappedRow[mappedKey] = row[key];
+               }
+               return mappedRow;
+            });
 
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
-        Papa.parse(text, {
-          header: true,
-          skipEmptyLines: true,
-          transformHeader: (header) => HEADER_MAPPING[header.trim()] || header.trim(),
-          complete: (results) => setParsedData(results.data as ProductDataRow[]),
-          error: (error: any) => toast({ variant: 'destructive', title: 'Error al leer CSV', description: error.message }),
-        });
-      };
-      reader.readAsText(file);
+            setParsedData(formattedData as ProductDataRow[]);
+          } catch (error: any) {
+             toast({ variant: 'destructive', title: 'Error al leer Excel', description: error.message });
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        toast({ variant: 'destructive', title: 'Formato no soportado', description: 'Sube un archivo Excel (.xlsx) o CSV.' });
+      }
     }
   };
 
-  const handleDownloadCsvTemplate = () => {
-    const csv = Papa.unparse(TEMPLATE_ROWS, {
-      columns: SPANISH_HEADERS,
-    });
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'plantilla_productos.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const handleDownloadTemplate = () => {
+    const worksheet = XLSX.utils.json_to_sheet(TEMPLATE_ROWS);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Plantilla");
+    XLSX.writeFile(workbook, "plantilla_productos.xlsx");
   };
 
   const handleImport = async () => {
@@ -251,19 +267,19 @@ export function ImportProductsDialog({ storeId }: ImportProductsDialogProps) {
           <div className="space-y-2">
             <h3 className="font-semibold">Paso 1: Descarga la plantilla</h3>
             <p className="text-sm text-muted-foreground">
-              Descarga la plantilla CSV, ábrela en Excel, LibreOffice o Google Sheets y llénala con tus productos.
+              Descarga la plantilla en Excel, llénala con tus productos y súbela en el paso 2.
             </p>
             <div className="flex flex-wrap gap-4 mt-2">
-              <Button variant="outline" onClick={handleDownloadCsvTemplate}>
-                <FileDown className="mr-2 h-4 w-4" />
-                Descargar Plantilla CSV
+              <Button variant="outline" onClick={handleDownloadTemplate} className="border-green-600/30 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950">
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Descargar Plantilla Excel
               </Button>
             </div>
           </div>
           <div className="space-y-2">
             <h3 className="font-semibold">Paso 2: Sube tu archivo</h3>
             <p className="text-sm text-muted-foreground">
-              Una vez que hayas llenado la plantilla, guárdala como CSV y súbela aquí.
+              Una vez que hayas llenado la plantilla, súbela aquí. Aceptamos Excel (.xlsx) y CSV.
             </p>
             <div className="flex items-center justify-center w-full">
               <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-muted/50">
@@ -274,11 +290,11 @@ export function ImportProductsDialog({ storeId }: ImportProductsDialogProps) {
                   ) : (
                     <>
                       <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Haz clic para subir</span> o arrastra y suelta</p>
-                      <p className="text-xs text-muted-foreground">Archivo CSV (máx. 5MB)</p>
+                      <p className="text-xs text-muted-foreground">Archivo Excel (.xlsx) o CSV (máx. 5MB)</p>
                     </>
                   )}
                 </div>
-                <input id="dropzone-file" type="file" accept=".csv,text/csv" className="hidden" onChange={handleFileChange} />
+                <input id="dropzone-file" type="file" accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" className="hidden" onChange={handleFileChange} />
               </label>
             </div>
           </div>

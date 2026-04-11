@@ -66,6 +66,7 @@ class _QuickOrderScreenState extends ConsumerState<QuickOrderScreen> {
   final _notesController = TextEditingController();
   String _productSearch = '';
   String _paymentType = 'CONTADO';
+  int _priceLevel = 1;
   ClientSummary? _selectedClient;
   bool _isSubmitting = false;
   final Map<String, _DraftOrderItem> _draftItems = {};
@@ -159,14 +160,14 @@ class _QuickOrderScreenState extends ConsumerState<QuickOrderScreen> {
           (item) => ReceiptLineItem(
             description: item.product.description,
             quantity: item.quantity,
-            unitPrice: item.product.salePrice,
+            unitPrice: item.product.priceForLevel(_priceLevel),
           ),
         )
         .toList();
     final draftNotes = _notesController.text.trim();
     final orderTotal = _draftItems.values.fold<double>(
       0,
-      (sum, item) => sum + (item.quantity * item.product.salePrice),
+      (sum, item) => sum + (item.quantity * item.product.priceForLevel(_priceLevel)),
     );
     final paymentTypeLabel = _paymentType;
 
@@ -185,9 +186,9 @@ class _QuickOrderScreenState extends ConsumerState<QuickOrderScreen> {
                   (item) => {
                     'productId': item.product.id,
                     'quantity': item.quantity,
-                    'unitPrice': item.product.salePrice,
+                    'unitPrice': item.product.priceForLevel(_priceLevel),
                     'presentation': 'UNIT',
-                    'priceLevel': 1,
+                    'priceLevel': _priceLevel,
                   },
                 )
                 .toList(),
@@ -294,7 +295,7 @@ class _QuickOrderScreenState extends ConsumerState<QuickOrderScreen> {
         _draftItems.values.fold<int>(0, (sum, item) => sum + item.quantity);
     final totalAmount = _draftItems.values.fold<double>(
       0,
-      (sum, item) => sum + (item.quantity * item.product.salePrice),
+      (sum, item) => sum + (item.quantity * item.product.priceForLevel(_priceLevel)),
     );
 
     return Scaffold(
@@ -332,6 +333,11 @@ class _QuickOrderScreenState extends ConsumerState<QuickOrderScreen> {
                           _paymentType = value;
                         });
                       },
+                    ),
+                    const SizedBox(height: 12),
+                    _PriceLevelSelector(
+                      value: _priceLevel,
+                      onChanged: (level) => setState(() => _priceLevel = level),
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -371,6 +377,7 @@ class _QuickOrderScreenState extends ConsumerState<QuickOrderScreen> {
                         child: _QuickProductCard(
                           product: product,
                           quantity: _draftItems[product.id]?.quantity ?? 0,
+                          priceLevel: _priceLevel,
                           onAdd: () => _addProduct(product),
                           onIncrease: () => _changeQuantity(product, 1),
                           onDecrease: () => _changeQuantity(product, -1),
@@ -563,6 +570,7 @@ class _QuickProductCard extends StatelessWidget {
   const _QuickProductCard({
     required this.product,
     required this.quantity,
+    required this.priceLevel,
     required this.onAdd,
     required this.onIncrease,
     required this.onDecrease,
@@ -570,6 +578,7 @@ class _QuickProductCard extends StatelessWidget {
 
   final CatalogProduct product;
   final int quantity;
+  final int priceLevel;
   final VoidCallback onAdd;
   final VoidCallback onIncrease;
   final VoidCallback onDecrease;
@@ -577,6 +586,8 @@ class _QuickProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasQuantity = quantity > 0;
+    final levelPrice = product.priceForLevel(priceLevel);
+    final showDiff = (levelPrice - product.salePrice).abs() > 0.01;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -598,9 +609,31 @@ class _QuickProductCard extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  'C\$ ${product.salePrice.toStringAsFixed(2)} • ${product.stockLabel}',
-                  style: const TextStyle(color: Colors.black54),
+                Row(
+                  children: [
+                    Text(
+                      'C\$ ${levelPrice.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: showDiff ? const Color(0xFF7C3AED) : Colors.black54,
+                      ),
+                    ),
+                    if (showDiff) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        'C\$ ${product.salePrice.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black38,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                    ],
+                    Text(
+                      ' • ${product.stockLabel}',
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -828,6 +861,105 @@ class _ClientPickerSheetState extends State<_ClientPickerSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PriceLevelSelector extends StatelessWidget {
+  const _PriceLevelSelector({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.sell_rounded, size: 16, color: Color(0xFF475569)),
+            const SizedBox(width: 6),
+            Text(
+              'Nivel de precio',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            if (value >= 4) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Requiere autorización',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF92400E),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(5, (index) {
+            final level = index + 1;
+            final isSelected = value == level;
+            final isRestricted = level >= 4;
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: index < 4 ? 6 : 0),
+                child: InkWell(
+                  onTap: () => onChanged(level),
+                  borderRadius: BorderRadius.circular(14),
+                  child: Ink(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? (isRestricted
+                              ? const Color(0xFFF59E0B)
+                              : const Color(0xFF14532D))
+                          : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isSelected
+                            ? Colors.transparent
+                            : Colors.grey.shade300,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'P$level',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                            color: isSelected ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                        if (isRestricted && !isSelected)
+                          const Icon(Icons.lock_outline_rounded,
+                              size: 12, color: Color(0xFFD97706)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
     );
   }
 }

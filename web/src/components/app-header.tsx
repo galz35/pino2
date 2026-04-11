@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Menu, Wallet, Bell, Globe } from 'lucide-react';
+import { Menu, Wallet, Bell } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import { ThemeToggle } from './theme-toggle';
@@ -26,6 +26,7 @@ interface AppHeaderProps {
   exchangeRate?: number;
   notifications: Notification[];
   onNotificationClick: (notificationId: string) => void;
+  isSocketConnected?: boolean;
 }
 
 export function AppHeader({
@@ -35,6 +36,7 @@ export function AppHeader({
   exchangeRate,
   notifications,
   onNotificationClick,
+  isSocketConnected = false,
 }: AppHeaderProps) {
   const [isSheetOpen, setIsSheetOpen] = React.useState(false);
   const { storeId } = useParams();
@@ -102,7 +104,7 @@ export function AppHeader({
             <span>C$ {exchangeRate.toFixed(2)} : $ 1.00</span>
           </div>
         )}
-        <NetworkStatusIndicator />
+        <NetworkStatusIndicator isSocketConnected={isSocketConnected} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="relative">
@@ -134,22 +136,7 @@ export function AppHeader({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Globe className="h-5 w-5" />
-              <span className="sr-only">Idioma</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleLanguageChange('es')} className={language === 'es' ? 'bg-muted' : ''}>
-              Español
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleLanguageChange('en')} className={language === 'en' ? 'bg-muted' : ''}>
-              English
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+
         <ThemeToggle />
         <UserNav />
       </div>

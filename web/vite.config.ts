@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const appBase = process.env.VITE_APP_BASENAME || '/dev/';
-const backendOrigin = process.env.VITE_DEV_BACKEND_ORIGIN || 'http://127.0.0.1:3010';
+const appBase = process.env.VITE_APP_BASENAME || '/';
+const backendOrigin = process.env.VITE_DEV_BACKEND_ORIGIN || 'http://localhost:3010';
 
 export default defineConfig({
   base: appBase,
@@ -14,16 +14,14 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
-      '/api-dev/socket.io': {
+      '/socket.io': {
         target: backendOrigin,
         changeOrigin: true,
         ws: true,
-        rewrite: (path) => path.replace(/^\/api-dev\/socket\.io/, '/socket.io'),
       },
-      '/api-dev': {
+      '/api': {
         target: backendOrigin,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api-dev/, '/api'),
       },
     },
   },

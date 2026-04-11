@@ -197,13 +197,11 @@ class PdfReceiptService {
       }
     }
 
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [XFile(file.path)],
-        subject: subject,
-        text: text,
-        sharePositionOrigin: origin,
-      ),
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      subject: subject,
+      text: text,
+      sharePositionOrigin: origin,
     );
   }
 

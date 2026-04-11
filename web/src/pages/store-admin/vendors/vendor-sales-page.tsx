@@ -1,166 +1,646 @@
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { MinusCircle, PlusCircle, User, ShoppingBag, Loader2, PackagePlus } from 'lucide-react';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Separator } from '@/components/ui/separator';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
 import apiClient from '@/services/api-client';
-import { ClientSelectionDialog } from '@/components/pos/client-selection-dialog';
-import { AddClientDialog } from '@/components/pos/add-client-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Loader2, ArrowLeft, Eye, XCircle, Edit3, Search, Plus, Download } from 'lucide-react';
+import { format } from 'date-fns';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
+import { exportToExcel } from '@/lib/export-excel';
 
-interface Product { id: string; description: string; salePrice: number; costPrice?: number; barcode?: string; }
-interface CartItem extends Product { quantity: number; }
-interface Client { id: string; name: string; phone?: string; address?: string; }
-const genericClient: Client = { id: 'generic', name: 'Cliente Genérico', phone: '', address: '' };
+interface OrderItem {
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+}
+
+interface Order {
+  id: string;
+  clientName: string;
+  total: number;
+  status: string;
+  paymentType?: string;
+  createdAt: string;
+  items?: OrderItem[];
+}
+
+const statusColor: Record<string, string> = {
+  RECIBIDO: 'bg-blue-100 text-blue-800',
+  EN_PREPARACION: 'bg-amber-100 text-amber-800',
+  ALISTADO: 'bg-sky-100 text-sky-800',
+  CARGADO_CAMION: 'bg-emerald-100 text-emerald-800',
+  EN_ENTREGA: 'bg-violet-100 text-violet-800',
+  ENTREGADO: 'bg-green-100 text-green-800',
+  CANCELADO: 'bg-red-100 text-red-800',
+  Pagada: 'bg-emerald-100 text-emerald-800',
+  'Pendiente de Pago': 'bg-amber-100 text-amber-800',
+};
+
+const statusLabel: Record<string, string> = {
+  RECIBIDO: 'Recibido',
+  EN_PREPARACION: 'Preparando',
+  ALISTADO: 'Listo',
+  CARGADO_CAMION: 'Cargado',
+  EN_ENTREGA: 'En ruta',
+  ENTREGADO: 'Entregado',
+  CANCELADO: 'Cancelado',
+  Pagada: 'Pagada',
+  'Pendiente de Pago': 'Pendiente',
+};
+
+// Statuses the vendor can still cancel
+const CANCELLABLE = ['RECIBIDO', 'EN_PREPARACION', 'Pendiente de Pago'];
+// Statuses the vendor can still edit quantities
+const EDITABLE = ['RECIBIDO'];
 
 export default function VendorSalesPage() {
-    const [cart, setCart] = useState<CartItem[]>([]);
-    const [settings, setSettings] = useState<{ applyVAT: boolean }>({ applyVAT: false });
-    const [selectedClient, setSelectedClient] = useState<Client>(genericClient);
-    const [paymentType, setPaymentType] = useState<'Contado' | 'Crédito'>('Contado');
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [isFinalizeDialogOpen, setIsFinalizeDialogOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const { storeId } = useParams<{ storeId: string }>();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [catalog, setCatalog] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [headerFilters, setHeaderFilters] = useState({ client: '', dateFrom: '', dateTo: '', status: '', payment: '' });
 
-    const { storeId } = useParams<{ storeId: string }>();
-    const [searchParams] = useSearchParams();
-    const { user } = useAuth();
-    const { toast } = useToast();
-    const clientId = searchParams.get('clientId');
+  // Detail dialog
+  const [detailOrder, setDetailOrder] = useState<Order | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
-    useEffect(() => {
-        if (!storeId) return;
-        apiClient.get(`/stores/${storeId}`).then(res => { if (res.data?.settings) setSettings(res.data.settings); }).catch(() => {});
-    }, [storeId]);
+  // Cancel dialog
+  const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
-    useEffect(() => {
-        if (!clientId) {
-            return;
-        }
+  // Edit mode
+  const [editMode, setEditMode] = useState(false);
+  const [editItems, setEditItems] = useState<OrderItem[]>([]);
+  const [editSaving, setEditSaving] = useState(false);
 
-        let isMounted = true;
-        apiClient
-            .get(`/clients/${clientId}`)
-            .then((res) => {
-                if (isMounted && res.data) {
-                    setSelectedClient(res.data);
-                }
-            })
-            .catch(() => {
-                if (isMounted) {
-                    toast({
-                        variant: 'destructive',
-                        title: 'Cliente no disponible',
-                        description: 'No se pudo cargar el cliente seleccionado.',
-                    });
-                }
-            });
+  const fetchOrders = () => {
+    if (!storeId || !user?.id) return;
+    setLoading(true);
+    apiClient
+      .get('/orders', { params: { storeId, vendorId: user.id } })
+      .then((res) => setOrders(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setOrders([]))
+      .finally(() => setLoading(false));
+  };
 
-        return () => {
-            isMounted = false;
-        };
-    }, [clientId, toast]);
+  useEffect(() => {
+    fetchOrders();
+    if (storeId) {
+      apiClient.get('/products', { params: { storeId, limit: 500 } })
+        .then(res => setCatalog(Array.isArray(res.data) ? res.data : []))
+        .catch(() => {});
+    }
+  }, [storeId, user?.id]);
 
-    const handleSearch = async (term: string) => {
-        setSearchTerm(term);
-        if (term.length < 2) { setSearchResults([]); return; }
-        try { const res = await apiClient.get('/products', { params: { storeId, search: term, limit: 10 } }); setSearchResults(res.data || []); } catch { setSearchResults([]); }
-    };
+  // OPEN DETAIL
+  const handleViewDetail = async (order: Order) => {
+    setDetailLoading(true);
+    setEditMode(false);
+    try {
+      const res = await apiClient.get(`/orders/${order.id}`);
+      setDetailOrder(res.data);
+      setEditItems(res.data.items || []);
+      setSearchQuery('');
+    } catch {
+      setDetailOrder({ ...order, items: [] });
+      setEditItems([]);
+      setSearchQuery('');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
-    const handleAddProduct = useCallback((product: Product) => {
-        setCart(prev => { const existing = prev.find(i => i.id === product.id); if (existing) return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i); return [...prev, { ...product, quantity: 1 }]; });
-        setSearchTerm(''); setSearchResults([]);
-    }, []);
+  // CANCEL ORDER
+  const handleCancelOrder = async () => {
+    if (!cancelOrderId) return;
+    setCancelLoading(true);
+    try {
+      await apiClient.patch(`/orders/${cancelOrderId}/status`, {
+        status: 'CANCELADO',
+        updatedBy: user?.id,
+      });
+      toast({ title: 'Pedido cancelado' });
+      setDetailOrder(null);
+      setCancelOrderId(null);
+      fetchOrders();
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: err?.response?.data?.message || 'No se pudo cancelar.',
+      });
+    } finally {
+      setCancelLoading(false);
+    }
+  };
 
-    const handleQuantityChange = (productId: string, amount: number) => { setCart(prev => prev.map(i => i.id === productId ? { ...i, quantity: Math.max(0, i.quantity + amount) } : i).filter(i => i.quantity > 0)); };
+  // EDIT: Change quantity locally
+  const handleEditQty = (itemId: string, delta: number) => {
+    setEditItems((prev) =>
+      prev
+        .map((it) =>
+          it.id === itemId
+            ? {
+                ...it,
+                quantity: Math.max(0, it.quantity + delta),
+                subtotal: Math.max(0, it.quantity + delta) * it.unitPrice,
+              }
+            : it,
+        )
+        .filter((it) => it.quantity > 0),
+    );
+  };
 
-    const subtotal = useMemo(() => cart.reduce((acc, i) => acc + i.salePrice * i.quantity, 0), [cart]);
-    const tax = useMemo(() => settings.applyVAT ? subtotal * 0.15 : 0, [subtotal, settings]);
-    const total = useMemo(() => subtotal + tax, [subtotal, tax]);
+  // EDIT: Add a totally new product to replacing order
+  const handleAddNewProduct = (prod: any) => {
+    const exists = editItems.find((i) => i.productId === prod.id);
+    if (!exists) {
+      const p = parseFloat(prod.salePrice || prod.price1 || 0);
+      setEditItems([...editItems, {
+        id: 'new-' + prod.id,
+        productId: prod.id,
+        productName: prod.description,
+        quantity: 1,
+        unitPrice: p,
+        subtotal: p
+      }]);
+    } else {
+      handleEditQty(exists.id, 1);
+    }
+    setSearchQuery('');
+  };
 
-    const resetSale = () => { setCart([]); setSelectedClient(genericClient); setPaymentType('Contado'); setIsFinalizeDialogOpen(false); };
+  const filteredCatalog = searchQuery
+    ? catalog.filter(p => p.description?.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode?.includes(searchQuery)).slice(0, 5)
+    : [];
 
-    const handleFinalizeOrder = async () => {
-        if (!user) { toast({ variant: 'destructive', title: 'Error' }); return; }
-        if (cart.length === 0 || selectedClient.id === 'generic') { toast({ variant: 'destructive', title: 'Error', description: 'Seleccione un cliente y agregue productos.' }); return; }
-        setIsProcessing(true);
-        try {
-            await apiClient.post('/orders', {
-                storeId, vendorId: user.id, salesManagerName: user.name, clientId: selectedClient.id, clientName: selectedClient.name, clientAddress: selectedClient.address,
-                items: cart.map(({ id, description, quantity, salePrice, costPrice }) => ({ productId: id, description, quantity, unitPrice: salePrice, costPrice: costPrice || 0 })),
-                subtotal, tax, total, paymentType, status: 'Pendiente', type: 'preventa',
-            });
-            toast({ title: 'Pedido Registrado' }); resetSale();
-        } catch (error: any) { toast({ variant: 'destructive', title: 'Error', description: error?.response?.data?.message || 'No se pudo registrar.' }); }
-        finally { setIsProcessing(false); }
-    };
+  // SAVE EDIT — re-create order (cancel old + create new)
+  const handleSaveEdit = async () => {
+    if (!detailOrder || editItems.length === 0) return;
+    setEditSaving(true);
+    try {
+      // Cancel old
+      await apiClient.patch(`/orders/${detailOrder.id}/status`, {
+        status: 'CANCELADO',
+        updatedBy: user?.id,
+      });
+
+      // Create replacement
+      const newTotal = editItems.reduce((s, i) => s + i.subtotal, 0);
+      await apiClient.post('/orders', {
+        storeId,
+        vendorId: user?.id,
+        cashierName: user?.name,
+        clientId: (detailOrder as any).clientId || undefined,
+        clientName: detailOrder.clientName,
+        items: editItems.map((i) => ({
+          productId: i.productId,
+          description: i.productName,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          costPrice: 0,
+        })),
+        subtotal: newTotal,
+        tax: 0,
+        total: newTotal,
+        paymentType: detailOrder.paymentType || 'CONTADO',
+        status: 'RECIBIDO',
+        type: 'venta_directa',
+      });
+
+      toast({ title: 'Pedido actualizado' });
+      setDetailOrder(null);
+      setEditMode(false);
+      fetchOrders();
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description:
+          err?.response?.data?.message || 'No se pudo editar el pedido.',
+      });
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const totalVentas = orders
+    .filter((o) => o.status !== 'CANCELADO')
+    .reduce((sum, o) => sum + Number(o.total || 0), 0);
+
+  const editTotal = editItems.reduce((s, i) => s + i.subtotal, 0);
+
+  const filteredOrders = orders.filter((o) => {
+    const fClient = headerFilters.client.toLowerCase();
+    const fStatus = headerFilters.status.toLowerCase();
+    const fPayment = headerFilters.payment.toLowerCase();
+    const createdStr = format(new Date(o.createdAt), 'yyyy-MM-dd');
+    const matchesFrom = headerFilters.dateFrom ? createdStr >= headerFilters.dateFrom : true;
+    const matchesTo = headerFilters.dateTo ? createdStr <= headerFilters.dateTo : true;
 
     return (
-        <div className="grid md:grid-cols-3 gap-6 h-full">
-            <div className="md:col-span-2 space-y-6">
-                <Card><CardHeader><CardTitle>Buscar Producto</CardTitle></CardHeader><CardContent>
-                    <Input placeholder="Buscar..." value={searchTerm} onChange={(e) => handleSearch(e.target.value)} />
-                    {searchResults.length > 0 && (<div className="mt-2 border rounded-md max-h-48 overflow-y-auto">{searchResults.map(p => (
-                        <div key={p.id} className="p-2 hover:bg-muted cursor-pointer flex justify-between" onClick={() => handleAddProduct(p)}><span>{p.description}</span><span className="text-muted-foreground">C$ {p.salePrice.toFixed(2)}</span></div>
-                    ))}</div>)}
-                </CardContent></Card>
-                <Card><CardHeader><CardTitle>Cliente</CardTitle><CardDescription>Selecciona un cliente para el pedido.</CardDescription></CardHeader><CardContent>
-                    <div className="flex flex-wrap gap-3">
-                        <ClientSelectionDialog
-                            currentClient={selectedClient}
-                            onSelectClient={setSelectedClient}
-                            trigger={<Button variant="outline" className="flex-1 justify-between min-w-[220px]">Buscar o seleccionar cliente</Button>}
-                        />
-                        <AddClientDialog
-                            onClientAdded={setSelectedClient}
-                            trigger={<Button variant="outline">Nuevo cliente</Button>}
-                        />
-                    </div>
-                    <div className="mt-2 p-4 border rounded-lg bg-muted/30 flex items-center gap-4"><User className="h-8 w-8 text-muted-foreground" /><div><p className="font-semibold">{selectedClient.name}</p><p className="text-sm text-muted-foreground">{selectedClient.phone || 'Sin teléfono'}</p></div></div>
-                </CardContent></Card>
-            </div>
-            <div className="relative flex flex-col h-full">
-                <Card className="flex flex-col flex-grow"><CardHeader><CardTitle>Nuevo Pedido</CardTitle></CardHeader>
-                    <CardContent className="flex-grow overflow-auto">
-                        {cart.length > 0 ? (<Table><TableHeader><TableRow><TableHead>Producto</TableHead><TableHead className="text-center">Cant.</TableHead><TableHead className="text-right">Subtotal</TableHead></TableRow></TableHeader>
-                            <TableBody>{cart.map(item => (<TableRow key={item.id}><TableCell><p className="font-medium truncate">{item.description}</p><p className="text-xs text-muted-foreground">C$ {item.salePrice.toFixed(2)}</p></TableCell>
-                                <TableCell className="text-center"><div className="flex items-center justify-center gap-1"><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleQuantityChange(item.id, -1)}><MinusCircle className="h-4 w-4" /></Button><span className="w-6 text-center">{item.quantity}</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleQuantityChange(item.id, 1)}><PlusCircle className="h-4 w-4" /></Button></div></TableCell>
-                                <TableCell className="text-right font-medium">C$ {(item.salePrice * item.quantity).toFixed(2)}</TableCell></TableRow>))}</TableBody></Table>)
-                        : (<div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4"><ShoppingBag className="h-16 w-16 mb-4" /><p className="text-lg font-medium">Pedido Vacío</p></div>)}
-                    </CardContent>
-                    {cart.length > 0 && (<div className="p-4 border-t mt-auto space-y-4 bg-background"><div className="space-y-2 text-sm">
-                        <div className="flex justify-between"><span>Subtotal:</span><span>C$ {subtotal.toFixed(2)}</span></div>
-                        {settings.applyVAT && <div className="flex justify-between"><span>IVA (15%):</span><span>C$ {tax.toFixed(2)}</span></div>}
-                        <Separator /><div className="flex justify-between font-bold text-lg"><span>Total:</span><span>C$ {total.toFixed(2)}</span></div>
-                    </div></div>)}
-                </Card>
-                {cart.length > 0 && (<div className="sticky bottom-0 bg-background border-t p-4">
-                    <Dialog open={isFinalizeDialogOpen} onOpenChange={setIsFinalizeDialogOpen}>
-                        <DialogTrigger asChild><Button className="w-full h-16 text-lg"><PackagePlus className="mr-2 h-6 w-6" />Finalizar Pedido</Button></DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader><DialogTitle>Finalizar Pedido</DialogTitle><p className="text-sm text-muted-foreground">Confirma los detalles.</p></DialogHeader>
-                            <div className="py-4 space-y-6">
-                                <div className="text-center"><p className="text-sm text-muted-foreground">Total</p><p className="text-4xl font-bold">C$ {total.toFixed(2)}</p></div>
-                                <div className="space-y-2"><Label>Tipo de Pago</Label>
-                                    <RadioGroup value={paymentType} onValueChange={(v) => setPaymentType(v as 'Contado' | 'Crédito')} className="flex gap-4">
-                                        <Label htmlFor="contado-s" className="flex items-center gap-2 border rounded-md p-3 flex-1 cursor-pointer"><RadioGroupItem value="Contado" id="contado-s" />Contado</Label>
-                                        <Label htmlFor="credito-s" className="flex items-center gap-2 border rounded-md p-3 flex-1 cursor-pointer"><RadioGroupItem value="Crédito" id="credito-s" />Crédito</Label>
-                                    </RadioGroup>
-                                </div>
-                            </div>
-                            <DialogFooter><Button variant="ghost" onClick={() => setIsFinalizeDialogOpen(false)}>Cancelar</Button><Button onClick={handleFinalizeOrder} disabled={isProcessing}>{isProcessing ? <Loader2 className="mr-2 animate-spin" /> : null}Registrar Pedido</Button></DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                </div>)}
-            </div>
-        </div>
+      (o.clientName?.toLowerCase() || 'genérico').includes(fClient) &&
+      (statusLabel[o.status] || o.status).toLowerCase().includes(fStatus) &&
+      (o.paymentType?.toLowerCase() || '').includes(fPayment) &&
+      matchesFrom && matchesTo
     );
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* HEADER */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button variant="ghost" size="sm" asChild>
+          <Link to={`/store/${storeId}/vendors/quick-sale`}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> Venta rápida
+          </Link>
+        </Button>
+        <h1 className="text-xl font-bold">Mis ventas</h1>
+        <Badge variant="secondary" className="ml-auto">
+          {orders.filter((o) => o.status !== 'CANCELADO').length} pedidos — C${' '}
+          {totalVentas.toFixed(2)}
+        </Badge>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={orders.length === 0}
+          onClick={() => {
+            const rows = orders.filter(o => o.status !== 'CANCELADO').map(o => ({
+              'Cliente': o.clientName || 'Genérico',
+              'Fecha': format(new Date(o.createdAt), 'dd/MM/yyyy HH:mm'),
+              'Estado': statusLabel[o.status] || o.status,
+              'Pago': o.paymentType || '—',
+              'Total (C$)': Number(o.total).toFixed(2),
+            }));
+            exportToExcel(rows, `Mis_Ventas_${format(new Date(), 'dd-MM-yyyy')}`, 'Ventas');
+          }}
+        >
+          <Download className="h-4 w-4 mr-1" />
+          Excel
+        </Button>
+      </div>
+
+      {/* TABLE */}
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="text-center text-muted-foreground py-16">
+          No hay ventas registradas aún.
+        </div>
+      ) : (
+        <div className="rounded-xl border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>
+                  Cliente
+                  <Input placeholder="Filtrar..." className="h-6 mt-1 text-xs font-normal" value={headerFilters.client} onChange={e => setHeaderFilters({...headerFilters, client: e.target.value})} />
+                </TableHead>
+                <TableHead>
+                  Fecha
+                  <div className="flex flex-col gap-1 mt-1">
+                    <Input type="date" className="h-6 text-xs p-1 font-normal w-full" value={headerFilters.dateFrom} onChange={e => setHeaderFilters({...headerFilters, dateFrom: e.target.value})} title="Desde" />
+                    <Input type="date" className="h-6 text-xs p-1 font-normal w-full" value={headerFilters.dateTo} onChange={e => setHeaderFilters({...headerFilters, dateTo: e.target.value})} title="Hasta" />
+                  </div>
+                </TableHead>
+                <TableHead>
+                  Estado
+                  <Input placeholder="Filtrar..." className="h-6 mt-1 text-xs font-normal" value={headerFilters.status} onChange={e => setHeaderFilters({...headerFilters, status: e.target.value})} />
+                </TableHead>
+                <TableHead>
+                  Pago
+                  <Input placeholder="Filtrar..." className="h-6 mt-1 text-xs font-normal" value={headerFilters.payment} onChange={e => setHeaderFilters({...headerFilters, payment: e.target.value})} />
+                </TableHead>
+                <TableHead className="text-right align-top pt-4">Total</TableHead>
+                <TableHead className="w-24 text-center align-top pt-4">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredOrders.map((order) => (
+                <TableRow key={order.id}>
+                  <TableCell className="font-medium">
+                    {order.clientName || 'Genérico'}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {format(new Date(order.createdAt), 'dd/MM HH:mm')}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      className={`text-xs ${statusColor[order.status] || 'bg-slate-100 text-slate-800'}`}
+                    >
+                      {statusLabel[order.status] || order.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {order.paymentType || '—'}
+                  </TableCell>
+                  <TableCell className="text-right font-bold">
+                    C$ {Number(order.total).toFixed(2)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        title="Ver detalle"
+                        onClick={() => handleViewDetail(order)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      {CANCELLABLE.includes(order.status) && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          title="Cancelar"
+                          onClick={() => setCancelOrderId(order.id)}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* ─── DETAIL DIALOG ─── */}
+      <Dialog
+        open={!!detailOrder}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDetailOrder(null);
+            setEditMode(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle>
+                {detailOrder?.clientName || 'Pedido'}
+              </DialogTitle>
+              {detailOrder && (
+                <Badge
+                  className={`text-xs ${statusColor[detailOrder.status] || ''}`}
+                >
+                  {statusLabel[detailOrder.status] || detailOrder.status}
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {detailOrder &&
+                format(new Date(detailOrder.createdAt), 'dd/MM/yyyy HH:mm')}{' '}
+              · {detailOrder?.paymentType}
+            </p>
+          </DialogHeader>
+
+          {detailLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* ITEMS TABLE */}
+              {(editMode ? editItems : detailOrder?.items || []).length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto</TableHead>
+                      <TableHead className="text-right">Precio</TableHead>
+                      <TableHead className="text-center w-24">
+                        Cant.
+                      </TableHead>
+                      <TableHead className="text-right">Subtotal</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(editMode ? editItems : detailOrder?.items || []).map(
+                      (item) => (
+                        <TableRow key={item.id || item.productId}>
+                          <TableCell className="text-sm font-medium">
+                            {item.productName}
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            C$ {Number(item.unitPrice).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {editMode ? (
+                              <div className="flex items-center justify-center gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() =>
+                                    handleEditQty(item.id, -1)
+                                  }
+                                >
+                                  -
+                                </Button>
+                                <Input
+                                  value={item.quantity}
+                                  readOnly
+                                  className="h-7 w-12 text-center text-sm"
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() =>
+                                    handleEditQty(item.id, 1)
+                                  }
+                                >
+                                  +
+                                </Button>
+                              </div>
+                            ) : (
+                              item.quantity
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            C${' '}
+                            {(editMode
+                              ? item.subtotal
+                              : item.unitPrice * item.quantity
+                            ).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ),
+                    )}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-muted-foreground text-sm py-4">
+                  Sin detalle de productos.
+                </p>
+              )}
+
+              {/* PRODUCT SEARCH FOR EDIT MODE */}
+              {editMode && (
+                <div className="bg-muted/30 p-3 rounded-md mt-2 space-y-2 border">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar producto para agregar..."
+                      className="pl-8 bg-background"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  {searchQuery && filteredCatalog.length > 0 && (
+                    <div className="flex flex-col gap-1 border bg-background rounded-md shadow-sm overflow-hidden">
+                      {filteredCatalog.map(p => (
+                        <div key={p.id} className="flex justify-between items-center p-2 hover:bg-muted cursor-pointer text-sm" onClick={() => handleAddNewProduct(p)}>
+                          <div>
+                            <p className="font-medium">{p.description}</p>
+                            <p className="text-xs text-muted-foreground">C$ {parseFloat(p.salePrice || p.price1 || 0).toFixed(2)}</p>
+                          </div>
+                          <Button size="icon" variant="ghost" className="h-6 w-6"><Plus className="h-4 w-4"/></Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {searchQuery && filteredCatalog.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-2 bg-background border rounded-md">No se encontraron productos.</p>
+                  )}
+                </div>
+              )}
+
+              <Separator />
+
+              {/* TOTAL */}
+              <div className="flex justify-between font-bold text-lg">
+                <span>Total</span>
+                <span>
+                  C${' '}
+                  {editMode
+                    ? editTotal.toFixed(2)
+                    : Number(detailOrder?.total || 0).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* FOOTER ACTIONS */}
+          {detailOrder && !detailLoading && (
+            <DialogFooter className="flex-col sm:flex-row gap-2">
+              {editMode ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setEditMode(false);
+                      setEditItems(detailOrder.items || []);
+                    }}
+                  >
+                    Cancelar edición
+                  </Button>
+                  <Button
+                    onClick={handleSaveEdit}
+                    disabled={editSaving || editItems.length === 0}
+                  >
+                    {editSaving && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Guardar cambios
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {EDITABLE.includes(detailOrder.status) && (
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => setEditMode(true)}
+                    >
+                      <Edit3 className="h-4 w-4" /> Editar
+                    </Button>
+                  )}
+                  {CANCELLABLE.includes(detailOrder.status) && (
+                    <Button
+                      variant="destructive"
+                      className="gap-2"
+                      onClick={() => setCancelOrderId(detailOrder.id)}
+                    >
+                      <XCircle className="h-4 w-4" /> Cancelar pedido
+                    </Button>
+                  )}
+                </>
+              )}
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── CANCEL CONFIRMATION ─── */}
+      <AlertDialog
+        open={!!cancelOrderId}
+        onOpenChange={(open) => !open && setCancelOrderId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cancelar este pedido?</AlertDialogTitle>
+            <AlertDialogDescription>
+              El pedido pasará a estado "Cancelado" y no se podrá revertir.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelLoading}>
+              Volver
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelOrder}
+              disabled={cancelLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelLoading && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Sí, cancelar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
 }

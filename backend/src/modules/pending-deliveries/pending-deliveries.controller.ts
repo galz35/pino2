@@ -12,13 +12,18 @@ export class PendingDeliveriesController {
 
   @Get()
   @ApiOperation({ summary: 'Listar entregas pendientes con filtros' })
-  findAll(
+  async findAll(
     @Query('storeId') storeId?: string,
     @Query('status') status?: string,
     @Query('ruteroId') ruteroId?: string,
     @Query('unassigned') unassigned?: string,
   ) {
-    return this.service.findAll({ storeId, status, ruteroId, unassigned: unassigned === 'true' });
+    try {
+      return await this.service.findAll({ storeId, status, ruteroId, unassigned: unassigned === 'true' });
+    } catch (e) {
+      console.error('ERROR EN pending-deliveries findAll:', e);
+      throw e;
+    }
   }
 
   @Post()

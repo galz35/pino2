@@ -9,7 +9,7 @@ const ensureLeadingSlash = (value: string) => {
 };
 
 const normalizeBasePath = (value?: string) => {
-  const normalized = stripTrailingSlash(ensureLeadingSlash(value || '/dev'));
+  const normalized = stripTrailingSlash(ensureLeadingSlash(value || '/'));
   return normalized === '' ? '/' : normalized;
 };
 
@@ -28,9 +28,9 @@ const resolveAgainstOrigin = (value: string, fallbackPath: string) => {
 };
 
 export const APP_BASENAME = normalizeBasePath(import.meta.env.VITE_APP_BASENAME);
-export const API_BASE_URL = resolveAgainstOrigin(import.meta.env.VITE_API_URL || '/api-dev', '/api-dev');
-export const SOCKET_URL = resolveAgainstOrigin(import.meta.env.VITE_SOCKET_URL || '/events', '/events');
-export const SOCKET_PATH = ensureLeadingSlash(import.meta.env.VITE_SOCKET_PATH || '/api-dev/socket.io');
+export const API_BASE_URL = resolveAgainstOrigin(import.meta.env.VITE_API_URL || '/api', '/api');
+export const SOCKET_URL = resolveAgainstOrigin(import.meta.env.VITE_SOCKET_URL || '/', '/');
+export const SOCKET_PATH = ensureLeadingSlash(import.meta.env.VITE_SOCKET_PATH || '/socket.io');
 
 export const withAppBase = (path = '/') => {
   const normalizedPath = ensureLeadingSlash(path);

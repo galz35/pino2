@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { PoolClient } from 'pg';
 import { DatabaseService } from '../../database/database.service';
 import { EventsGateway } from '../../common/gateways/events.gateway';
 
@@ -28,7 +29,8 @@ export class ReturnsService {
           quantity: number;
         }
     >;
-  }) {
+    externalId?: string;
+  }, transactionalClient?: PoolClient) {
     if (dto.saleId) {
       return this.createSaleReturn({
         storeId: dto.storeId,
@@ -36,10 +38,27 @@ export class ReturnsService {
         cashierId: dto.cashierId,
         notes: dto.notes,
         items: dto.items as Array<{ productId: string; quantity: number }>,
-      });
+        externalId: dto.externalId,
+      }, transactionalClient);
     }
 
-    return this.db.withTransaction(async (client) => {
+    const execute = async (client: PoolClient) => {
+      // Check idempotency
+      if (dto.externalId) {
+        const existing = await client.query('SELECT * FROM returns WHERE external_id = $1', [dto.externalId]);
+        if (existing.rowCount > 0) {
+          await client.query(
+            'INSERT INTO sync_idempotency_log (store_id, external_id, entity_type) VALUES ($1, $2, $3)',
+            [dto.storeId, dto.externalId, 'RETURN'],
+          );
+          return {
+            ...this.mapRow(existing.rows[0]),
+            message: 'Operación ya procesada anteriormente (Idempotencia)',
+            isDuplicate: true,
+          };
+        }
+      }
+
       const preparedItems: Array<{
         productId: string;
         unitPrice: number;
@@ -84,9 +103,9 @@ export class ReturnsService {
       const total = preparedItems.reduce((sum, item) => sum + item.totalUnits * item.unitPrice, 0);
 
       const returnRes = await client.query(
-        `INSERT INTO returns (store_id, order_id, rutero_id, notes, total)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-        [dto.storeId, dto.orderId || null, dto.ruteroId || null, dto.notes || null, total],
+        `INSERT INTO returns (store_id, order_id, rutero_id, notes, total, external_id)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [dto.storeId, dto.orderId || null, dto.ruteroId || null, dto.notes || null, total, dto.externalId || null],
       );
       const returnRecord = returnRes.rows[0];
 
@@ -173,7 +192,12 @@ export class ReturnsService {
       });
 
       return result;
-    });
+    };
+
+    if (transactionalClient) {
+      return execute(transactionalClient);
+    }
+    return this.db.withTransaction(execute);
   }
 
   async findAll(filters: { storeId?: string; ruteroId?: string; orderId?: string; fromDate?: string; toDate?: string }) {
@@ -226,8 +250,25 @@ export class ReturnsService {
     cashierId?: string;
     notes?: string;
     items: Array<{ productId: string; quantity: number }>;
-  }) {
-    return this.db.withTransaction(async (client) => {
+    externalId?: string;
+  }, transactionalClient?: PoolClient) {
+    const execute = async (client: PoolClient) => {
+      // Check idempotency
+      if (dto.externalId) {
+        const existing = await client.query('SELECT * FROM returns WHERE external_id = $1', [dto.externalId]);
+        if (existing.rowCount > 0) {
+          await client.query(
+            'INSERT INTO sync_idempotency_log (store_id, external_id, entity_type) VALUES ($1, $2, $3)',
+            [dto.storeId, dto.externalId, 'RETURN'],
+          );
+          return {
+            ...this.mapRow(existing.rows[0]),
+            message: 'Operación ya procesada anteriormente (Idempotencia)',
+            isDuplicate: true,
+          };
+        }
+      }
+
       const saleRes = await client.query('SELECT * FROM sales WHERE id = $1', [dto.saleId]);
       if (saleRes.rowCount === 0) {
         throw new NotFoundException('Venta no encontrada');
@@ -268,14 +309,15 @@ export class ReturnsService {
       }
 
       const returnRes = await client.query(
-        `INSERT INTO returns (store_id, order_id, rutero_id, notes, total)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        `INSERT INTO returns (store_id, order_id, rutero_id, notes, total, external_id)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
         [
           storeId,
           null,
           userId,
           dto.notes || `Devolución de venta ${sale.ticket_number || dto.saleId}`,
           totalRefund,
+          dto.externalId || null,
         ],
       );
       const returnRecord = returnRes.rows[0];
@@ -337,7 +379,12 @@ export class ReturnsService {
       });
 
       return result;
-    });
+    };
+
+    if (transactionalClient) {
+      return execute(transactionalClient);
+    }
+    return this.db.withTransaction(execute);
   }
 
   private mapRow(row: any): any {

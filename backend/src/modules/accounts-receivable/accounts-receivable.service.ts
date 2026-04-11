@@ -1,9 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { CollectionsService } from '../collections/collections.service';
 
 @Injectable()
 export class AccountsReceivableService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly collectionsService: CollectionsService,
+  ) {}
 
   async findAll(storeId: string, pending?: boolean) {
     let sql = `SELECT ar.*, c.name as client_name 
@@ -42,7 +46,7 @@ export class AccountsReceivableService {
     return this.mapRow(res.rows[0]);
   }
 
-  async addPayment(accountId: string, dto: { amount: number; paymentMethod?: string; notes?: string; collectedBy?: string }) {
+  async addPayment(accountId: string, dto: { amount: number; paymentMethod?: string; notes?: string; collectedBy?: string, externalId?: string }) {
     if (Number(dto.amount) <= 0) {
       throw new BadRequestException('El monto del pago debe ser mayor a 0');
     }
@@ -60,19 +64,16 @@ export class AccountsReceivableService {
       const newRemaining = currentRemaining - dto.amount;
 
       if (dto.collectedBy) {
-        await client.query(
-          `INSERT INTO collections (store_id, account_id, rutero_id, client_id, amount, payment_method, notes)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [
-            account.store_id,
-            accountId,
-            dto.collectedBy,
-            account.client_id,
-            dto.amount,
-            dto.paymentMethod || 'CASH',
-            dto.notes || 'Cobro registrado desde cuentas por cobrar',
-          ],
-        );
+        await this.collectionsService.create({
+          storeId: account.store_id,
+          accountId,
+          ruteroId: dto.collectedBy,
+          clientId: account.client_id,
+          amount: dto.amount,
+          paymentMethod: dto.paymentMethod,
+          notes: dto.notes,
+          externalId: dto.externalId,
+        }, client);
       }
 
       await client.query(

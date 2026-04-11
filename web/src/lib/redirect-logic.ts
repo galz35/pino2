@@ -14,12 +14,17 @@ export function getRedirectPath(user: User | null): string | null {
 
 
 
-    // Master Admin / Owner (Acceso global)
+    // Master Admin / Owner (Acceso global al SaaS)
     if (role === 'master-admin' || role === 'owner') {
         return '/master-admin/dashboard';
     }
 
-    // Si no tiene tienda asignada y no es admin global, error
+    // Administrador de Cadena (Corporativo multi-tienda)
+    if (role === 'chain-admin') {
+        return '/chain-admin/dashboard';
+    }
+
+    // Si no tiene tienda asignada y no es un rol superior, error
     if (!storeId) {
         console.warn(`[RedirectLogic] User with role "${role}" has no assigned storeId.`);
         return '/login?error=no-store';

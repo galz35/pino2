@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { PoolClient } from 'pg';
 import { DatabaseService } from '../../database/database.service';
 
 @Injectable()
@@ -27,10 +28,12 @@ export class SalesService {
     paymentCurrency?: string;
     amountReceived?: number;
     change?: number;
-  }) {
+    externalId?: string;
+  }, transactionalClient?: PoolClient) {
     const cashShiftId = dto.cashShiftId || dto.shiftId;
     const ticketNumber = dto.ticketNumber || `T-${Date.now()}`;
-    return await this.db.withTransaction(async (client) => {
+
+    const execute = async (client: PoolClient) => {
       // 1. Validar caja abierta
       const shiftRes = await client.query(
         'SELECT status, actual_cash, starting_cash FROM cash_shifts WHERE id = $1 AND store_id = $2 FOR UPDATE',
@@ -49,9 +52,25 @@ export class SalesService {
       const tax = subtotal * 0.15; // IVA 15% quemado temporalmente para pruebas
       const total = subtotal + tax;
 
-      const sql = `INSERT INTO sales (store_id, cash_shift_id, cashier_id, ticket_number, subtotal, tax, total, payment_method)
-                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`;
-      const vals = [dto.storeId, cashShiftId, dto.cashierId, ticketNumber, subtotal, tax, total, dto.paymentMethod];
+      // 3. Comprobar idempotencia si viene externalId
+      if (dto.externalId) {
+        const existingSale = await client.query('SELECT * FROM sales WHERE external_id = $1', [dto.externalId]);
+        if (existingSale.rowCount > 0) {
+          await client.query(
+            'INSERT INTO sync_idempotency_log (store_id, external_id, entity_type) VALUES ($1, $2, $3)',
+            [dto.storeId, dto.externalId, 'SALE'],
+          );
+          return {
+            ...this.mapSaleRow(existingSale.rows[0]),
+            message: 'Operación ya procesada anteriormente (Idempotencia)',
+            isDuplicate: true,
+          };
+        }
+      }
+
+      const sql = `INSERT INTO sales (store_id, cash_shift_id, cashier_id, ticket_number, subtotal, tax, total, payment_method, external_id)
+                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`;
+      const vals = [dto.storeId, cashShiftId, dto.cashierId, ticketNumber, subtotal, tax, total, dto.paymentMethod, dto.externalId];
       const saleRes = await client.query(sql, vals);
       const sale = saleRes.rows[0];
 
@@ -139,7 +158,12 @@ export class SalesService {
         createdAt: sale.created_at,
         message: 'Venta Procesada Satisfactoriamente',
       };
-    });
+    };
+
+    if (transactionalClient) {
+      return execute(transactionalClient);
+    }
+    return await this.db.withTransaction(execute);
   }
 
   async findAll(storeId?: string, shiftId?: string, startDate?: string, endDate?: string, storeIds?: string) {

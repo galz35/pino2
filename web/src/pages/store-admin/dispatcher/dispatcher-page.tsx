@@ -15,29 +15,14 @@ import { Input } from '@/components/ui/input';
 import apiClient from '@/services/api-client';
 import { ClientSelectionDialog } from '@/components/pos/client-selection-dialog';
 import { AddClientDialog } from '@/components/pos/add-client-dialog';
+import { Client, Product as GlobalProduct } from '@/types';
 
-interface Product {
-    id: string;
-    description: string;
-    barcode: string;
-    salePrice: number;
-    costPrice?: number;
-    currentStock?: number;
-    usesInventory?: boolean;
-}
-
-interface CartItem extends Product {
+interface CartItem extends GlobalProduct {
     quantity: number;
 }
 
-interface Client {
-    id: string;
-    name: string;
-    phone?: string;
-    address?: string;
-}
 
-const genericClient: Client = { id: 'generic', name: 'Cliente Genérico', phone: '', address: '' };
+const genericClient: Client = { id: 'generic', storeId: '', name: 'Cliente Genérico', phone: '', address: '', email: '' };
 
 export default function DispatcherPage() {
     const [cart, setCart] = useState<CartItem[]>([]);
@@ -45,7 +30,7 @@ export default function DispatcherPage() {
     const [selectedClient, setSelectedClient] = useState<Client>(genericClient);
     const [isProcessing, setIsProcessing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [searchResults, setSearchResults] = useState<Product[]>([]);
+    const [searchResults, setSearchResults] = useState<GlobalProduct[]>([]);
 
     const { storeId } = useParams<{ storeId: string }>();
     const { user } = useAuth();
@@ -71,7 +56,7 @@ export default function DispatcherPage() {
         } catch { setSearchResults([]); }
     };
 
-    const handleAddProduct = useCallback((product: Product) => {
+    const handleAddProduct = useCallback((product: GlobalProduct) => {
         setCart((prevCart) => {
             const existing = prevCart.find((item) => item.id === product.id);
             if (existing) {
@@ -126,25 +111,36 @@ export default function DispatcherPage() {
     };
 
     return (
-        <div className="grid md:grid-cols-3 gap-6 h-full">
-            <div className="md:col-span-2 space-y-6">
-                {/* Product Search */}
-                <Card>
-                    <CardHeader><CardTitle>Buscar Producto</CardTitle></CardHeader>
-                    <CardContent>
-                        <Input placeholder="Buscar por nombre o código de barra..." value={searchTerm} onChange={(e) => handleSearch(e.target.value)} />
-                        {searchResults.length > 0 && (
-                            <div className="mt-2 border rounded-md max-h-48 overflow-y-auto">
-                                {searchResults.map(p => (
-                                    <div key={p.id} className="p-2 hover:bg-muted cursor-pointer flex justify-between" onClick={() => handleAddProduct(p)}>
-                                        <span>{p.description}</span>
-                                        <span className="text-muted-foreground">C$ {p.salePrice.toFixed(2)}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+        <div className="h-full flex flex-col">
+            <div className="mb-6 bg-card p-6 rounded-lg border shadow-sm">
+                <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                    <User className="h-6 w-6 text-primary" />
+                    Sala de Ventas / Despachador
+                </h1>
+                <p className="text-muted-foreground mt-1">
+                    Crea comandas rápidamente seleccionando cliente y productos para que el cajero las cobre.
+                </p>
+            </div>
+            
+            <div className="grid md:grid-cols-3 gap-6 flex-grow overflow-hidden">
+                <div className="md:col-span-2 flex flex-col gap-6 overflow-y-auto pr-2">
+                    {/* Product Search */}
+                    <Card className="shrink-0">
+                        <CardHeader><CardTitle>Buscar Producto</CardTitle></CardHeader>
+                        <CardContent>
+                            <Input placeholder="Buscar por nombre o código de barra..." value={searchTerm} onChange={(e) => handleSearch(e.target.value)} />
+                            {searchResults.length > 0 && (
+                                <div className="mt-2 border rounded-md max-h-48 overflow-y-auto shadow-sm">
+                                    {searchResults.map(p => (
+                                        <div key={p.id} className="p-3 hover:bg-muted cursor-pointer flex justify-between border-b last:border-b-0" onClick={() => handleAddProduct(p)}>
+                                            <span className="font-medium">{p.description}</span>
+                                            <span className="text-muted-foreground ml-4 shrink-0">C$ {p.salePrice.toFixed(2)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
 
                 {/* Client */}
                 <Card>
@@ -234,6 +230,7 @@ export default function DispatcherPage() {
                     </div>
                 )}
             </div>
+        </div>
         </div>
     );
 }

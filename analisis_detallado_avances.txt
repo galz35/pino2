@@ -1,0 +1,86 @@
+================================================================================
+  ANÁLISIS DETALLADO DE AVANCES - SISTEMA LOS PINOS
+  Diagnóstico Completo: Backend (NestJS), Frontend (React/Vite) y Mobile (Flutter)
+  Carpeta de Trabajo: d:\pino\sistema_final
+  Fecha de Corte: 3 de abril de 2026
+================================================================================
+
+Este documento consolida el estado actual del proyecto cruzando los requerimientos iniciales con los archivos de planificación, documentación de "Handoff" y el barrido técnico del repositorio unificado en `sistema_final`.
+
+════════════════════════════════════════════════════════════════════════════════
+  1. BACKEND (Node.js + NestJS + PostgreSQL + Socket.io)
+  Nivel de Avance Real: 100% del alcance core / 95% del requerimiento global
+════════════════════════════════════════════════════════════════════════════════
+
+El backend está construido sobre bases sólidas, empleando el driver pg nativo sin ORM pesado, con 31 submódulos en la capa de negocio operativos, los cuales interactúan eficientemente.
+
+  [+] CUMPLIDO (Sólido y Operativo)
+  ---------------------------------
+  - Autenticación y roles: Implementado JWT, gestión de usuarios.
+  - Catálogo y Tiendas: Configuración, productos, departamentos y cadenas.
+  - Gestión de Inventarios y Bodega: Productos con conversiones (bultos/unidades), kárdex, y el "Inventario de Rutero" (vendor_inventories).
+  - Flujo Comercial: Pedidos (crédito/contado), Ventas SQL transaccional.
+  - Cuentas y Finanzas: Facturas a proveedores, CxC (cuentas por cobrar, con bloqueos de sobrepago) y CxP (pago a proveedores), cobranza y cierres diarios.
+  - Logística: Devoluciones, rutas, zonas.
+  - Sincronización Realtime: Implementación activa de Socket.IO que transmite eventos clave como "NEW_ORDER", "NEW_RETURN", "INVENTORY_UPDATE".
+
+  [-] PARCIALMENTE PENDIENTE O A LA ESPERA DE REFINAMIENTO (5%)
+  ---------------------------------
+  - Refinamiento de Bodega: Existen los cambios de estado (preparar, alistar, cargar camión), pero el sistema aún trata estos eventos bajo el gran bloque de `orders` sin un módulo ultra-especializado de "warehouse" aislado.
+  - Expansión Realtime: Los sockets ya envían la señal base, pero la reconciliación móvil y eventos muy finos del rutero podrían requerir endpoints WebSocket adicionales en la fase final de "Sync móvil offline avanzado".
+
+  * Veredicto de Backend: Supera el requerimiento base y ya no tiene "bloques inexistentes". Sólido para sostener tanto la Web como la App Móvil.
+
+════════════════════════════════════════════════════════════════════════════════
+  2. FRONTEND WEB (React + Vite + Tailwind + Radix UI)
+  Nivel de Avance Real: 20% - 25% completado
+════════════════════════════════════════════════════════════════════════════════
+
+ElFrontend Web pasó por un proceso de migración (de un monstruo Next.js+Firebase a un componente SPA React Vite conectándose a NestJS).
+
+  [+] CUMPLIDO (Lo que sí sirve)
+  ---------------------------------
+  - Framework configurado: Entorno Vite limpio. HMR operativo.
+  - Conexión real a Backend: Implementado el cliente HTTP para interactuar con la API REST de NestJS (`apiClient.ts`).
+  - Módulos operativos: Login, reportes básicos, productos, settings. El núcleo (POS básico de caja y dashboards) está funcional *gracias a nuestra limpieza reciente*.
+
+  [-] EL GAP GIGANTE (Faltante)
+  ---------------------------------
+  - Faltan 20 módulos completos (casi un 80% de la UI web real) que vivían en Next.js (Firebase) y aún no existen formados en la carpeta /pages de Vite.
+  - Ejemplos de módulos inexistentes en web: Facturación formal (Store Billing), Control Tower, Despacho (Dispatcher), Cuentas maestras de cadenas (Master-admin chains/stores/licenses), Flujo de proveedores.
+  - Falta el modo "Offline Cache Web" para la web (aunque el móvil lo cubra nativamente).
+
+  * Veredicto de Frontend Web: Totalmente funcional en su "cascarón", pero logísticamente incompleto. Requiere crear las interfaces de usuario para conectar con las rutas del backend que ¡ya existen!
+
+════════════════════════════════════════════════════════════════════════════════
+  3. MÓVIL (Flutter App)
+  Nivel de Avance Real: 90% (Con bloqueo técnico temporal)
+════════════════════════════════════════════════════════════════════════════════
+
+La aplicación de campo, pensada para los vendedores y distribuidores, es una implementación nativa fuerte.
+
+  [+] CUMPLIDO Y OPERATIVO
+  ---------------------------------
+  - Conexión Activa: Sistema de Login, navegación segura por roles y visualización (Catálogo, Preventa, Clientes, Bodega, Cuentas por Cobrar, Devoluciones).
+  - Persistencia Offline Básica (Drift/SQLite):
+    -> ¡Sí tiene base de datos local!
+    -> Almacena en caché tiendas, catálogo, cartera.
+    -> Cuenta con una "Cola de Trabajos Local" que guarda pedidos y eventos temporalmente cuando la red desaparece, con opción de retintento en el Home.
+  - Eventos de red: Sabe reaccionar cuando "vuelve internet" enviando los datos acumulados.
+  - Diseño: Generación de PDF operando.
+
+  [-] LO QUE FALTA DE FLUTTER
+  ---------------------------------
+  1. BLOQUEO TÉCNICO INMEDIATO: El `pubspec.yaml` demanda Dart `^3.11.4`, lo que imposibilita construir la App con el Flutter 3.38.9 (SDK de Dart 3.10.8) local del entorno. Esto es de correción prioritaria.
+  2. "Offline-First de Punta a Punta": Aunque existe una base offline para fallos espontáneos de red de corto plazo, el sistema no está estructurado para que todo el negocio funcione totalmente independiente del backend por 2 semanas y luego resuelva los "Conflictos" (Deltas) de manera hiper-robusta (reconciliación inteligente frente a cambios de servidor).
+
+  * Veredicto de Flutter: Solo requiere ajustes en los cimientos del SDK (subir el SDK de Flutter del servidor) para volver a correr, seguido de refinar la lógica robusta de sincronización Delta (conflict-resolution).
+
+════════════════════════════════════════════════════════════════════════════════
+  4. CONCLUSIÓN Y RECOMENDACIÓN ESTRATÉGICA
+════════════════════════════════════════════════════════════════════════════════
+
+1. La deuda técnica de linting del backend (1787 errores TS) no bloquea la corrida, pero se recomienda sanearla mediante el tipado de variables "any".
+2. Prioridad Crítica (Configuración): Actualizar Flutter en la máquina local o flexibilizar aún más las dependencias de `pubspec.yaml` que exigen versiones nuevas de Dart para compilar la app.
+3. Prioridad de Desarrollo: Centrar los esfuerzos en React. Como el backend responde de maravilla, es vital crear las carpetas en el frontend web para "Caja Registradora", "Facturas P/P" y "Torre de Control", y mapear componentes UI básicos conectados al `apiClient.ts`.
+4. El requerimiento del cliente NO debe publicarse como 100% hoy. Se debe ser transparente y decir: "El backend está cerrado, Flutter móvil está cerrado en alcance uno, falta la web y la robustez offline extrema".

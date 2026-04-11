@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS sales (
     tax DECIMAL(12, 2) NOT NULL,
     total DECIMAL(12, 2) NOT NULL,
     payment_method VARCHAR(50) DEFAULT 'CASH',
+    external_id UUID UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -169,6 +170,7 @@ CREATE TABLE IF NOT EXISTS orders (
     status VARCHAR(30) DEFAULT 'PENDING',
     notes TEXT,
     updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    external_id UUID UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -374,6 +376,7 @@ CREATE TABLE IF NOT EXISTS returns (
     rutero_id UUID REFERENCES users(id) ON DELETE SET NULL,
     notes TEXT,
     total DECIMAL(12, 2) DEFAULT 0,
+    external_id UUID UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -397,6 +400,7 @@ CREATE TABLE IF NOT EXISTS collections (
     amount DECIMAL(12, 2) NOT NULL,
     payment_method VARCHAR(30) DEFAULT 'CASH',
     notes TEXT,
+    external_id UUID UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

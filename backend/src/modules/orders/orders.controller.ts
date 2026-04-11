@@ -32,10 +32,11 @@ export class OrdersController {
     @Query('storeId') storeId?: string,
     @Query('status') status?: string,
     @Query('vendorId') vendorId?: string,
+    @Query('clientId') clientId?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
   ) {
-    return this.service.findAll({ storeId, status, vendorId, fromDate, toDate });
+    return this.service.findAll({ storeId, status, vendorId, clientId, fromDate, toDate });
   }
 
   @Get(':id')

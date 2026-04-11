@@ -28,7 +28,7 @@ export class InventoryService {
     storeId: string;
     productId: string;
     userId: string;
-    type: 'IN' | 'OUT';
+    type: 'IN' | 'OUT' | 'MERMA' | 'AJUSTE_POSITIVO' | 'AJUSTE_NEGATIVO' | 'TRASLADO_IN' | 'TRASLADO_OUT';
     quantity: number;
     reference: string;
   }) {
@@ -55,11 +55,16 @@ export class InventoryService {
       );
 
       let newStock = currentStock;
-      if (dto.type === 'IN') {
+      const addTypes = ['IN', 'AJUSTE_POSITIVO', 'TRASLADO_IN'];
+      const subTypes = ['OUT', 'MERMA', 'AJUSTE_NEGATIVO', 'TRASLADO_OUT'];
+
+      if (addTypes.includes(dto.type)) {
         newStock += quantity;
-      } else {
+      } else if (subTypes.includes(dto.type)) {
         newStock -= quantity;
-        if (newStock < 0) throw new BadRequestException('El ajuste resulta en stock negativo (Operación Denegada)');
+        if (newStock < 0) throw new BadRequestException(`El ajuste resulta en stock negativo. Stock actual: ${currentStock}, Cantidad: ${quantity}`);
+      } else {
+        throw new BadRequestException(`Tipo de movimiento no reconocido: ${dto.type}`);
       }
 
       const balanceBulks = Math.floor(newStock / unitsPerBulk);
@@ -231,5 +236,121 @@ export class InventoryService {
       unitsPerBulk: Math.max(1, this.parseInteger(row.units_per_bulk ?? 1, 'units_per_bulk')),
       updatedAt: row.updated_at,
     }));
+  }
+
+  async transferBetweenStores(dto: {
+    fromStoreId: string;
+    toStoreId: string;
+    productId: string;
+    quantity: number;
+    userId: string;
+    reference?: string;
+  }) {
+    if (dto.fromStoreId === dto.toStoreId) {
+      throw new BadRequestException('No se puede trasladar a la misma tienda');
+    }
+
+    return await this.db.withTransaction(async (client) => {
+      const quantity = this.parseInteger(dto.quantity, 'quantity');
+      if (quantity <= 0) throw new BadRequestException('quantity debe ser mayor que cero');
+
+      // 1. Lock and validate source product
+      const srcRes = await client.query(
+        'SELECT current_stock, description FROM products WHERE id = $1 AND store_id = $2 FOR UPDATE',
+        [dto.productId, dto.fromStoreId],
+      );
+      if (srcRes.rowCount === 0) throw new BadRequestException('Producto no encontrado en la tienda origen');
+
+      const srcStock = this.parseInteger(srcRes.rows[0].current_stock, 'current_stock');
+      const productDesc = srcRes.rows[0].description;
+
+      if (srcStock < quantity) {
+        throw new BadRequestException(`Stock insuficiente en origen. Disponible: ${srcStock}, Solicitado: ${quantity}`);
+      }
+
+      // 2. Find or create product in destination store
+      let destProdRes = await client.query(
+        'SELECT id, current_stock FROM products WHERE store_id = $1 AND description = $2 FOR UPDATE',
+        [dto.toStoreId, productDesc],
+      );
+
+      let destProductId: string;
+      let destCurrentStock: number;
+
+      if (destProdRes.rowCount === 0) {
+        // Copy full product to destination store to ensure sellability
+        const copyRes = await client.query(
+          `INSERT INTO products (
+             store_id, description, barcode, sale_price, cost_price, wholesale_price,
+             price1, price2, price3, price4, price5,
+             current_stock, uses_inventory, department_id, units_per_bulk, min_stock,
+             brand, supplier_id, sub_department
+           )
+           SELECT $1, description, barcode, sale_price, cost_price, wholesale_price,
+             price1, price2, price3, price4, price5,
+             0, uses_inventory, department_id, units_per_bulk, min_stock,
+             brand, supplier_id, sub_department
+           FROM products WHERE id = $2
+           RETURNING id, current_stock`,
+          [dto.toStoreId, dto.productId],
+        );
+        destProductId = copyRes.rows[0].id;
+        destCurrentStock = 0;
+      } else {
+        destProductId = destProdRes.rows[0].id;
+        destCurrentStock = this.parseInteger(destProdRes.rows[0].current_stock ?? 0, 'current_stock');
+      }
+
+      // 3. Update stocks
+      const newSrcStock = srcStock - quantity;
+      const newDestStock = destCurrentStock + quantity;
+
+      await client.query('UPDATE products SET current_stock = $1, updated_at = NOW() WHERE id = $2', [newSrcStock, dto.productId]);
+      await client.query('UPDATE products SET current_stock = $1, updated_at = NOW() WHERE id = $2', [newDestStock, destProductId]);
+
+      const ref = dto.reference || `Traslado entre tiendas`;
+
+      // 4. Record kardex on BOTH stores
+      await client.query(
+        `INSERT INTO movements (store_id, product_id, user_id, type, quantity, balance, reference)
+         VALUES ($1, $2, $3, 'TRASLADO_OUT', $4, $5, $6)`,
+        [dto.fromStoreId, dto.productId, dto.userId, quantity, newSrcStock, `${ref}`],
+      );
+
+      await client.query(
+        `INSERT INTO movements (store_id, product_id, user_id, type, quantity, balance, reference)
+         VALUES ($1, $2, $3, 'TRASLADO_IN', $4, $5, $6)`,
+        [dto.toStoreId, destProductId, dto.userId, quantity, newDestStock, `${ref}`],
+      );
+
+      // 5. Emit real-time events to both stores
+      const payload = {
+        fromStoreId: dto.fromStoreId,
+        toStoreId: dto.toStoreId,
+        productId: dto.productId,
+        quantity,
+        reference: ref,
+      };
+
+      this.eventsGateway.emitSyncUpdate({
+        type: 'INVENTORY_TRANSFER',
+        storeId: dto.fromStoreId,
+        payload,
+      });
+
+      this.eventsGateway.emitSyncUpdate({
+        type: 'INVENTORY_TRANSFER',
+        storeId: dto.toStoreId,
+        payload,
+      });
+
+      return {
+        success: true,
+        productDescription: productDesc,
+        quantity,
+        fromStock: newSrcStock,
+        toStock: newDestStock,
+      };
+    });
   }
 }

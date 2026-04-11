@@ -21,6 +21,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 
+import { QuickOperationalPulse } from '@/components/dashboard/quick-operational-pulse';
+
 export default function DashboardPage() {
   const [storeName, setStoreName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -92,30 +94,33 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <section className="rounded-3xl bg-gradient-to-br from-slate-950 via-blue-900 to-emerald-700 p-6 text-white shadow-xl">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div className="space-y-3">
-            <Badge className="w-fit border border-white/20 bg-white/10 text-white hover:bg-white/10">
-              Centro de control
-            </Badge>
-            <div className="space-y-2">
-              <h1 className="text-3xl font-black tracking-tight">
-                Panel de tienda
-              </h1>
-              <p className="text-lg font-semibold text-white">
-                {storeName}
-              </p>
-              <p className="max-w-2xl text-sm text-sky-50/85">
-                Usa esta vista para entrar rápido a venta, bodega, despacho y
-                cobranza. El objetivo es decidir y actuar, no navegar de más.
-              </p>
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="space-y-3">
+              <Badge className="w-fit border border-white/20 bg-white/10 text-white hover:bg-white/10">
+                Pulsaciones vivas
+              </Badge>
+              <div className="space-y-1">
+                <h1 className="text-3xl font-black tracking-tight">
+                  Panel Operativo
+                </h1>
+                <p className="text-lg font-bold text-sky-200/90 italic">
+                  {storeName}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+               <div className="flex -space-x-2">
+                  <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400"></div>
+                  <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400 delay-75"></div>
+                  <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400 delay-150"></div>
+               </div>
+               <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Sistema en línea</span>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <StatusChip label="Caja" value="Lista para operar" />
-            <StatusChip label="Bodega" value="Seguimiento vivo" />
-            <StatusChip label="Ruta" value="Pedidos y despacho" />
-          </div>
+          <QuickOperationalPulse storeId={storeId} />
         </div>
       </section>
 
@@ -198,23 +203,6 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function StatusChip({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-4">
-      <p className="text-xs uppercase tracking-[0.18em] text-white/70">
-        {label}
-      </p>
-      <p className="mt-3 text-lg font-black text-white">{value}</p>
     </div>
   );
 }

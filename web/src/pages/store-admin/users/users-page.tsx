@@ -140,19 +140,11 @@ export default function StoreUsersPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Usuarios de la Tienda</h1>
-          <p className="text-muted-foreground">
-            Gestiona los cajeros, bodegueros y vendedores de tu tienda.
-          </p>
-        </div>
+          <h1 className="text-2xl font-bold tracking-tight">Usuarios</h1>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Usuarios</CardTitle>
-          <CardDescription>
-            Administra el acceso de los empleados a esta tienda.
-          </CardDescription>
+          <CardTitle>Personal</CardTitle>
         </CardHeader>
         <CardContent>
           {renderContent()}

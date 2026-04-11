@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { toast } from '@/lib/swalert';
+import { clearCache } from '@/services/api-client';
 import { SOCKET_PATH, SOCKET_URL } from '@/lib/runtime-config';
 
 export const useRealTimeEvents = (storeId?: string) => {
@@ -24,13 +25,25 @@ export const useRealTimeEvents = (storeId?: string) => {
       case 'NEW_ORDER':
         toast.success(
           '¡Nuevo Pedido!',
-          `Se ha recibido una orden por C$ ${event.payload.total.toFixed(2)}`
+          `Se ha recibido una orden por C$ ${Number(event.payload?.total || 0).toFixed(2)}`
         );
         break;
       case 'NEW_VISIT':
         toast.info(
           'Nueva Visita en Ruta',
-          `El vendedor ha registrado una visita en: ${event.payload.clientId}`
+          `El vendedor ha registrado una visita en: ${event.payload?.clientId || 'Cliente desconocido'}`
+        );
+        break;
+      case 'NOTIFICATION':
+        toast.info(
+          event.payload?.title || 'Notificación',
+          event.payload?.message || 'Tienes un nuevo aviso.'
+        );
+        break;
+      case 'ORDER_STATUS_CHANGE':
+        toast.info(
+          `Pedido ${event.payload?.orderId?.substring(0, 8)}`,
+          `Ha cambiado de estado a: ${event.payload?.status?.replace('_', ' ')}`
         );
         break;
       default:
@@ -50,6 +63,7 @@ export const useRealTimeEvents = (storeId?: string) => {
         return;
       }
 
+      clearCache();
       setLastEvent(data);
       handleNotification(data);
     };

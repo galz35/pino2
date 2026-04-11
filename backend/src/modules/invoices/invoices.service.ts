@@ -14,6 +14,7 @@ export class InvoicesService {
     total: number;
     status: string;
     cashierName: string;
+    userId?: string;
     items: Array<{
       productId?: string;
       description: string;
@@ -94,14 +95,15 @@ export class InvoicesService {
           );
         }
 
-        // Log inventory movement
+        // Log inventory movement (Kardex)
         const finalStock = currentStock + item.quantity;
         await client.query(
-          `INSERT INTO movements (store_id, product_id, type, quantity, balance, reference)
-           VALUES ($1, $2, 'IN', $3, $4, $5)`,
+          `INSERT INTO movements (store_id, product_id, user_id, type, quantity, balance, reference)
+           VALUES ($1, $2, $3, 'IN', $4, $5, $6)`,
           [
             dto.storeId,
             productId,
+            dto.userId || null,
             item.quantity,
             finalStock,
             `Factura Proveedor #${dto.invoiceNumber}`,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { CalendarDays, CreditCard, HandCoins, Loader2, RefreshCw, Wallet } from 'lucide-react';
+import { CalendarDays, CreditCard, Download, HandCoins, Loader2, RefreshCw, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +20,8 @@ import financeService, {
   type CollectionRecord,
   type CollectionSummary,
 } from '@/services/finance-service';
+import { useRealTimeEvents } from '@/hooks/use-real-time-events';
+import { exportToExcel } from '@/lib/export-excel';
 
 const dateOnlyFormatter = new Intl.DateTimeFormat('es-NI', {
   dateStyle: 'medium',
@@ -57,6 +59,7 @@ function getStatusVariant(status?: string): 'default' | 'secondary' | 'destructi
 export default function ReceivablesPage() {
   const { storeId } = useParams<{ storeId: string }>();
   const { user } = useAuth();
+  const { lastEvent } = useRealTimeEvents(storeId);
 
   const [accounts, setAccounts] = useState<AccountReceivable[]>([]);
   const [collections, setCollections] = useState<CollectionRecord[]>([]);
@@ -104,6 +107,12 @@ export default function ReceivablesPage() {
   useEffect(() => {
     loadData();
   }, [storeId, selectedDate]);
+
+  useEffect(() => {
+    if (lastEvent && lastEvent.type !== 'PING') {
+      loadData();
+    }
+  }, [lastEvent]);
 
   const pendingTotal = useMemo(
     () => accounts.reduce((acc, account) => acc + Number(account.pendingAmount || account.remainingAmount || 0), 0),
@@ -184,6 +193,24 @@ export default function ReceivablesPage() {
           <Button variant="outline" onClick={() => loadData(true)} disabled={refreshing}>
             {refreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             Actualizar
+          </Button>
+          <Button
+            variant="outline"
+            disabled={accounts.length === 0}
+            onClick={() => {
+              const rows = accounts.map(a => ({
+                'Cliente': a.clientName || 'Sin nombre',
+                'Pedido': a.orderId || 'N/A',
+                'Descripción': a.description || '',
+                'Creada': formatDate(a.createdAt),
+                'Estado': a.status,
+                'Saldo Pendiente': Number(a.pendingAmount || a.remainingAmount || 0).toFixed(2),
+              }));
+              exportToExcel(rows, `Cartera_${selectedDate}`, 'Cartera');
+            }}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Exportar
           </Button>
         </div>
       </div>

@@ -9,6 +9,7 @@ const normalizeRawRole = (value?: string | null) =>
 export type NormalizedUserRole =
   | 'master-admin'
   | 'owner'
+  | 'chain-admin'
   | 'store-admin'
   | 'cashier'
   | 'inventory'
@@ -27,6 +28,9 @@ export const normalizeUserRole = (value?: string | null): NormalizedUserRole => 
       return 'master-admin';
     case 'owner':
       return 'owner';
+    case 'chain-admin':
+    case 'chainadmin':
+      return 'chain-admin';
     case 'store-admin':
     case 'store-administrator':
     case 'admin':
@@ -43,11 +47,15 @@ export const normalizeUserRole = (value?: string | null): NormalizedUserRole => 
     case 'despacho':
       return 'dispatcher';
     case 'rutero':
+    case 'repartidor':
+    case 'despachador-de-ruta':
       return 'rutero';
     case 'vendor':
+    case 'vendedor':
     case 'vendedor-ambulante':
       return 'vendor';
     case 'gestor-de-ventas':
+    case 'gestor-ventas':
     case 'sales-manager':
       return 'sales-manager';
     default:

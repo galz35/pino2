@@ -55,4 +55,6 @@ apiClient.get = async function (url, config) {
   return originalGet.call(this, url, config);
 };
 
+export const clearCache = () => memoryCache.clear();
+
 export default apiClient;

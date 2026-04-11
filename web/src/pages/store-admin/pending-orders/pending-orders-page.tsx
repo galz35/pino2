@@ -20,6 +20,7 @@ import {
     AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import apiClient from '@/services/api-client';
+import { useRealTimeEvents } from '@/hooks/use-real-time-events';
 
 interface OrderItem {
     id: string;
@@ -42,6 +43,7 @@ interface PendingOrder {
 export default function PendingOrdersPage() {
     const { storeId } = useParams<{ storeId: string }>();
     const { toast } = useToast();
+    const { lastEvent } = useRealTimeEvents(storeId);
 
     const [orders, setOrders] = useState<PendingOrder[]>([]);
     const [loading, setLoading] = useState(true);
@@ -66,6 +68,12 @@ export default function PendingOrdersPage() {
         const interval = setInterval(fetchOrders, 15000);
         return () => clearInterval(interval);
     }, [storeId]);
+
+    useEffect(() => {
+        if (lastEvent && lastEvent.type !== 'PING') {
+            fetchOrders();
+        }
+    }, [lastEvent]);
 
     const handleProcessOrder = async (order: PendingOrder) => {
         try {
@@ -168,13 +176,19 @@ export default function PendingOrdersPage() {
 
     return (
         <div>
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold tracking-tight">
-                    Comandas Pendientes de Cobro
-                </h1>
-                <p className="text-muted-foreground">
-                    Aquí se muestran las comandas generadas por los despachadores que están listas para ser facturadas.
-                </p>
+            <div className="mb-6 flex justify-between items-center bg-card p-6 rounded-lg border shadow-sm">
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                        <ClipboardCheck className="h-6 w-6 text-primary" />
+                        Comandas Pendientes de Cobro
+                    </h1>
+                    <p className="text-muted-foreground mt-1">
+                        Comandas listas para ser facturadas.
+                    </p>
+                </div>
+                <Button onClick={fetchOrders} variant="outline" className="gap-2 shrink-0">
+                    <Hourglass className="h-4 w-4" /> Actualizar
+                </Button>
             </div>
             <Card>
                 <CardHeader>

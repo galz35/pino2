@@ -11,7 +11,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, FileWarning, LineChart, Loader2 } from 'lucide-react';
+import { CalendarIcon, FileWarning, LineChart, Loader2, Download } from 'lucide-react';
 import { format, startOfDay, endOfDay, startOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -22,6 +22,7 @@ import { logError } from '@/lib/error-logger';
 import { DateRange } from 'react-day-picker';
 import { DepartmentSalesChart } from '@/components/dashboard/department-sales-chart';
 import { ProductSalesChart } from '@/components/dashboard/product-sales-chart';
+import { exportToExcel } from '@/lib/export-excel';
 
 interface SaleItem {
   id: string;
@@ -172,6 +173,30 @@ export default function ReportsPage() {
               )}
               Generar Reporte
             </Button>
+            {salesData.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const rows = salesData.flatMap(sale =>
+                    sale.items.map(item => ({
+                      'Fecha': format(new Date(sale.createdAt), 'dd/MM/yyyy HH:mm'),
+                      'Producto': item.description,
+                      'Departamento': item.department || 'General',
+                      'Cantidad': item.quantity,
+                      'Precio Unit.': item.salePrice,
+                      'Total': item.quantity * item.salePrice,
+                    }))
+                  );
+                  const rangeLabel = date?.from && date?.to
+                    ? `${format(date.from, 'dd-MM-yyyy')}_${format(date.to, 'dd-MM-yyyy')}`
+                    : 'reporte';
+                  exportToExcel(rows, `Ventas_${rangeLabel}`, 'Ventas');
+                }}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Exportar Excel
+              </Button>
+            )}
           </div>
         </CardHeader>
       </Card>
