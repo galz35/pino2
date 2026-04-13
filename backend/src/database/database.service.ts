@@ -19,8 +19,7 @@ export class DatabaseService implements OnModuleInit {
     private readonly configService: ConfigService,
   ) {
     this.pool.on('error', (err) => {
-      this.logger.error('Unexpected error on idle client', err);
-      process.exit(-1);
+      this.logger.warn('A database connection was dropped (possibly closed by the cloud provider). Pool will recover automatically.', err.message);
     });
   }
 
@@ -36,7 +35,7 @@ export class DatabaseService implements OnModuleInit {
     try {
       const res = await this.pool.query<T>(text, params);
       const duration = Date.now() - start;
-      this.logger.debug(`Executed query: { text: ${text}, time: ${duration}ms, rows: ${res.rowCount} }`);
+      // this.logger.debug(`Executed query: { text: ${text}, time: ${duration}ms, rows: ${res.rowCount} }`);
       await this.maybeCaptureSlowQuery(text, params, duration, res.rowCount ?? 0, 'pool');
       return res;
     } catch (error) {

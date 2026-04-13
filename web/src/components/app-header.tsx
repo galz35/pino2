@@ -13,14 +13,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
-import type { Notification } from './app-layout';
-import type { NavItem } from './app-layout';
+import type { Notification, NavLink } from './app-layout';
 import { Link, useParams, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { NetworkStatusIndicator } from './network-status-indicator';
 
 interface AppHeaderProps {
-  navItems: NavItem[];
+  navItems: NavLink[];
   language: 'es' | 'en';
   onLanguageChange: (lang: string) => void;
   exchangeRate?: number;

@@ -11,13 +11,39 @@ import {
   FileText, Map, MapPin, Settings, LifeBuoy, Package, History, Wrench,
   ShoppingCart, ClipboardCheck, AreaChart, UsersRound, Truck, HandCoins,
   ShieldCheck, SendToBack, Route, DollarSign, ListOrdered, PackagePlus, ReceiptText, Boxes, Wallet, Undo2,
+  ChevronDown,
 } from 'lucide-react';
 
-export interface NavItem {
+// --- Nav Item Types ---
+export interface NavLink {
+  type: 'link';
   name: string;
   href: string;
   icon: React.ElementType;
   section?: string;
+}
+
+export interface NavGroup {
+  type: 'group';
+  name: string;
+  icon: React.ElementType;
+  children: NavLink[];
+}
+
+export interface NavSeparator {
+  type: 'separator';
+}
+
+export type NavItem = NavLink | NavGroup | NavSeparator;
+
+// Backward-compatible flat NavItem for AppHeader mobile (extracts all links from groups)
+export function flattenNavItems(items: NavItem[]): NavLink[] {
+  const result: NavLink[] = [];
+  for (const item of items) {
+    if (item.type === 'link') result.push(item);
+    else if (item.type === 'group') result.push(...item.children);
+  }
+  return result;
 }
 
 export interface Notification {
@@ -78,6 +104,10 @@ const translations = {
     routeStaff: 'Personal de Ruta',
     returns: 'Devoluciones',
     dailyClosing: 'Cierre de Caja',
+    inventory: 'Inventario',
+    finances: 'Finanzas',
+    commercial: 'Comercial',
+    team: 'Equipo',
   },
   en: {
     dashboard: 'Dashboard',
@@ -96,7 +126,7 @@ const translations = {
     vendors: 'Vendors',
     assignInventory: 'Assign Inventory',
     myRoute: 'My Route',
-    addClient: 'Add Client',
+    addClient: 'Clients',
     sales: 'Sales',
     dispatcher: 'Dispatcher',
     pendingOrders: 'Orders',
@@ -114,160 +144,201 @@ const translations = {
     routeStaff: 'Route Staff',
     returns: 'Returns',
     dailyClosing: 'Daily Closing',
+    inventory: 'Inventory',
+    finances: 'Finances',
+    commercial: 'Commercial',
+    team: 'Team',
   }
 };
 
+// ===================================================================
+// NAV DEFINITIONS — CONSOLIDATED WITH GROUPS
+// ===================================================================
+
 const getChainAdminNav = (lang: 'es' | 'en'): NavItem[] => [
-  { name: translations[lang].dashboard, href: '/chain-admin/dashboard', icon: LayoutDashboard, section: 'Corporativo' },
-  { name: translations[lang].stores, href: '/master-admin/stores', icon: Store, section: 'Corporativo' },
-  { name: translations[lang].help, href: '/master-admin/help', icon: LifeBuoy, section: 'Soporte' },
+  { type: 'link', name: translations[lang].dashboard, href: '/chain-admin/dashboard', icon: LayoutDashboard },
+  { type: 'link', name: translations[lang].stores, href: '/master-admin/stores', icon: Store },
 ];
 
 const getMasterAdminNav = (lang: 'es' | 'en'): NavItem[] => [
-  { name: translations[lang].dashboard, href: '/master-admin/dashboard', icon: LayoutDashboard, section: 'Control' },
-  { name: translations[lang].stores, href: '/master-admin/stores', icon: Store, section: 'Control' },
-  { name: 'Cadenas', href: '/master-admin/chains', icon: Briefcase, section: 'Control' },
-  { name: translations[lang].users, href: '/master-admin/users', icon: Users, section: 'Control' },
-  { name: translations[lang].licenses, href: '/master-admin/licenses', icon: WalletCards, section: 'Control' },
-  { name: 'Monitor Sync', href: '/master-admin/sync-monitor', icon: RefreshCw, section: 'Monitoreo' },
-  { name: translations[lang].monitor, href: '/master-admin/monitor', icon: FileText, section: 'Monitoreo' },
-  { name: 'Zonas Globales', href: '/master-admin/config/zones', icon: Map, section: 'Configuracion' },
-  { name: 'Sub-Zonas (Barrios)', href: '/master-admin/config/sub-zones', icon: MapPin, section: 'Configuracion' },
-  { name: 'Configuración', href: '/master-admin/config', icon: Settings, section: 'Configuracion' },
-  { name: 'Comparar Tiendas', href: '/master-admin/comparison', icon: AreaChart, section: 'Monitoreo' },
-  { name: translations[lang].help, href: '/master-admin/help', icon: LifeBuoy, section: 'Soporte' },
+  { type: 'link', name: translations[lang].dashboard, href: '/master-admin/dashboard', icon: LayoutDashboard },
+  { type: 'link', name: translations[lang].stores, href: '/master-admin/stores', icon: Store },
+  { type: 'link', name: 'Cadenas', href: '/master-admin/chains', icon: Briefcase },
+  { type: 'link', name: translations[lang].users, href: '/master-admin/users', icon: Users },
+  { type: 'link', name: translations[lang].licenses, href: '/master-admin/licenses', icon: WalletCards },
+  { type: 'separator' },
+  { type: 'link', name: 'Monitor Sync', href: '/master-admin/sync-monitor', icon: RefreshCw },
+  { type: 'link', name: translations[lang].monitor, href: '/master-admin/monitor', icon: FileText },
+  { type: 'link', name: 'Comparar Tiendas', href: '/master-admin/comparison', icon: AreaChart },
+  { type: 'separator' },
+  { type: 'link', name: 'Zonas Globales', href: '/master-admin/config/zones', icon: Map },
+  { type: 'link', name: 'Sub-Zonas (Barrios)', href: '/master-admin/config/sub-zones', icon: MapPin },
+  { type: 'link', name: 'Configuración', href: '/master-admin/config', icon: Settings },
 ];
 
-const getStoreAdminNav = (storeId: string, lang: 'es' | 'en', settings: StoreSettings) => {
-  const nav: NavItem[] = [
-    ...(settings.enableDispatcherMode ? [{
-      name: translations[lang].pendingOrders,
-      href: `/store/${storeId}/pending-orders`,
-      icon: ClipboardCheck,
-      section: 'Operacion',
-    }] : []),
-    {
-      name: translations[lang].cashRegister,
-      href: `/store/${storeId}/cash-register`,
-      icon: WalletCards,
-      section: 'Operacion',
-    },
-    {
-      name: translations[lang].dashboard,
-      href: `/store/${storeId}/dashboard`,
-      icon: LayoutDashboard,
-      section: 'Operacion',
-    },
-    {
-      name: translations[lang].billing,
-      href: `/store/${storeId}/facturacion`,
-      icon: ShoppingCart,
-      section: 'Operacion',
-    },
-    { name: 'Bodega Logística', href: `/store/${storeId}/warehouse`, icon: Boxes, section: 'Operacion' },
-    { name: translations[lang].products, href: `/store/${storeId}/products`, icon: Package, section: 'Inventario y compras' },
-    { name: 'Entrada Inventario', href: `/store/${storeId}/inventory/entry`, icon: PackagePlus, section: 'Inventario y compras' },
-    { name: translations[lang].movements, href: `/store/${storeId}/inventory/movements`, icon: History, section: 'Inventario y compras' },
-    ...(settings.enableSupplierManagement ? [{
-      name: translations[lang].suppliers,
-      href: `/store/${storeId}/suppliers`,
-      icon: Briefcase,
-      section: 'Inventario y compras',
-    }, {
-      name: translations[lang].supplierInvoices,
-      href: `/store/${storeId}/suppliers/invoice`,
-      icon: ReceiptText,
-      section: 'Inventario y compras',
-    }] : []),
-    { name: translations[lang].accountsReceivable, href: `/store/${storeId}/finance/receivables`, icon: HandCoins, section: 'Finanzas' },
-    { name: 'Aging Cartera', href: `/store/${storeId}/finance/aging`, icon: History, section: 'Finanzas' },
-    { name: 'Cuentas por Pagar', href: `/store/${storeId}/finance/payables`, icon: Wallet, section: 'Finanzas' },
-    { name: translations[lang].reports, href: `/store/${storeId}/reports`, icon: AreaChart, section: 'Comercial' },
-    ...(settings.enableSalesManagerMode ? [
-      { name: translations[lang].vendors, href: `/store/${storeId}/vendors`, icon: UsersRound, section: 'Comercial' },
-      { name: 'Rutas y Despacho', href: `/store/${storeId}/vendors/routes`, icon: MapPin, section: 'Comercial' },
-      { name: translations[lang].addClient, href: `/store/${storeId}/vendors/clients`, icon: Users, section: 'Comercial' },
-      { name: translations[lang].assignInventory, href: `/store/${storeId}/vendors/inventory`, icon: Truck, section: 'Comercial' },
-      { name: 'Zonas y Barrios', href: `/store/${storeId}/vendors/zones`, icon: Map, section: 'Comercial' },
-      { name: 'Pipeline Pedidos', href: `/store/${storeId}/orders-pipeline`, icon: ListOrdered, section: 'Comercial' },
-      { name: 'Cierres de Caja', href: `/store/${storeId}/daily-closings`, icon: Wallet, section: 'Comercial' },
-    ] : []),
-    {
-      name: translations[lang].authorizations,
-      href: `/store/${storeId}/authorizations`,
-      icon: ShieldCheck,
-      section: 'Administracion',
-    },
-    { name: translations[lang].users, href: `/store/${storeId}/users`, icon: Users, section: 'Administracion' },
-    { name: translations[lang].settings, href: `/store/${storeId}/settings`, icon: Settings, section: 'Administracion' },
-    { name: translations[lang].help, href: `/store/${storeId}/help`, icon: LifeBuoy, section: 'Soporte' },
+// --- STORE ADMIN: 25 → 8 groups ---
+const getStoreAdminNav = (storeId: string, lang: 'es' | 'en', settings: StoreSettings): NavItem[] => {
+  const t = translations[lang];
+  const nav: NavItem[] = [];
+
+  // 1. Caja — Always visible, primary action
+  nav.push({ type: 'link', name: t.cashRegister, href: `/store/${storeId}/cash-register`, icon: WalletCards });
+
+  // 2. Facturación (+ Comandas si están activas)
+  if (settings.enableDispatcherMode) {
+    nav.push({ type: 'link', name: t.pendingOrders, href: `/store/${storeId}/pending-orders`, icon: ClipboardCheck });
+  }
+  nav.push({ type: 'link', name: t.billing, href: `/store/${storeId}/facturacion`, icon: ShoppingCart });
+
+  // 3. Panel
+  nav.push({ type: 'link', name: t.dashboard, href: `/store/${storeId}/dashboard`, icon: LayoutDashboard });
+
+  nav.push({ type: 'separator' });
+
+  // 4. Inventario (group) — Productos + Entrada + Movimientos + Bodega + Proveedores + Facturas
+  const invChildren: NavLink[] = [
+    { type: 'link', name: 'Bodega', href: `/store/${storeId}/warehouse`, icon: Boxes },
+    { type: 'link', name: t.products, href: `/store/${storeId}/products`, icon: Package },
+    { type: 'link', name: 'Entrada', href: `/store/${storeId}/inventory/entry`, icon: PackagePlus },
+    { type: 'link', name: t.movements, href: `/store/${storeId}/inventory/movements`, icon: History },
   ];
+  if (settings.enableSupplierManagement) {
+    invChildren.push(
+      { type: 'link', name: t.suppliers, href: `/store/${storeId}/suppliers`, icon: Briefcase },
+      { type: 'link', name: t.supplierInvoices, href: `/store/${storeId}/suppliers/invoice`, icon: ReceiptText },
+    );
+  }
+  nav.push({ type: 'group', name: t.inventory, icon: Package, children: invChildren });
+
+  // 5. Finanzas (group) — CxC + Aging + CxP
+  nav.push({
+    type: 'group',
+    name: t.finances,
+    icon: Wallet,
+    children: [
+      { type: 'link', name: t.accountsReceivable, href: `/store/${storeId}/finance/receivables`, icon: HandCoins },
+      { type: 'link', name: 'Aging Cartera', href: `/store/${storeId}/finance/aging`, icon: History },
+      { type: 'link', name: 'Cuentas por Pagar', href: `/store/${storeId}/finance/payables`, icon: Wallet },
+    ],
+  });
+
+  // 6. Comercial / Ventas en Calle (group, only if salesManagerMode)
+  nav.push({ type: 'link', name: t.reports, href: `/store/${storeId}/reports`, icon: AreaChart });
+
+  if (settings.enableSalesManagerMode) {
+    nav.push({
+      type: 'group',
+      name: t.commercial,
+      icon: Truck,
+      children: [
+        { type: 'link', name: t.vendors, href: `/store/${storeId}/vendors`, icon: UsersRound },
+        { type: 'link', name: 'Rutas y Despacho', href: `/store/${storeId}/vendors/routes`, icon: MapPin },
+        { type: 'link', name: t.addClient, href: `/store/${storeId}/vendors/clients`, icon: Users },
+        { type: 'link', name: t.assignInventory, href: `/store/${storeId}/vendors/inventory`, icon: Truck },
+        { type: 'link', name: 'Zonas y Barrios', href: `/store/${storeId}/vendors/zones`, icon: Map },
+        { type: 'link', name: 'Pipeline Pedidos', href: `/store/${storeId}/orders-pipeline`, icon: ListOrdered },
+        { type: 'link', name: 'Cierres de Caja', href: `/store/${storeId}/daily-closings`, icon: Wallet },
+      ],
+    });
+  }
+
+  nav.push({ type: 'separator' });
+
+  // 7. Equipo (group) — Usuarios + Autorizaciones
+  nav.push({
+    type: 'group',
+    name: t.team,
+    icon: Users,
+    children: [
+      { type: 'link', name: t.users, href: `/store/${storeId}/users`, icon: UsersRound },
+      { type: 'link', name: t.authorizations, href: `/store/${storeId}/authorizations`, icon: ShieldCheck },
+    ],
+  });
+
+  // 8. Configuración — link directo
+  nav.push({ type: 'link', name: t.settings, href: `/store/${storeId}/settings`, icon: Settings });
+
   return nav;
 };
 
-const getBodegueroNav = (storeId: string, lang: 'es' | 'en'): NavItem[] => [
-  { name: 'Bodega Logística', href: `/store/${storeId}/warehouse`, icon: Boxes, section: 'Operacion' },
-  { name: translations[lang].products, href: `/store/${storeId}/products`, icon: Package, section: 'Operacion' },
-  { name: translations[lang].movements, href: `/store/${storeId}/inventory/movements`, icon: History, section: 'Operacion' },
-  { name: 'Entrada Inventario', href: `/store/${storeId}/inventory/entry`, icon: PackagePlus, section: 'Operacion' },
-  { name: translations[lang].adjustments, href: `/store/${storeId}/inventory/adjustments`, icon: Wrench, section: 'Operacion' },
-  { name: translations[lang].suppliers, href: `/store/${storeId}/suppliers`, icon: Briefcase, section: 'Apoyo' },
-  { name: translations[lang].supplierInvoices, href: `/store/${storeId}/suppliers/invoice`, icon: ReceiptText, section: 'Apoyo' },
-  { name: translations[lang].help, href: `/store/${storeId}/help`, icon: LifeBuoy, section: 'Apoyo' },
-];
-
-const getCashierNav = (storeId: string, lang: 'es' | 'en', settings: StoreSettings) => {
-  const nav: NavItem[] = [
-    { name: translations[lang].billing, href: `/store/${storeId}/facturacion`, icon: ShoppingCart, section: 'Operacion' },
-    ...(settings.enableDispatcherMode ? [{
-      name: translations[lang].pendingOrders,
-      href: `/store/${storeId}/pending-orders`,
-      icon: ClipboardCheck,
-      section: 'Operacion',
-    }] : []),
-    { name: translations[lang].cashRegister, href: `/store/${storeId}/cash-register`, icon: WalletCards, section: 'Operacion' },
-    { name: translations[lang].help, href: `/store/${storeId}/help`, icon: LifeBuoy, section: 'Apoyo' },
+// --- Simple role navs (already compact) ---
+const getBodegueroNav = (storeId: string, lang: 'es' | 'en'): NavItem[] => {
+  const t = translations[lang];
+  return [
+    { type: 'link', name: 'Bodega', href: `/store/${storeId}/warehouse`, icon: Boxes },
+    { type: 'separator' },
+    {
+      type: 'group',
+      name: t.inventory,
+      icon: Package,
+      children: [
+        { type: 'link', name: t.products, href: `/store/${storeId}/products`, icon: Package },
+        { type: 'link', name: 'Entrada', href: `/store/${storeId}/inventory/entry`, icon: PackagePlus },
+        { type: 'link', name: t.movements, href: `/store/${storeId}/inventory/movements`, icon: History },
+        { type: 'link', name: t.adjustments, href: `/store/${storeId}/inventory/adjustments`, icon: Wrench },
+        { type: 'link', name: t.suppliers, href: `/store/${storeId}/suppliers`, icon: Briefcase },
+        { type: 'link', name: t.supplierInvoices, href: `/store/${storeId}/suppliers/invoice`, icon: ReceiptText },
+      ],
+    },
   ];
+};
+
+const getCashierNav = (storeId: string, lang: 'es' | 'en', settings: StoreSettings): NavItem[] => {
+  const nav: NavItem[] = [
+    { type: 'link', name: translations[lang].billing, href: `/store/${storeId}/facturacion`, icon: ShoppingCart },
+  ];
+  if (settings.enableDispatcherMode) {
+    nav.push({ type: 'link', name: translations[lang].pendingOrders, href: `/store/${storeId}/pending-orders`, icon: ClipboardCheck });
+  }
+  nav.push({ type: 'link', name: translations[lang].cashRegister, href: `/store/${storeId}/cash-register`, icon: WalletCards });
   return nav;
 };
 
 const getDespachoNav = (storeId: string, lang: 'es' | 'en'): NavItem[] => [
-  { name: translations[lang].dispatcher, href: `/store/${storeId}/dispatcher`, icon: SendToBack, section: 'Operacion' },
-  { name: 'Bodega Logística', href: `/store/${storeId}/warehouse`, icon: Boxes, section: 'Operacion' },
-  { name: translations[lang].help, href: `/store/${storeId}/help`, icon: LifeBuoy, section: 'Apoyo' },
+  { type: 'link', name: translations[lang].dispatcher, href: `/store/${storeId}/dispatcher`, icon: SendToBack },
+  { type: 'link', name: 'Bodega', href: `/store/${storeId}/warehouse`, icon: Boxes },
 ];
 
-const getRuteroNav = (storeId: string, lang: 'es' | 'en', settings: StoreSettings) => {
+const getRuteroNav = (storeId: string, lang: 'es' | 'en', _settings: StoreSettings): NavItem[] => {
   return [
-    { name: translations[lang].deliveryRoute, href: `/store/${storeId}/delivery-route`, icon: Route, section: 'Operacion' },
-    { name: translations[lang].collections, href: `/store/${storeId}/vendors/collections`, icon: HandCoins, section: 'Operacion' },
-    { name: translations[lang].returns, href: `/store/${storeId}/vendors/returns`, icon: Undo2, section: 'Operacion' },
-    { name: translations[lang].dailyClosing, href: `/store/${storeId}/daily-closing`, icon: WalletCards, section: 'Operacion' },
-    { name: translations[lang].help, href: `/store/${storeId}/help`, icon: LifeBuoy, section: 'Apoyo' },
+    { type: 'link', name: translations[lang].deliveryRoute, href: `/store/${storeId}/delivery-route`, icon: Route },
+    { type: 'link', name: translations[lang].collections, href: `/store/${storeId}/vendors/collections`, icon: HandCoins },
+    { type: 'link', name: translations[lang].returns, href: `/store/${storeId}/vendors/returns`, icon: Undo2 },
+    { type: 'link', name: translations[lang].dailyClosing, href: `/store/${storeId}/daily-closing`, icon: WalletCards },
   ];
 };
 
 const getVendedorAmbulanteNav = (storeId: string, lang: 'es' | 'en'): NavItem[] => [
-  { name: translations[lang].quickSale, href: `/store/${storeId}/vendors/quick-sale`, icon: DollarSign, section: 'Operacion' },
-  { name: translations[lang].addClient, href: `/store/${storeId}/vendors/clients`, icon: Users, section: 'Operacion' },
-  { name: translations[lang].sales, href: `/store/${storeId}/vendors/sales`, icon: ListOrdered, section: 'Operacion' },
-  { name: translations[lang].collections, href: `/store/${storeId}/vendors/collections`, icon: HandCoins, section: 'Operacion' },
-  { name: translations[lang].returns, href: `/store/${storeId}/vendors/returns`, icon: Undo2, section: 'Operacion' },
-  { name: translations[lang].help, href: `/store/${storeId}/help`, icon: LifeBuoy, section: 'Apoyo' },
+  { type: 'link', name: translations[lang].quickSale, href: `/store/${storeId}/vendors/quick-sale`, icon: DollarSign },
+  { type: 'link', name: translations[lang].addClient, href: `/store/${storeId}/vendors/clients`, icon: Users },
+  { type: 'link', name: translations[lang].sales, href: `/store/${storeId}/vendors/sales`, icon: ListOrdered },
+  { type: 'link', name: translations[lang].collections, href: `/store/${storeId}/vendors/collections`, icon: HandCoins },
+  { type: 'link', name: translations[lang].returns, href: `/store/${storeId}/vendors/returns`, icon: Undo2 },
 ];
 
 const getGestorVentasNav = (storeId: string, lang: 'es' | 'en'): NavItem[] => [
-  { name: 'Dashboard Ventas', href: `/store/${storeId}/vendors/dashboard`, icon: Route, section: 'Operacion' },
-  { name: 'Rutas y Despacho', href: `/store/${storeId}/vendors/routes`, icon: MapPin, section: 'Operacion' },
-  { name: 'Historial Ventas', href: `/store/${storeId}/vendors/sales`, icon: PackagePlus, section: 'Operacion' },
-  { name: translations[lang].addClient, href: `/store/${storeId}/vendors/clients`, icon: Users, section: 'Comercial' },
-  { name: 'Gestionar Zonas', href: `/store/${storeId}/vendors/zones`, icon: Map, section: 'Comercial' },
-  { name: translations[lang].collections, href: `/store/${storeId}/vendors/collections`, icon: HandCoins, section: 'Comercial' },
-  { name: translations[lang].vendorInventory, href: `/store/${storeId}/vendors/inventory`, icon: Boxes, section: 'Comercial' },
-  { name: translations[lang].routeStaff, href: `/store/${storeId}/vendors`, icon: UsersRound, section: 'Comercial' },
-
-  { name: translations[lang].help, href: `/store/${storeId}/help`, icon: LifeBuoy, section: 'Apoyo' },
+  { type: 'link', name: 'Dashboard Ventas', href: `/store/${storeId}/vendors/dashboard`, icon: Route },
+  { type: 'link', name: 'Rutas y Despacho', href: `/store/${storeId}/vendors/routes`, icon: MapPin },
+  { type: 'separator' },
+  {
+    type: 'group',
+    name: translations[lang].commercial,
+    icon: Truck,
+    children: [
+      { type: 'link', name: translations[lang].sales, href: `/store/${storeId}/vendors/sales`, icon: PackagePlus },
+      { type: 'link', name: translations[lang].addClient, href: `/store/${storeId}/vendors/clients`, icon: Users },
+      { type: 'link', name: 'Gestionar Zonas', href: `/store/${storeId}/vendors/zones`, icon: Map },
+      { type: 'link', name: translations[lang].collections, href: `/store/${storeId}/vendors/collections`, icon: HandCoins },
+      { type: 'link', name: translations[lang].vendorInventory, href: `/store/${storeId}/vendors/inventory`, icon: Boxes },
+      { type: 'link', name: translations[lang].routeStaff, href: `/store/${storeId}/vendors`, icon: UsersRound },
+    ],
+  },
 ];
+
+
+// ===================================================================
+// REALTIME NOTIFICATIONS (unchanged)
+// ===================================================================
 
 const buildNotificationKey = (event: RealtimeEvent | null) => {
   if (!event) return '';
@@ -342,7 +413,7 @@ const buildRealtimeNotification = (
         id,
         title: event.payload?.title || 'Nuevo Aviso',
         description: event.payload?.message || 'Tienes una nueva notificación.',
-        href: fallbackHref, // Notifications aren't always bound to a specific route
+        href: fallbackHref,
         userId: currentUserId || 'system',
         read: false,
       };
@@ -370,6 +441,86 @@ const buildRealtimeNotification = (
 };
 
 
+// ===================================================================
+// COLLAPSIBLE NAV GROUP COMPONENT
+// ===================================================================
+
+function NavGroupItem({
+  item,
+  onLinkClick,
+}: {
+  item: NavGroup;
+  onLinkClick?: () => void;
+}) {
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  // Auto-expand if any child is active
+  const isChildActive = item.children.some(child => pathname.startsWith(child.href));
+  const [isOpen, setIsOpen] = useState(isChildActive);
+
+  useEffect(() => {
+    if (isChildActive) setIsOpen(true);
+  }, [isChildActive]);
+
+  const Icon = item.icon;
+
+  return (
+    <div>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          'flex items-center justify-between w-full gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:bg-muted/50',
+          isChildActive && 'text-primary font-medium'
+        )}
+      >
+        <div className="flex items-center gap-3">
+          <Icon className="h-4 w-4" />
+          <span>{item.name}</span>
+        </div>
+        <ChevronDown
+          className={cn(
+            'h-3.5 w-3.5 transition-transform duration-200',
+            isOpen && 'rotate-180'
+          )}
+        />
+      </button>
+      <div
+        className={cn(
+          'overflow-hidden transition-all duration-200 ease-in-out',
+          isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+        )}
+      >
+        <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2">
+          {item.children.map((child) => {
+            const ChildIcon = child.icon;
+            const isActive = pathname.startsWith(child.href);
+            return (
+              <Link
+                key={child.href}
+                to={child.href}
+                onClick={onLinkClick}
+                className={cn(
+                  'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-xs text-muted-foreground transition-all hover:text-primary hover:bg-muted/50',
+                  isActive && 'bg-muted text-primary font-medium'
+                )}
+              >
+                <ChildIcon className="h-3.5 w-3.5" />
+                {child.name}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ===================================================================
+// MAIN NAV RENDERER
+// ===================================================================
+
 function MainNav({
   navItems,
   onLinkClick,
@@ -380,47 +531,50 @@ function MainNav({
   const location = useLocation();
   const pathname = location.pathname;
 
-  const handleLinkClick = () => {
-    if (onLinkClick) {
-      onLinkClick();
-    }
-  };
-
   return (
     <>
       {navItems.map((item, index) => {
+        if (item.type === 'separator') {
+          return <div key={`sep-${index}`} className="my-2 border-t border-border/40" />;
+        }
+
+        if (item.type === 'group') {
+          return (
+            <NavGroupItem
+              key={item.name}
+              item={item}
+              onLinkClick={onLinkClick}
+            />
+          );
+        }
+
+        // Regular link
         const Icon = item.icon;
         const isActive = pathname.startsWith(item.href) && item.href !== '/' || (pathname === '/' && item.href === '/');
-        const showSectionTitle =
-          index === 0 || item.section !== navItems[index - 1]?.section;
 
         return (
-          <div key={item.name} className={cn(showSectionTitle && index !== 0 && 'mt-4')}>
-            {/* Section titles temporarily hidden to declutter sidebar
-            {showSectionTitle && item.section ? (
-              <p className="mb-2 px-3 text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground/80">
-                {item.section}
-              </p>
-            ) : null}
-            */}
-            <Link
-              to={item.href}
-              onClick={handleLinkClick}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary',
-                isActive && 'bg-muted text-primary'
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {item.name}
-            </Link>
-          </div>
+          <Link
+            key={item.name}
+            to={item.href}
+            onClick={onLinkClick}
+            className={cn(
+              'flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary hover:bg-muted/50',
+              isActive && 'bg-muted text-primary font-medium'
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            {item.name}
+          </Link>
         );
       })}
     </>
   );
 }
 
+
+// ===================================================================
+// APP LAYOUT
+// ===================================================================
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { storeId } = useParams();
@@ -489,14 +643,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       case 'master-admin':
       case 'owner':
         if (storeId) {
-          const combined = [...getMasterAdminNav(language), ...getStoreAdminNav(storeId, language, storeSettings)];
-          return combined.filter((v, i, a) => a.findIndex(t => t.name === v.name) === i);
+          // When master-admin is inside a store, show store nav
+          return getStoreAdminNav(storeId, language, storeSettings);
         }
         return getMasterAdminNav(language);
       case 'chain-admin':
         if (storeId) {
-          const combined = [...getChainAdminNav(language), ...getStoreAdminNav(storeId, language, storeSettings)];
-          return combined.filter((v, i, a) => a.findIndex(t => t.name === v.name) === i);
+          return getStoreAdminNav(storeId, language, storeSettings);
         }
         return getChainAdminNav(language);
       case 'store-admin':
@@ -514,10 +667,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       case 'sales-manager':
         return getGestorVentasNav(storeId || '', language);
       default:
-        // Default to store admin nav for robust fallback if storeId exists
         return storeId ? getStoreAdminNav(storeId, language, storeSettings) : [];
     }
   }, [user, language, storeId, storeSettings]);
+
+  // Flatten for AppHeader (mobile hamburger menu still uses flat list)
+  const flatNav = useMemo(() => flattenNavItems(navItems), [navItems]);
 
   const nav = <MainNav navItems={navItems} onLinkClick={() => {}} />;
 
@@ -525,10 +680,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
+  const helpHref = storeId ? `/store/${storeId}/help` : '/master-admin/help';
+
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
       <div className="hidden border-r bg-muted/40 md:block">
-        <div className="flex h-full max-h-screen flex-col gap-2">
+        <div className="flex h-full max-h-screen flex-col">
           <div className="flex h-16 items-center border-b px-4 lg:h-[60px] lg:px-6">
             <Link 
               to={
@@ -556,9 +713,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto py-2">
             {storeId && (normalizeUserRole(user?.role) === 'master-admin' || normalizeUserRole(user?.role) === 'owner' || normalizeUserRole(user?.role) === 'chain-admin') && (
-              <div className="p-3 border-b border-border/50">
+              <div className="px-2 pb-2 mb-1 border-b border-border/50 lg:px-4">
                 <Link
                   to={normalizeUserRole(user?.role) === 'chain-admin' ? '/chain-admin/dashboard' : '/master-admin/stores'}
                   className="flex items-center justify-center gap-2 w-full px-3 py-2 text-sm font-medium text-primary-foreground bg-primary rounded-lg transition-colors hover:bg-primary/90"
@@ -568,15 +725,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Link>
               </div>
             )}
-            <nav className="grid items-start px-2 py-4 text-sm font-medium lg:px-4">
+            <nav className="grid items-start px-2 text-sm font-medium lg:px-4 gap-0.5">
               {nav}
             </nav>
+          </div>
+
+          {/* Help pinned to sidebar footer */}
+          <div className="border-t p-2 lg:px-4">
+            <Link
+              to={helpHref}
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-xs text-muted-foreground transition-all hover:text-primary hover:bg-muted/50"
+            >
+              <LifeBuoy className="h-4 w-4" />
+              {translations[language].help}
+            </Link>
           </div>
         </div>
       </div>
       <div className="flex flex-col">
         <AppHeader
-          navItems={navItems}
+          navItems={flatNav}
           language={language}
           onLanguageChange={handleLanguageChange}
           exchangeRate={storeSettings.exchangeRate}

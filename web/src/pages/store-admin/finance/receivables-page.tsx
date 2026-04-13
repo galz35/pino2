@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { CalendarDays, CreditCard, Download, HandCoins, Loader2, RefreshCw, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -123,6 +123,18 @@ export default function ReceivablesPage() {
     () => accounts.filter((account) => account.status === 'PARTIAL').length,
     [accounts],
   );
+
+  const groupedAccounts = useMemo(() => {
+    const groups: Record<string, AccountReceivable[]> = {};
+    for (const account of accounts) {
+      const clientName = account.clientName || 'Cliente sin nombre';
+      if (!groups[clientName]) {
+        groups[clientName] = [];
+      }
+      groups[clientName].push(account);
+    }
+    return groups;
+  }, [accounts]);
 
   const openPaymentDialog = (account: AccountReceivable) => {
     setSelectedAccount(account);
@@ -287,7 +299,7 @@ export default function ReceivablesPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Cliente</TableHead>
+                        <TableHead>Referencia / Pedido</TableHead>
                         <TableHead>Detalle</TableHead>
                         <TableHead>Creada</TableHead>
                         <TableHead>Estado</TableHead>
@@ -296,30 +308,50 @@ export default function ReceivablesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {accounts.map((account) => (
-                        <TableRow key={account.id}>
-                          <TableCell>
-                            <div className="font-medium">{account.clientName || 'Cliente sin nombre'}</div>
-                            <div className="text-xs text-muted-foreground">{account.orderId ? `Pedido ${account.orderId}` : 'Sin pedido vinculado'}</div>
-                          </TableCell>
-                          <TableCell className="max-w-[280px] text-sm text-muted-foreground">
-                            {account.description || 'Sin descripción'}
-                          </TableCell>
-                          <TableCell>{formatDate(account.createdAt)}</TableCell>
-                          <TableCell>
-                            <Badge variant={getStatusVariant(account.status)}>{account.status}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {formatCurrency(Number(account.pendingAmount || account.remainingAmount || 0))}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button size="sm" onClick={() => openPaymentDialog(account)}>
-                              <HandCoins className="mr-2 h-4 w-4" />
-                              Registrar abono
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {Object.entries(groupedAccounts).map(([clientName, clientAccounts]) => {
+                        const clientTotal = clientAccounts.reduce((sum, acc) => sum + Number(acc.pendingAmount || acc.remainingAmount || 0), 0);
+                        return (
+                          <React.Fragment key={clientName}>
+                            <TableRow className="bg-muted/30 hover:bg-muted/30 font-medium">
+                              <TableCell colSpan={4} className="py-3 text-[15px] font-semibold text-primary">
+                                {clientName}
+                                <Badge variant="secondary" className="ml-3 font-normal">
+                                  {clientAccounts.length} cuenta(s)
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-bold text-[15px] py-3 text-primary">
+                                {formatCurrency(clientTotal)}
+                              </TableCell>
+                              <TableCell></TableCell>
+                            </TableRow>
+                            {clientAccounts.map((account) => (
+                              <TableRow key={account.id}>
+                                <TableCell className="pl-6 border-l-2 border-l-transparent group-hover:border-l-primary/30">
+                                  <div className="font-medium text-sm">
+                                    {account.orderId ? `Pedido #${account.orderId.substring(0, 8)}...` : 'Sin referencia'}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="max-w-[280px] text-sm text-muted-foreground">
+                                  {account.description || 'Sin descripción'}
+                                </TableCell>
+                                <TableCell>{formatDate(account.createdAt)}</TableCell>
+                                <TableCell>
+                                  <Badge variant={getStatusVariant(account.status)}>{account.status}</Badge>
+                                </TableCell>
+                                <TableCell className="text-right font-semibold">
+                                  {formatCurrency(Number(account.pendingAmount || account.remainingAmount || 0))}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button size="sm" onClick={() => openPaymentDialog(account)}>
+                                    <HandCoins className="mr-2 h-4 w-4" />
+                                    Abonar
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </React.Fragment>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

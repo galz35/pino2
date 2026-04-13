@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { differenceInDays, parseISO } from 'date-fns';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, LogIn, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -59,6 +59,7 @@ export default function MasterStoresPage() {
                                 <div><h4 className="font-semibold mb-2">Licencia</h4>{store.license ? (<div className="space-y-1 text-sm"><p><strong>Tipo:</strong> {store.license.type}</p><p><strong>Inicio:</strong> {new Date(store.license.startDate).toLocaleDateString()}</p><p><strong>Vence:</strong> {store.license.expiryDate ? new Date(store.license.expiryDate).toLocaleDateString() : 'N/A'}</p></div>) : (<p className="text-sm text-muted-foreground">Sin licencia</p>)}</div>
                             </div>
                             <div className="mt-4 flex gap-2 justify-end">
+                                <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white"><Link to={`/store/${store.id}/dashboard`}><LogIn className="mr-2 h-4 w-4" /> Entrar a Tienda</Link></Button>
                                 <Button asChild variant="outline" size="sm"><Link to={`/master-admin/stores/edit/${store.id}`}><Edit className="mr-2 h-4 w-4" /> Editar</Link></Button>
                                 <AlertDialog><AlertDialogTrigger asChild><Button variant="destructive" size="sm"><Trash2 className="mr-2 h-4 w-4" /> Eliminar</Button></AlertDialogTrigger>
                                     <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esto eliminará "{store.name}" permanentemente.</AlertDialogDescription></AlertDialogHeader>
