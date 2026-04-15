@@ -37,7 +37,7 @@ export function getRedirectPath(user: User | null): string | null {
         case 'cashier':
             return `/store/${storeId}/billing`;
         case 'inventory':
-            return `/store/${storeId}/products`;
+            return `/store/${storeId}/warehouse`;
         case 'dispatcher':
             return `/store/${storeId}/dispatcher`;
         case 'rutero':

@@ -11,7 +11,7 @@ import {
   FileText, Map, MapPin, Settings, LifeBuoy, Package, History, Wrench,
   ShoppingCart, ClipboardCheck, AreaChart, UsersRound, Truck, HandCoins,
   ShieldCheck, SendToBack, Route, DollarSign, ListOrdered, PackagePlus, ReceiptText, Boxes, Wallet, Undo2,
-  ChevronDown,
+  ChevronDown, PanelLeftClose, PanelLeft,
 } from 'lucide-react';
 
 // --- Nav Item Types ---
@@ -580,6 +580,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { storeId } = useParams();
   const { user } = useAuth();
   const [language, setLanguage] = useState<'es' | 'en'>('es');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [storeSettings, setStoreSettings] = useState<StoreSettings>({
     enableDispatcherMode: false,
     enableSalesManagerMode: false,
@@ -682,39 +683,77 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const helpHref = storeId ? `/store/${storeId}/help` : '/master-admin/help';
 
+  const sidebarWidth = sidebarCollapsed ? '64px' : '280px';
+
   return (
-    <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
-      <div className="hidden border-r bg-muted/40 md:block">
+    <div className="grid min-h-screen w-full grid-cols-1 md:grid-cols-[var(--sidebar-w)_1fr]" style={{ '--sidebar-w': sidebarWidth } as React.CSSProperties}>
+      <div className={cn(
+        'hidden border-r bg-muted/40 md:block transition-all duration-300 ease-in-out overflow-hidden',
+      )} style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
         <div className="flex h-full max-h-screen flex-col">
-          <div className="flex h-16 items-center border-b px-4 lg:h-[60px] lg:px-6">
-            <Link 
-              to={
-                normalizeUserRole(user?.role) === 'master-admin' || normalizeUserRole(user?.role) === 'owner' 
-                  ? '/master-admin/dashboard' 
-                  : normalizeUserRole(user?.role) === 'chain-admin' 
-                    ? '/chain-admin/dashboard' 
-                    : (storeId ? `/store/${storeId}/dashboard` : '/')
-              } 
-              className="flex items-center gap-2 font-semibold"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-6 w-6 text-primary"
+          <div className="flex h-16 items-center border-b px-2 lg:h-[60px] justify-between">
+            {!sidebarCollapsed ? (
+              <Link 
+                to={
+                  normalizeUserRole(user?.role) === 'master-admin' || normalizeUserRole(user?.role) === 'owner' 
+                    ? '/master-admin/dashboard' 
+                    : normalizeUserRole(user?.role) === 'chain-admin' 
+                      ? '/chain-admin/dashboard' 
+                      : (storeId ? `/store/${storeId}/dashboard` : '/')
+                } 
+                className="flex items-center gap-2 font-semibold pl-2"
               >
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-              </svg>
-              <span>MultiTienda</span>
-            </Link>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-6 w-6 text-primary flex-shrink-0"
+                >
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                </svg>
+                <span className="whitespace-nowrap">MultiTienda</span>
+              </Link>
+            ) : (
+              <Link 
+                to={
+                  normalizeUserRole(user?.role) === 'master-admin' || normalizeUserRole(user?.role) === 'owner' 
+                    ? '/master-admin/dashboard' 
+                    : normalizeUserRole(user?.role) === 'chain-admin' 
+                      ? '/chain-admin/dashboard' 
+                      : (storeId ? `/store/${storeId}/dashboard` : '/')
+                } 
+                className="flex items-center justify-center w-full"
+                title="MultiTienda"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-6 w-6 text-primary"
+                >
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                </svg>
+              </Link>
+            )}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-1.5 rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-primary flex-shrink-0"
+              title={sidebarCollapsed ? 'Expandir menú' : 'Contraer menú'}
+            >
+              {sidebarCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto py-2">
-            {storeId && (normalizeUserRole(user?.role) === 'master-admin' || normalizeUserRole(user?.role) === 'owner' || normalizeUserRole(user?.role) === 'chain-admin') && (
+            {!sidebarCollapsed && storeId && (normalizeUserRole(user?.role) === 'master-admin' || normalizeUserRole(user?.role) === 'owner' || normalizeUserRole(user?.role) === 'chain-admin') && (
               <div className="px-2 pb-2 mb-1 border-b border-border/50 lg:px-4">
                 <Link
                   to={normalizeUserRole(user?.role) === 'chain-admin' ? '/chain-admin/dashboard' : '/master-admin/stores'}
@@ -725,19 +764,45 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Link>
               </div>
             )}
-            <nav className="grid items-start px-2 text-sm font-medium lg:px-4 gap-0.5">
-              {nav}
-            </nav>
+            {sidebarCollapsed ? (
+              <nav className="flex flex-col items-center gap-1 px-1">
+                {flatNav.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname.startsWith(item.href) && item.href !== '/' || (pathname === '/' && item.href === '/');
+                  return (
+                    <Link
+                      key={item.href}
+                      to={item.href}
+                      title={item.name}
+                      className={cn(
+                        'flex items-center justify-center rounded-lg p-2.5 text-muted-foreground transition-all hover:text-primary hover:bg-muted/50',
+                        isActive && 'bg-muted text-primary'
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </Link>
+                  );
+                })}
+              </nav>
+            ) : (
+              <nav className="grid items-start px-2 text-sm font-medium lg:px-4 gap-0.5">
+                {nav}
+              </nav>
+            )}
           </div>
 
           {/* Help pinned to sidebar footer */}
-          <div className="border-t p-2 lg:px-4">
+          <div className="border-t p-2">
             <Link
               to={helpHref}
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-xs text-muted-foreground transition-all hover:text-primary hover:bg-muted/50"
+              title={translations[language].help}
+              className={cn(
+                'flex items-center rounded-lg px-3 py-2 text-xs text-muted-foreground transition-all hover:text-primary hover:bg-muted/50',
+                sidebarCollapsed ? 'justify-center' : 'gap-3'
+              )}
             >
-              <LifeBuoy className="h-4 w-4" />
-              {translations[language].help}
+              <LifeBuoy className="h-4 w-4 flex-shrink-0" />
+              {!sidebarCollapsed && translations[language].help}
             </Link>
           </div>
         </div>

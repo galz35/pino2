@@ -370,37 +370,31 @@ export default function BillingPage() {
     );
   }
 
-  // Check for Cashier role to render specific layout
-  // Check for Cashier role to render specific layout
-  if (user?.role === 'Cashier' || user?.role === 'Cajero' || user?.role === 'store-admin') {
-    return (
-      <>
-        <CashierBillingView
-          cart={cart}
-          subtotal={subtotal}
-          tax={tax}
-          total={total}
-          onAddProduct={handleAddProduct}
-          onRemoveProduct={(productId) => {
-            const item = cart.find(i => i.id === productId);
-            if (item) handleQuantityChange(productId, -item.quantity);
-          }}
-          onUpdateQuantity={handleQuantityChange}
-          client={selectedClient}
-          onSelectClient={setSelectedClient}
-          onFinalize={handleFinalizeSale}
-          activeShift={activeShift}
-          onClearCart={() => setCart([])}
-          onSetCart={(newCart) => setCart(newCart as any)}
-          lastSale={saleToPrint}
-        />
-        <div className="fixed top-0 left-0 -z-50 opacity-0 pointer-events-none">
-          <PrintableSaleTicket ref={ticketRef} storeId={storeId} sale={saleToPrint} />
-        </div>
-      </>
-    );
-  }
-
-  // The rest of the return would follow, but we are standardizing on CashierBillingView for better UX
-  return null;
+  // Render billing view for all authenticated users (routing already controls role access)
+  return (
+    <>
+      <CashierBillingView
+        cart={cart}
+        subtotal={subtotal}
+        tax={tax}
+        total={total}
+        onAddProduct={handleAddProduct}
+        onRemoveProduct={(productId) => {
+          const item = cart.find(i => i.id === productId);
+          if (item) handleQuantityChange(productId, -item.quantity);
+        }}
+        onUpdateQuantity={handleQuantityChange}
+        client={selectedClient}
+        onSelectClient={setSelectedClient}
+        onFinalize={handleFinalizeSale}
+        activeShift={activeShift}
+        onClearCart={() => setCart([])}
+        onSetCart={(newCart) => setCart(newCart as any)}
+        lastSale={saleToPrint}
+      />
+      <div className="fixed top-0 left-0 -z-50 opacity-0 pointer-events-none">
+        <PrintableSaleTicket ref={ticketRef} storeId={storeId} sale={saleToPrint} />
+      </div>
+    </>
+  );
 }
