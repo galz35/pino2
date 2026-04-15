@@ -3,6 +3,10 @@ import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import './lib/firebase';
+import { registerSW } from 'virtual:pwa-register';
+
+// Registro automático de la PWA
+registerSW({ immediate: true });
 
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
