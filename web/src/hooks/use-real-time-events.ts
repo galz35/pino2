@@ -52,7 +52,9 @@ export const useRealTimeEvents = (storeId?: string) => {
   }, []);
 
   useEffect(() => {
-    const newSocket = io(SOCKET_URL, {
+    // Append namespace to the URL
+    const namespaceUrl = `${SOCKET_URL}/events`.replace(/\/\//g, '/').replace(':/', '://');
+    const newSocket = io(namespaceUrl, {
       transports: ['websocket'],
       autoConnect: true,
       path: SOCKET_PATH,

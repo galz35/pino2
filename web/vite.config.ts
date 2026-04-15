@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import path from 'path';
 
 const appBase = process.env.VITE_APP_BASENAME || '/';
 const backendOrigin = process.env.VITE_DEV_BACKEND_ORIGIN || 'http://localhost:3010';
@@ -39,7 +40,9 @@ export default defineConfig({
     })
   ],
   resolve: {
-    tsconfigPaths: true,
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
   },
   server: {
     port: 5173,

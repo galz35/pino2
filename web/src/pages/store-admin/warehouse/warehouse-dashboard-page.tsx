@@ -52,7 +52,7 @@ export default function WarehouseDashboardPage() {
   // Modals state
   const [pickingOrder, setPickingOrder] = useState<OrderDetail | null>(null);
   const [loadingModal, setLoadingModal] = useState(false);
-  
+
   const [loadingOrder, setLoadingOrder] = useState<Order | null>(null);
   const [vendors, setVendors] = useState<UserType[]>([]);
   const [selectedVendorId, setSelectedVendorId] = useState<string>('');
@@ -168,11 +168,11 @@ export default function WarehouseDashboardPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-4 pt-0">
-                 {order.vendorName && (
-                    <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground bg-muted p-1 rounded">
-                      <User className="h-3 w-3" /> {order.vendorName}
-                    </div>
-                 )}
+                {order.vendorName && (
+                  <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground bg-muted p-1 rounded">
+                    <User className="h-3 w-3" /> {order.vendorName}
+                  </div>
+                )}
               </CardContent>
               <CardFooter className="p-3 pt-0 flex justify-end gap-2 bg-muted/10 border-t">
                 {status === 'RECIBIDO' && (
@@ -223,10 +223,10 @@ export default function WarehouseDashboardPage() {
         </div>
       ) : (
         <div className="flex flex-1 gap-4 overflow-x-auto pb-4">
-            {renderColumn('Nuevos', 'RECIBIDO', <ArrowRight className="h-5 w-5 text-amber-600" />, 'bg-amber-100 text-amber-700 border border-amber-200')}
-            {renderColumn('Picking', 'EN_PREPARACION', <PackageOpen className="h-5 w-5 text-blue-600" />, 'bg-blue-100 text-blue-700 border border-blue-200')}
-            {renderColumn('Listo', 'ALISTADO', <CheckCircle2 className="h-5 w-5 text-emerald-600" />, 'bg-emerald-100 text-emerald-700 border border-emerald-200')}
-            {renderColumn('Despachado', 'CARGADO_CAMION', <Truck className="h-5 w-5 text-gray-600" />, 'bg-gray-100 text-gray-700 border border-gray-200')}
+          {renderColumn('Nuevos', 'RECIBIDO', <ArrowRight className="h-5 w-5 text-amber-600" />, 'bg-amber-100 text-amber-700 border border-amber-200')}
+          {renderColumn('Picking', 'EN_PREPARACION', <PackageOpen className="h-5 w-5 text-blue-600" />, 'bg-blue-100 text-blue-700 border border-blue-200')}
+          {renderColumn('Listo', 'ALISTADO', <CheckCircle2 className="h-5 w-5 text-emerald-600" />, 'bg-emerald-100 text-emerald-700 border border-emerald-200')}
+          {renderColumn('Despachado', 'CARGADO_CAMION', <Truck className="h-5 w-5 text-gray-600" />, 'bg-gray-100 text-gray-700 border border-gray-200')}
         </div>
       )}
 
@@ -242,7 +242,7 @@ export default function WarehouseDashboardPage() {
               Cliente: <span className="font-bold text-foreground">{pickingOrder?.clientName}</span>
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="max-h-[50vh] overflow-auto">
             <Table>
               <TableHeader>
@@ -314,7 +314,7 @@ export default function WarehouseDashboardPage() {
             </Select>
 
             <div className="mt-6 p-4 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-lg text-sm">
-               ⚠️ <strong>Aviso:</strong> Confirmar esta acción generará un registro de transferencia formal (`INVENTORY_TRANSFER`). Una vez cargado el camión, las mermas o cambios son responsabilidad del vendedor.
+              ⚠️ <strong>Aviso:</strong> Confirmar esta acción generará un registro de transferencia formal (`INVENTORY_TRANSFER`). Una vez cargado el camión, las mermas o cambios son responsabilidad del vendedor.
             </div>
           </div>
 
