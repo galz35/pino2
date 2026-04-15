@@ -8,9 +8,18 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Injectable, Logger } from '@nestjs/common';
 
+const allowedOrigins = (
+  process.env.CORS_ORIGIN ||
+  'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000'
+)
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 @WebSocketGateway({
   cors: {
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'],
+    origin: allowedOrigins,
+    credentials: true,
   },
   namespace: 'events',
 })
