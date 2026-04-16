@@ -176,7 +176,7 @@ export default function InventoryAdjustmentsPage() {
                     className={`p-3 rounded-md cursor-pointer border transition-colors ${selectedProduct?.id === product.id ? 'bg-muted ring-2 ring-primary' : 'hover:bg-muted/50'}`}
                   >
                     <p className="font-semibold">{product.description}</p>
-                    <p className="text-sm text-muted-foreground">Stock: {product.currentStock}</p>
+                    <p className="text-sm text-muted-foreground">Existencia: {product.currentStock}</p>
                   </div>
                 ))}
               </div>

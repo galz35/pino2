@@ -167,7 +167,7 @@ const getMasterAdminNav = (lang: 'es' | 'en'): NavItem[] => [
   { type: 'link', name: translations[lang].users, href: '/master-admin/users', icon: Users },
   { type: 'link', name: translations[lang].licenses, href: '/master-admin/licenses', icon: WalletCards },
   { type: 'separator' },
-  { type: 'link', name: 'Monitor Sync', href: '/master-admin/sync-monitor', icon: RefreshCw },
+  { type: 'link', name: 'Monitor de Sincronización', href: '/master-admin/sync-monitor', icon: RefreshCw },
   { type: 'link', name: translations[lang].monitor, href: '/master-admin/monitor', icon: FileText },
   { type: 'link', name: 'Comparar Tiendas', href: '/master-admin/comparison', icon: AreaChart },
   { type: 'separator' },
@@ -236,7 +236,7 @@ const getStoreAdminNav = (storeId: string, lang: 'es' | 'en', settings: StoreSet
         { type: 'link', name: t.addClient, href: `/store/${storeId}/vendors/clients`, icon: Users },
         { type: 'link', name: t.assignInventory, href: `/store/${storeId}/vendors/inventory`, icon: Truck },
         { type: 'link', name: 'Zonas y Barrios', href: `/store/${storeId}/vendors/zones`, icon: Map },
-        { type: 'link', name: 'Pipeline Pedidos', href: `/store/${storeId}/orders-pipeline`, icon: ListOrdered },
+        { type: 'link', name: 'Flujo de Pedidos', href: `/store/${storeId}/orders-pipeline`, icon: ListOrdered },
         { type: 'link', name: 'Cierres de Caja', href: `/store/${storeId}/daily-closings`, icon: Wallet },
       ],
     });
@@ -317,7 +317,7 @@ const getVendedorAmbulanteNav = (storeId: string, lang: 'es' | 'en'): NavItem[] 
 ];
 
 const getGestorVentasNav = (storeId: string, lang: 'es' | 'en'): NavItem[] => [
-  { type: 'link', name: 'Dashboard Ventas', href: `/store/${storeId}/vendors/dashboard`, icon: Route },
+  { type: 'link', name: 'Tablero de Ventas', href: `/store/${storeId}/vendors/dashboard`, icon: Route },
   { type: 'link', name: 'Rutas y Despacho', href: `/store/${storeId}/vendors/routes`, icon: MapPin },
   { type: 'separator' },
   {

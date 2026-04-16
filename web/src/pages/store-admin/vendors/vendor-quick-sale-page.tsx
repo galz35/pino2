@@ -330,7 +330,7 @@ export default function VendorQuickSalePage() {
           {/* FOOTER: totals + register button */}
           <div className="border-t p-3 space-y-3 bg-slate-50">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal ({totalItems} items)</span>
+              <span className="text-muted-foreground">Subtotal ({totalItems} artículos)</span>
               <span className="font-semibold">C$ {subtotal.toFixed(2)}</span>
             </div>
             {settings.applyVAT && (

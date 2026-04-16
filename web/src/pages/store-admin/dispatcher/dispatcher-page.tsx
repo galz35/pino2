@@ -16,6 +16,7 @@ import apiClient from '@/services/api-client';
 import { ClientSelectionDialog } from '@/components/pos/client-selection-dialog';
 import { AddClientDialog } from '@/components/pos/add-client-dialog';
 import { Client, Product as GlobalProduct } from '@/types';
+import { TicketService } from '@/services/pos/ticket-service';
 
 interface CartItem extends GlobalProduct {
     quantity: number;
@@ -90,7 +91,7 @@ export default function DispatcherPage() {
 
         setIsProcessing(true);
         try {
-            await apiClient.post('/pending-orders', {
+            const res = await apiClient.post('/pending-orders', {
                 storeId,
                 dispatcherId: user.id,
                 dispatcherName: user.name,
@@ -100,7 +101,29 @@ export default function DispatcherPage() {
                 subtotal, tax, total,
                 status: 'Pendiente',
             });
+            
             toast({ title: 'Comanda Enviada', description: `La comanda para ${selectedClient.name} está lista para ser cobrada.` });
+
+            // Imprimir pre-ticket
+            try {
+                TicketService.generateAndPrint({
+                    id: res.data?.id ? res.data.id.substring(0, 8) : Date.now().toString().substring(5),
+                    items: cart as any,
+                    total,
+                    subtotal,
+                    discount: 0,
+                    clientName: selectedClient.name,
+                    cashierName: `Despachador: ${user.name}`,
+                    storeName: 'Ticket Pre-Cuenta',
+                    paymentMethod: 'PENDIENTE DE PAGO',
+                    amountReceived: 0,
+                    change: 0,
+                    settings: settings as any
+                });
+            } catch(e) {
+                console.error("Error al imprimir ticket pre-cuenta", e);
+            }
+
             resetOrder();
         } catch (error) {
             console.error(error);

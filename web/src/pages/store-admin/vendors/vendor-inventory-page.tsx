@@ -85,7 +85,7 @@ export default function VendorInventoryPage() {
                         <CardContent className="flex-grow"><ScrollArea className="h-[500px]"><div className="space-y-2">
                             {loading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />) : filteredProducts.map(product => (
                                 <div key={product.id} onClick={() => setSelectedProduct(product)} className={`p-3 rounded-md cursor-pointer border transition-colors ${selectedProduct?.id === product.id ? 'bg-muted ring-2 ring-primary' : 'hover:bg-muted/50'}`}>
-                                    <p className="font-semibold">{product.description}</p><p className="text-sm text-muted-foreground">Stock: {product.currentStock}</p>
+                                    <p className="font-semibold">{product.description}</p><p className="text-sm text-muted-foreground">Existencia: {product.currentStock}</p>
                                 </div>
                             ))}
                         </div></ScrollArea></CardContent>
@@ -95,8 +95,8 @@ export default function VendorInventoryPage() {
                         <CardContent>{selectedProduct ? (
                             <div className="space-y-6">
                                 <div className="space-y-2 p-4 border rounded-md bg-muted/20">
-                                    <div className="flex justify-between"><span>Stock Tienda:</span><span className="font-bold">{selectedProduct.currentStock}</span></div>
-                                    <div className="flex justify-between"><span>Stock Vendedor:</span><span className="font-bold">{selectedProduct.vendorStock ?? 0}</span></div>
+                                    <div className="flex justify-between"><span>Existencia Tienda:</span><span className="font-bold">{selectedProduct.currentStock}</span></div>
+                                    <div className="flex justify-between"><span>Existencia Vendedor:</span><span className="font-bold">{selectedProduct.vendorStock ?? 0}</span></div>
                                 </div>
                                 <Separator />
                                 <div className="space-y-2"><Label>Asignar a Vendedor</Label><div className="flex gap-2"><Input type="number" value={assignQty} onChange={(e) => setAssignQty(Number(e.target.value))} /><Button disabled={isProcessing} onClick={() => handleTransaction('assign', assignQty)}><Send className="h-4 w-4" /></Button></div></div>

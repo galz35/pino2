@@ -47,7 +47,7 @@ export default function AddVendorPage() {
                     <CardHeader><CardTitle>Agregar Nuevo Personal de Ruta</CardTitle><CardDescription>Crea un nuevo usuario para ventas en calle.</CardDescription></CardHeader>
                     <CardContent>
                         <Form {...form}><form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                            <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre Completo</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                            <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nombre Completo</FormLabel><FormControl><Input placeholder="Ej. Juan Pérez" {...field} /></FormControl><FormMessage /></FormItem>)} />
                             <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Correo Electrónico</FormLabel><FormControl><Input type="email" placeholder="vendedor@ejemplo.com" {...field} /></FormControl><FormMessage /></FormItem>)} />
                             <FormField control={form.control} name="password" render={({ field }) => (
                                 <FormItem><FormLabel>Contraseña</FormLabel><FormControl>

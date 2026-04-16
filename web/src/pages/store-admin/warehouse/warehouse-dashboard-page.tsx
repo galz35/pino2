@@ -56,6 +56,17 @@ export default function WarehouseDashboardPage() {
   const [loadingOrder, setLoadingOrder] = useState<Order | null>(null);
   const [vendors, setVendors] = useState<UserType[]>([]);
   const [selectedVendorId, setSelectedVendorId] = useState<string>('');
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+  const [pickingNotes, setPickingNotes] = useState('');
+
+  const toggleCheckedItem = (itemId: string) => {
+    setCheckedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
 
   const fetchOrders = async () => {
     try {
@@ -103,6 +114,7 @@ export default function WarehouseDashboardPage() {
   const handleOpenPicking = async (order: Order) => {
     try {
       setLoadingModal(true);
+      setCheckedItems(new Set());
       const res = await apiClient.get(`/orders/${order.id}`);
       setPickingOrder(res.data);
     } catch (err) {
@@ -114,8 +126,19 @@ export default function WarehouseDashboardPage() {
 
   const handleFinishPicking = async () => {
     if (!pickingOrder) return;
-    const success = await updateOrderStatus(pickingOrder.id, 'ALISTADO');
-    if (success) setPickingOrder(null);
+    const isPartial = checkedItems.size < pickingOrder.items.length;
+    const missingItems = pickingOrder.items.filter(i => !checkedItems.has(i.id));
+    let notes = pickingNotes.trim();
+    if (isPartial) {
+      const missingList = missingItems.map(i => `${i.productName} (${i.quantity} u.)`).join(', ');
+      const autoNote = `⚠️ ENVÍO PARCIAL — Pendientes: ${missingList}`;
+      notes = notes ? `${autoNote}\n${notes}` : autoNote;
+    }
+    const success = await updateOrderStatus(pickingOrder.id, 'ALISTADO', { notes });
+    if (success) {
+      setPickingOrder(null);
+      setPickingNotes('');
+    }
   };
 
   const handleOpenLoading = async (order: Order) => {
@@ -182,7 +205,7 @@ export default function WarehouseDashboardPage() {
                 )}
                 {status === 'EN_PREPARACION' && (
                   <Button size="sm" variant="secondary" className="w-full font-bold text-blue-700 bg-blue-100 hover:bg-blue-200" onClick={() => handleOpenPicking(order)}>
-                    <PackageOpen className="mr-2 h-4 w-4" /> Picking List
+                    <PackageOpen className="mr-2 h-4 w-4" /> Alistar Pedido
                   </Button>
                 )}
                 {status === 'ALISTADO' && (
@@ -224,22 +247,27 @@ export default function WarehouseDashboardPage() {
       ) : (
         <div className="flex flex-1 gap-4 overflow-x-auto pb-4">
           {renderColumn('Nuevos', 'RECIBIDO', <ArrowRight className="h-5 w-5 text-amber-600" />, 'bg-amber-100 text-amber-700 border border-amber-200')}
-          {renderColumn('Picking', 'EN_PREPARACION', <PackageOpen className="h-5 w-5 text-blue-600" />, 'bg-blue-100 text-blue-700 border border-blue-200')}
+          {renderColumn('Preparando', 'EN_PREPARACION', <PackageOpen className="h-5 w-5 text-blue-600" />, 'bg-blue-100 text-blue-700 border border-blue-200')}
           {renderColumn('Listo', 'ALISTADO', <CheckCircle2 className="h-5 w-5 text-emerald-600" />, 'bg-emerald-100 text-emerald-700 border border-emerald-200')}
           {renderColumn('Despachado', 'CARGADO_CAMION', <Truck className="h-5 w-5 text-gray-600" />, 'bg-gray-100 text-gray-700 border border-gray-200')}
         </div>
       )}
 
-      {/* MODAL DE PICKING LIST CON BULTOS Y UNIDADES */}
+      {/* MODAL DE LISTA DE ALISTAMIENTO CON CHECKLIST */}
       <Dialog open={!!pickingOrder} onOpenChange={(open) => !open && setPickingOrder(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
               <PackageOpen className="h-6 w-6 text-primary" />
-              Picking List - Orden {pickingOrder?.id.slice(0, 8)}
+              Lista de Alistamiento - Orden {pickingOrder?.id.slice(0, 8)}
             </DialogTitle>
             <DialogDescription>
               Cliente: <span className="font-bold text-foreground">{pickingOrder?.clientName}</span>
+              {pickingOrder && (
+                <span className="ml-4 text-xs">
+                  ({checkedItems.size} de {pickingOrder.items.length} productos alistados)
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -247,6 +275,7 @@ export default function WarehouseDashboardPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px] text-center">✓</TableHead>
                   <TableHead>Producto</TableHead>
                   <TableHead className="text-center bg-muted/50 rounded-tl-md">Cant. Solicitada</TableHead>
                   <TableHead className="text-center font-bold text-primary bg-primary/10">📦 Bultos Cerrados</TableHead>
@@ -258,11 +287,24 @@ export default function WarehouseDashboardPage() {
                   const upb = item.unitsPerBulk || 1;
                   const bulks = Math.floor(item.quantity / upb);
                   const units = item.quantity % upb;
+                  const isChecked = checkedItems.has(item.id);
 
                   return (
-                    <TableRow key={item.id} className="text-base">
+                    <TableRow
+                      key={item.id}
+                      className={`text-base cursor-pointer transition-colors ${isChecked ? 'bg-emerald-50 opacity-70' : 'hover:bg-muted/30'}`}
+                      onClick={() => toggleCheckedItem(item.id)}
+                    >
+                      <TableCell className="text-center">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleCheckedItem(item.id)}
+                          className="h-5 w-5 rounded border-gray-300 text-primary accent-primary cursor-pointer"
+                        />
+                      </TableCell>
                       <TableCell>
-                        <p className="font-semibold">{item.productName}</p>
+                        <p className={`font-semibold ${isChecked ? 'line-through text-muted-foreground' : ''}`}>{item.productName}</p>
                         <p className="text-xs text-muted-foreground">{item.presentation || 'Sin presentación'} | Caja de {upb}</p>
                       </TableCell>
                       <TableCell className="text-center">{item.quantity} u.</TableCell>
@@ -275,10 +317,31 @@ export default function WarehouseDashboardPage() {
             </Table>
           </div>
 
-          <DialogFooter className="mt-6 border-t pt-4">
+          {pickingOrder && checkedItems.size < pickingOrder.items.length && checkedItems.size > 0 && (
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm font-bold text-amber-800 mb-2">
+                ⚠️ Faltan {pickingOrder.items.length - checkedItems.size} producto(s) por alistar
+              </p>
+              <textarea
+                value={pickingNotes}
+                onChange={(e) => setPickingNotes(e.target.value)}
+                placeholder="Observación (ej: producto agotado, se enviará mañana...)"
+                className="w-full text-sm border rounded-lg p-2 min-h-[60px] resize-none"
+              />
+            </div>
+          )}
+
+          <DialogFooter className="mt-4 border-t pt-4">
             <Button variant="outline" onClick={() => setPickingOrder(null)}>Cancelar</Button>
-            <Button onClick={handleFinishPicking} className="gap-2">
-              <CheckCircle2 className="h-4 w-4" /> Marcar Todo Alineado y Listo
+            <Button
+              onClick={handleFinishPicking}
+              className="gap-2"
+              disabled={!pickingOrder || checkedItems.size === 0}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              {pickingOrder && checkedItems.size < pickingOrder.items.length
+                ? `Enviar Parcial (${checkedItems.size}/${pickingOrder.items.length})`
+                : 'Todo Alistado ✓'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -305,16 +368,19 @@ export default function WarehouseDashboardPage() {
                 <SelectValue placeholder="Seleccionar rutero activo..." />
               </SelectTrigger>
               <SelectContent>
-                {vendors.map(v => (
+                {vendors.map(v => {
+                  const roleLabel = v.role === 'rutero' ? 'Rutero' : v.role === 'vendor' ? 'Vendedor' : v.role === 'store-admin' ? 'Administrador' : v.role;
+                  return (
                   <SelectItem key={v.id} value={v.id}>
-                    {v.name} ({v.role})
+                    {v.name} ({roleLabel})
                   </SelectItem>
-                ))}
+                  );
+                })}
               </SelectContent>
             </Select>
 
             <div className="mt-6 p-4 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-lg text-sm">
-              ⚠️ <strong>Aviso:</strong> Confirmar esta acción generará un registro de transferencia formal (`INVENTORY_TRANSFER`). Una vez cargado el camión, las mermas o cambios son responsabilidad del vendedor.
+              ⚠️ <strong>Aviso:</strong> Confirmar esta acción generará un registro de transferencia formal de inventario. Una vez cargado el camión, las mermas o cambios son responsabilidad del vendedor.
             </div>
           </div>
 

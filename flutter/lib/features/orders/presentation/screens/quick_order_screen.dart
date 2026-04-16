@@ -713,7 +713,7 @@ class _QuickOrderFooter extends StatelessWidget {
               children: [
                 Expanded(
                   child: _FooterMetric(
-                    label: 'Items',
+                    label: 'Artículos',
                     value: '$totalItems',
                   ),
                 ),

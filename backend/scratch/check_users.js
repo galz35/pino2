@@ -1,24 +1,22 @@
 const { Client } = require('pg');
 
 const client = new Client({
-  host: '190.56.16.85',
-  port: 5432,
-  user: 'alacaja',
-  password: 'TuClaveFuerte',
-  database: 'multitienda_db'
+  connectionString: "postgresql://alacaja:TuClaveFuerte@190.56.16.85:5432/multitienda_db",
+  connectionTimeoutMillis: 10000,
 });
 
-async function run() {
-  await client.connect();
-  const res = await client.query(`
-    SELECT u.id, u.email, u.name, u.role, u.is_active, s.name as store_name, s.id as store_id
-    FROM users u
-    LEFT JOIN user_stores us ON u.id = us.user_id
-    LEFT JOIN stores s ON us.store_id = s.id
-    ORDER BY u.role, u.email
-  `);
-  console.log(JSON.stringify(res.rows, null, 2));
-  await client.end();
+async function checkUsers() {
+  try {
+    await client.connect();
+    console.log('Connected to DB');
+    const res = await client.query("SELECT email, role, name FROM users WHERE is_active = true LIMIT 10");
+    console.log('Users found:');
+    console.table(res.rows);
+  } catch (err) {
+    console.error('Error connecting to DB:', err);
+  } finally {
+    await client.end();
+  }
 }
 
-run();
+checkUsers();

@@ -74,7 +74,7 @@ export default function ChainDashboardPage() {
     if (loading) {
         return (
             <div className="space-y-6">
-                <h1 className="text-2xl font-bold tracking-tight">Dashboard Corporativo Multisucursal</h1>
+                <h1 className="text-2xl font-bold tracking-tight">Tablero Corporativo Multisucursal</h1>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {Array.from({ length: 4 }).map((_, i) => (
                         <Card key={i}>
@@ -93,7 +93,7 @@ export default function ChainDashboardPage() {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold tracking-tight">Dashboard Corporativo</h1>
+                <h1 className="text-2xl font-bold tracking-tight">Tablero Corporativo</h1>
                 <p className="text-muted-foreground">Monitor en tiempo real de operaciones consolidado de la cadena multi-tienda.</p>
             </div>
 

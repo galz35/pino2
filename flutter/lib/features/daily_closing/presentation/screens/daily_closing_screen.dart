@@ -210,30 +210,16 @@ class _DailyClosingScreenState extends ConsumerState<DailyClosingScreen> {
               style: const TextStyle(color: Colors.black54, fontSize: 13),
             ),
             const SizedBox(height: 16),
-            Container(
+              Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: Column(
-                children: [
-                  _ConfirmRow(label: 'Ventas', value: _totalSales),
-                  const SizedBox(height: 8),
-                  _ConfirmRow(label: 'Cobros', value: _totalCollections),
-                  const SizedBox(height: 8),
-                  _ConfirmRow(
-                    label: 'Devoluciones',
-                    value: _totalReturns,
-                    negative: true,
-                  ),
-                  const Divider(height: 20),
-                  _ConfirmRow(
-                    label: 'Efectivo total',
-                    value: _cashTotal,
-                    bold: true,
-                  ),
-                ],
+              child: const Text(
+                'Al confirmar, notificarás a bodega que finalizaste la jornada y comenzarás el arqueo físico de efectivo y producto no entregado.',
+                style: TextStyle(color: Colors.black87, fontSize: 14),
+                textAlign: TextAlign.center,
               ),
             ),
             const SizedBox(height: 16),
@@ -297,86 +283,41 @@ class _DailyClosingScreenState extends ConsumerState<DailyClosingScreen> {
                   const SizedBox(height: 18),
 
                   // ── Metric chips ──
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      _MetricChip(
-                        icon: Icons.local_shipping_rounded,
-                        label: 'Entregas',
-                        value: '$_deliveredCount / ${_deliveries.length}',
-                        color: const Color(0xFF3B82F6),
-                      ),
-                      _MetricChip(
-                        icon: Icons.attach_money_rounded,
-                        label: 'Ventas',
-                        value: 'C\$ ${_totalSales.toStringAsFixed(2)}',
-                        color: const Color(0xFF22C55E),
-                      ),
-                      _MetricChip(
-                        icon: Icons.assignment_return_rounded,
-                        label: 'Devol.',
-                        value: 'C\$ ${_totalReturns.toStringAsFixed(2)}',
-                        color: const Color(0xFFF97316),
-                      ),
-                      _MetricChip(
-                        icon: Icons.wallet_rounded,
-                        label: 'Efectivo',
-                        value: 'C\$ ${_cashTotal.toStringAsFixed(2)}',
-                        color: const Color(0xFF6366F1),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 22),
-
-                  // ── Deliveries section ──
-                  _SectionHeader(
-                    icon: Icons.local_shipping_rounded,
-                    title: 'Entregas del día',
-                    subtitle:
-                        '$_deliveredCount entregados · $_notDeliveredCount no entregados · $_pendingCount pendientes',
-                  ),
-                  const SizedBox(height: 8),
-                  if (_deliveries.isEmpty)
-                    const _EmptySection(text: 'Sin entregas registradas hoy.')
-                  else
-                    ..._deliveries.map(
-                      (d) => _DeliveryTile(
-                        clientName: d['clientName'] ?? '—',
-                        paymentType: d['paymentType'] ?? '',
-                        total: double.tryParse('${d['total']}') ?? 0,
-                        status: d['status'] ?? 'Pendiente',
-                      ),
+                  // ── Simple status card ──
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEEF2FF),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFC7D2FE)),
                     ),
-                  const SizedBox(height: 22),
-
-                  // ── Returns section ──
-                  _SectionHeader(
-                    icon: Icons.assignment_return_rounded,
-                    title: 'Devoluciones del día',
-                    subtitle:
-                        '${_returns.length} devolución(es) — C\$ ${_totalReturns.toStringAsFixed(2)}',
-                  ),
-                  const SizedBox(height: 8),
-                  if (_returns.isEmpty)
-                    const _EmptySection(text: 'Sin devoluciones hoy.')
-                  else
-                    ..._returns.map(
-                      (r) => _ReturnTile(
-                        notes:
-                            r['notes'] as String? ??
-                            'Devolución #${(r['id'] as String? ?? '').substring(0, 8)}',
-                        total: double.tryParse('${r['total']}') ?? 0,
-                      ),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.local_shipping_rounded,
+                          size: 48,
+                          color: Color(0xFF4F46E5),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Jornada de Entregas',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF312E81),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Has completado $_deliveredCount entregas hoy. Al finalizar el día, presiona el botón inferior para notificar a la base y proceder con la entrega de dinero y productos en las instalaciones.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: const Color(0xFF312E81).withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
                     ),
-                  const SizedBox(height: 22),
-
-                  // ── Summary card ──
-                  _ClosingSummaryCard(
-                    totalSales: _totalSales,
-                    totalCollections: _totalCollections,
-                    totalReturns: _totalReturns,
-                    cashTotal: _cashTotal,
                   ),
                 ],
               ),
@@ -474,348 +415,19 @@ class _ClosingHero extends StatelessWidget {
   }
 }
 
-class _MetricChip extends StatelessWidget {
-  const _MetricChip({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
 
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.18)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: color.withValues(alpha: 0.8),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
 
-  final IconData icon;
-  final String title;
-  final String subtitle;
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 20, color: const Color(0xFF475569)),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: const TextStyle(fontSize: 12, color: Colors.black54),
-        ),
-      ],
-    );
-  }
-}
 
-class _EmptySection extends StatelessWidget {
-  const _EmptySection({required this.text});
-  final String text;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Center(
-        child: Text(text, style: const TextStyle(color: Colors.black38)),
-      ),
-    );
-  }
-}
 
-class _DeliveryTile extends StatelessWidget {
-  const _DeliveryTile({
-    required this.clientName,
-    required this.paymentType,
-    required this.total,
-    required this.status,
-  });
 
-  final String clientName;
-  final String paymentType;
-  final double total;
-  final String status;
 
-  @override
-  Widget build(BuildContext context) {
-    final statusColor = switch (status) {
-      'Entregado' => const Color(0xFF22C55E),
-      'No Entregado' => const Color(0xFFEF4444),
-      _ => const Color(0xFF94A3B8),
-    };
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  clientName,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                if (paymentType.isNotEmpty)
-                  Text(
-                    paymentType,
-                    style: const TextStyle(fontSize: 12, color: Colors.black45),
-                  ),
-              ],
-            ),
-          ),
-          Text(
-            'C\$ ${total.toStringAsFixed(2)}',
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(width: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              status,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: statusColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
-class _ReturnTile extends StatelessWidget {
-  const _ReturnTile({required this.notes, required this.total});
 
-  final String notes;
-  final double total;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              notes,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-          Text(
-            'C\$ ${total.toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              color: Color(0xFFF97316),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ClosingSummaryCard extends StatelessWidget {
-  const _ClosingSummaryCard({
-    required this.totalSales,
-    required this.totalCollections,
-    required this.totalReturns,
-    required this.cashTotal,
-  });
-
-  final double totalSales;
-  final double totalCollections;
-  final double totalReturns;
-  final double cashTotal;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEEF2FF),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFFC7D2FE),
-          style: BorderStyle.solid,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.receipt_long_rounded,
-                color: Color(0xFF4F46E5),
-                size: 22,
-              ),
-              SizedBox(width: 8),
-              Text(
-                'Resumen para cierre',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF312E81),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _SummaryRow(label: 'Total vendido', value: totalSales),
-          const SizedBox(height: 8),
-          _SummaryRow(label: 'Total cobrado', value: totalCollections),
-          const SizedBox(height: 8),
-          _SummaryRow(
-            label: '(-) Devoluciones',
-            value: totalReturns,
-            negative: true,
-          ),
-          const Divider(height: 24),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFC7D2FE).withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Column(
-              children: [
-                const Text(
-                  'EFECTIVO TOTAL',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 2,
-                    color: Color(0xFF4F46E5),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'C\$ ${cashTotal.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF312E81),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({
-    required this.label,
-    required this.value,
-    this.negative = false,
-  });
-
-  final String label;
-  final double value;
-  final bool negative;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(color: Color(0xFF64748B))),
-        Text(
-          '${negative ? '-' : ''}C\$ ${value.toStringAsFixed(2)}',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: negative ? const Color(0xFFF97316) : const Color(0xFF0F172A),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _ClosingFooter extends StatelessWidget {
   const _ClosingFooter({
@@ -927,40 +539,4 @@ class _ClosingFooter extends StatelessWidget {
   }
 }
 
-class _ConfirmRow extends StatelessWidget {
-  const _ConfirmRow({
-    required this.label,
-    required this.value,
-    this.negative = false,
-    this.bold = false,
-  });
 
-  final String label;
-  final double value;
-  final bool negative;
-  final bool bold;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
-            fontSize: bold ? 16 : 14,
-          ),
-        ),
-        Text(
-          '${negative ? '-' : ''}C\$ ${value.toStringAsFixed(2)}',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: negative ? const Color(0xFFF97316) : const Color(0xFF0F172A),
-            fontSize: bold ? 16 : 14,
-          ),
-        ),
-      ],
-    );
-  }
-}

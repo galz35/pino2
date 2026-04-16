@@ -1,10 +1,14 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../../database/database.service';
+import { EventsGateway } from '../../common/gateways/events.gateway';
 
 @Injectable()
 export class SalesService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly eventsGateway: EventsGateway,
+  ) {}
 
   /**
    * Procesa una venta transaccional pura:
@@ -142,6 +146,15 @@ export class SalesService {
           [newCash, cashShiftId]
         );
       }
+
+      this.eventsGateway.emitSyncUpdate({
+        type: 'SALE_COMPLETED',
+        storeId: dto.storeId,
+        payload: {
+          saleId: sale.id,
+          ticketNumber: sale.ticket_number || ticketNumber,
+        },
+      });
 
       return {
         success: true,

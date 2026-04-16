@@ -257,7 +257,7 @@ export default function ProductsPage() {
                                             <p className="font-medium">C$ {product.salePrice.toFixed(2)}</p>
                                         </div>
                                             <div className="text-right sm:text-left">
-                                                <p className="text-xs text-muted-foreground">Stock</p>
+                                                <p className="text-xs text-muted-foreground">Existencia</p>
                                                 {product.usesInventory ? (
                                                     <div className="flex flex-col items-end sm:items-start">
                                                         <Badge variant="default" className={cn("text-base", getStockBadgeVariant(product.currentStock, product.minStock))}>

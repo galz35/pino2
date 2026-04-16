@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Search, Home, Trash2, Archive, Users, FolderOpen, Banknote, History, ShoppingBag, CreditCard, Printer } from 'lucide-react';
+import { Search, Home, Trash2, Archive, Users, FolderOpen, Banknote, History, ShoppingBag, CreditCard, Printer, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Product, Client } from '@/types';
 import { ProductSearch } from '@/components/pos/product-search';
@@ -9,6 +9,7 @@ import { UserSwitchDialog } from '@/components/auth/user-switch-dialog';
 import { ClientSelectionDialog } from '@/components/pos/client-selection-dialog';
 import { PaymentDialog, PaymentData } from '@/components/pos/payment-dialog';
 import { PriceSelectionDialog } from '@/components/pos/price-selection-dialog';
+import { PendingTicketsDialog, PendingTicket } from '@/components/pos/pending-tickets-dialog';
 import {
     Dialog,
     DialogContent,
@@ -87,6 +88,8 @@ export function CashierBillingView({
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [isHoldDialogOpen, setIsHoldDialogOpen] = useState(false);
+    const [isPendingTicketsOpen, setIsPendingTicketsOpen] = useState(false);
+    const [currentPendingTicketId, setCurrentPendingTicketId] = useState<string | null>(null);
     const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
     const [isUserSwitchOpen, setIsUserSwitchOpen] = useState(false);
     const [priceSelectionProduct, setPriceSelectionProduct] = useState<Product | null>(null);
@@ -116,6 +119,31 @@ export function CashierBillingView({
     const saveHeldOrders = (orders: Order[]) => {
         localStorage.setItem('held_orders', JSON.stringify(orders));
         setHeldOrders(orders);
+    };
+
+    const handleSelectPendingTicket = (ticket: PendingTicket) => {
+        const mappedCart: CartItemPOS[] = ticket.items.map(item => ({
+            id: item.productId || item.id,
+            description: item.description,
+            salePrice: Number(item.unitPrice || item.salePrice || 0),
+            quantity: item.quantity,
+            barcode: item.barcode || '',
+            costPrice: Number(item.costPrice || 0),
+            usesInventory: true,
+            currentStock: 0,
+        })) as any;
+        
+        if (onSetCart) onSetCart(mappedCart);
+        if (onSelectClient) {
+            onSelectClient({
+                id: ticket.clientId || 'generic',
+                name: ticket.clientName || 'ANÓNIMO',
+                storeId: storeId || '',
+                phone: '', address: '', email: ''
+            });
+        }
+        setCurrentPendingTicketId(ticket.id);
+        toast.success("Ticket cargado", "La comanda de mostrador ha sido cargada");
     };
 
     const handleHoldCurrentOrder = () => {
@@ -155,6 +183,7 @@ export function CashierBillingView({
         const result = await alert.confirm("¿Limpiar Carrito?", "¿Estás seguro de que deseas eliminar todos los productos?");
         if (result.isConfirmed) {
             if (onClearCart) onClearCart();
+            setCurrentPendingTicketId(null);
             toast.success("Carrito Limpiado");
         }
     };
@@ -417,6 +446,13 @@ export function CashierBillingView({
                         </Button>
                         <ReturnsDialog />
                         <Button
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-[10px] h-10 flex gap-2 shadow-sm transition-all active:scale-95 relative"
+                            onClick={() => setIsPendingTicketsOpen(true)}
+                        >
+                            <FileText className="h-4 w-4" /> TICKETS
+                            {/* Opcional: Agregar un pinging dot si hay tickets, pero requiere polling. Lo dejamos simple por ahora */}
+                        </Button>
+                        <Button
                             className="bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-xl text-[10px] h-10 flex gap-2 shadow-sm transition-all active:scale-95"
                             onClick={handleOpenDrawer}
                         >
@@ -462,7 +498,16 @@ export function CashierBillingView({
                 onOpenChange={setIsPaymentDialogOpen}
                 total={total}
                 onConfirm={(payment) => {
-                    onFinalize(payment);
+                    const paymentWithTicket = { ...payment, linkedTicketId: currentPendingTicketId || undefined };
+                    onFinalize(paymentWithTicket as any);
+                    
+                    if (currentPendingTicketId && storeId) {
+                        try {
+                            apiClient.patch(`/pending-orders/${currentPendingTicketId}/status`, { status: 'Cobrado' });
+                        } catch(e) {}
+                    }
+                    setCurrentPendingTicketId(null);
+
                     setIsPaymentDialogOpen(false);
                     // Disparar ticket automáticamente al finalizar si hay settings
                     if (payment) {
@@ -482,6 +527,13 @@ export function CashierBillingView({
                         });
                     }
                 }}
+            />
+
+            <PendingTicketsDialog
+                open={isPendingTicketsOpen}
+                onOpenChange={setIsPendingTicketsOpen}
+                storeId={storeId || ''}
+                onSelectTicket={handleSelectPendingTicket}
             />
 
             <Dialog open={isHoldDialogOpen} onOpenChange={setIsHoldDialogOpen}>
@@ -543,7 +595,7 @@ export function CashierBillingView({
                     <div className="h-10 w-10 flex items-center justify-center rounded-2xl bg-current/5">
                         <ShoppingBag className="h-6 w-6" />
                     </div>
-                    <span className="text-[9px] font-black uppercase tracking-widest">Stock</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest">Existencia</span>
                 </button>
                 <div className="h-12 w-[2px] bg-slate-100"></div>
                 <button

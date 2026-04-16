@@ -513,6 +513,9 @@ ALTER TABLE vendor_inventories ADD COLUMN IF NOT EXISTS current_units INT DEFAUL
 -- 4.6 Zonas por tienda: dia de visita para dashboard vendedor
 ALTER TABLE store_zones ADD COLUMN IF NOT EXISTS visit_day VARCHAR(30) DEFAULT 'Ninguno';
 
+-- 4.7 Arquitectura Multi-Local Organizativa
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS store_type VARCHAR(50) DEFAULT 'SUPERMERCADO';
+
 -- ============================================================
 -- SECCIÓN 5: ÍNDICES DE PERFORMANCE
 -- ============================================================

@@ -22,7 +22,7 @@ const allowedOrigins = (
     credentials: true,
   },
   namespace: 'events',
-  path: '/api-dev/socket.io',
+  path: '/socket.io',
 })
 @Injectable()
 export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {

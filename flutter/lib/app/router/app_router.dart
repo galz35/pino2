@@ -12,6 +12,7 @@ import '../../features/orders/presentation/screens/quick_order_screen.dart';
 import '../../features/returns/presentation/screens/returns_screen.dart';
 import '../../features/startup/presentation/screens/splash_screen.dart';
 import '../../features/warehouse/presentation/screens/warehouse_board_screen.dart';
+import '../../features/warehouse/presentation/screens/inventory_adjustment_screen.dart';
 import '../../features/daily_closing/presentation/screens/daily_closing_screen.dart';
 import '../../features/vendor_inventory/presentation/screens/vendor_inventory_screen.dart';
 import '../../features/sales_history/presentation/screens/sales_history_screen.dart';
@@ -91,6 +92,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/sales-history/:storeId',
         builder: (context, state) => SalesHistoryScreen(
+          storeId: state.pathParameters['storeId'] ?? '',
+          storeName: state.uri.queryParameters['storeName'],
+        ),
+      ),
+      GoRoute(
+        path: '/inventory-adjustments/:storeId',
+        builder: (context, state) => InventoryAdjustmentScreen(
           storeId: state.pathParameters['storeId'] ?? '',
           storeName: state.uri.queryParameters['storeName'],
         ),

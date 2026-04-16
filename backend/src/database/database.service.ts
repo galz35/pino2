@@ -147,6 +147,16 @@ export class DatabaseService implements OnModuleInit {
       `);
     }
 
+    // Asegurar store_type para arquitectura multi-tienda corporativa
+    await this.pool.query(`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'stores' AND column_name = 'store_type') THEN
+          ALTER TABLE stores ADD COLUMN store_type VARCHAR(50) DEFAULT 'SUPERMERCADO';
+        END IF;
+      END $$;
+    `);
+
     // Tabla de estado de sincronización por tienda
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS sync_status (

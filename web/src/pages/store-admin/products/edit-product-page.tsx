@@ -370,11 +370,11 @@ export default function EditProductPage() {
 
             <div className="grid gap-4 md:grid-cols-4">
               <div className="space-y-2">
-                <Label htmlFor="currentStock">Stock total</Label>
+                <Label htmlFor="currentStock">Existencia total</Label>
                 <Input id="currentStock" type="number" min="0" step="1" value={formData.currentStock} onChange={(event) => updateField('currentStock', event.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="minStock">Stock mínimo</Label>
+                <Label htmlFor="minStock">Existencia mínima</Label>
                 <Input id="minStock" type="number" min="0" step="1" value={formData.minStock} onChange={(event) => updateField('minStock', event.target.value)} />
               </div>
               <div className="space-y-2">

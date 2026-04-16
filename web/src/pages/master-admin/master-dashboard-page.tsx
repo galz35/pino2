@@ -39,7 +39,7 @@ export default function MasterDashboardPage() {
     }, []);
 
     if (loading) return (
-        <div className="space-y-6"><h1 className="text-2xl font-bold tracking-tight">Panel de Master-Admin</h1>
+        <div className="space-y-6"><h1 className="text-2xl font-bold tracking-tight">Panel de Administrador Global</h1>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">{Array.from({ length: 5 }).map((_, i) => (
                 <Card key={i}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><Skeleton className="h-5 w-32" /><Skeleton className="h-6 w-6 rounded-full" /></CardHeader><CardContent><Skeleton className="h-8 w-16" /></CardContent></Card>
             ))}</div>
@@ -48,7 +48,7 @@ export default function MasterDashboardPage() {
 
     return (
         <div>
-            <h1 className="text-2xl font-bold tracking-tight mb-4">Panel de Master-Admin</h1>
+            <h1 className="text-2xl font-bold tracking-tight mb-4">Panel de Administrador Global</h1>
             <p className="text-muted-foreground mb-6">Métricas importantes para la gestión de todas las tiendas.</p>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                 <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Tiendas</CardTitle><Store className="h-4 w-4 text-blue-500" /></CardHeader><CardContent><div className="text-2xl font-bold">{totalStores}</div></CardContent></Card>

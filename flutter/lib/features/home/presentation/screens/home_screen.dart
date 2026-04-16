@@ -622,6 +622,12 @@ class _RoleActionGrid extends StatelessWidget {
             routeKey: _RouteKey.warehouse,
           ),
           _ActionDescriptor(
+            title: 'Ajustes de Stock',
+            subtitle: 'Escanear código y ajustar.',
+            icon: Icons.qr_code_scanner_rounded,
+            routeKey: _RouteKey.inventoryAdjustments,
+          ),
+          _ActionDescriptor(
             title: 'Catálogo',
             subtitle: 'Stock, bultos y precios.',
             icon: Icons.inventory_2_rounded,
@@ -808,6 +814,7 @@ class _RoleActionGrid extends StatelessWidget {
       _RouteKey.dailyClosing => '/daily-closing/$storeId',
       _RouteKey.vendorInventory => '/vendor-inventory/$storeId',
       _RouteKey.salesHistory => '/sales-history/$storeId',
+      _RouteKey.inventoryAdjustments => '/inventory-adjustments/$storeId',
     };
 
     context.push(
@@ -1303,4 +1310,5 @@ enum _RouteKey {
   dailyClosing,
   vendorInventory,
   salesHistory,
+  inventoryAdjustments,
 }
