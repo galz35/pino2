@@ -63,7 +63,13 @@ export class InvoicesService {
             const newProduct = await client.query(
               `INSERT INTO products (store_id, description, sale_price, cost_price, current_stock, uses_inventory, department_id)
                VALUES ($1, $2, $3, $4, $5, true, NULL) RETURNING id`,
-              [dto.storeId, item.description, item.unitPrice * 1.3, item.unitPrice, item.quantity],
+              [
+                dto.storeId,
+                item.description,
+                item.unitPrice * 1.3,
+                item.unitPrice,
+                item.quantity,
+              ],
             );
             productId = newProduct.rows[0].id;
             // For new products, movement will show had=0, has=quantity
@@ -83,7 +89,14 @@ export class InvoicesService {
         await client.query(
           `INSERT INTO invoice_items (invoice_id, product_id, description, quantity, unit_price, subtotal)
            VALUES ($1, $2, $3, $4, $5, $6)`,
-          [invoice.id, productId, item.description, item.quantity, item.unitPrice, lineSubtotal],
+          [
+            invoice.id,
+            productId,
+            item.description,
+            item.quantity,
+            item.unitPrice,
+            lineSubtotal,
+          ],
         );
 
         // Update product stock (only for existing products, new ones already have the stock set)
@@ -139,7 +152,8 @@ export class InvoicesService {
   }
 
   async findAll(storeId?: string, supplierId?: string) {
-    let sql = 'SELECT i.*, s.name as supplier_name FROM invoices i LEFT JOIN suppliers s ON i.supplier_id = s.id WHERE 1=1';
+    let sql =
+      'SELECT i.*, s.name as supplier_name FROM invoices i LEFT JOIN suppliers s ON i.supplier_id = s.id WHERE 1=1';
     const params: any[] = [];
 
     if (storeId) {
@@ -161,7 +175,8 @@ export class InvoicesService {
       'SELECT i.*, s.name as supplier_name FROM invoices i LEFT JOIN suppliers s ON i.supplier_id = s.id WHERE i.id = $1',
       [id],
     );
-    if (res.rowCount === 0) throw new NotFoundException('Factura no encontrada');
+    if (res.rowCount === 0)
+      throw new NotFoundException('Factura no encontrada');
 
     const invoice = this.mapRow(res.rows[0]);
 

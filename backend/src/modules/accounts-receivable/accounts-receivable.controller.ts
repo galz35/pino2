@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AccountsReceivableService } from './accounts-receivable.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -12,7 +21,10 @@ export class AccountsReceivableController {
 
   @Get()
   @ApiOperation({ summary: 'Listar cuentas por cobrar' })
-  findAll(@Query('storeId') storeId: string, @Query('pending') pending?: string) {
+  findAll(
+    @Query('storeId') storeId: string,
+    @Query('pending') pending?: string,
+  ) {
     return this.service.findAll(storeId, pending === 'true');
   }
 
@@ -24,7 +36,16 @@ export class AccountsReceivableController {
 
   @Post()
   @ApiOperation({ summary: 'Crear cuenta por cobrar' })
-  create(@Body() dto: { storeId: string; clientId: string; orderId?: string; totalAmount: number; description?: string }) {
+  create(
+    @Body()
+    dto: {
+      storeId: string;
+      clientId: string;
+      orderId?: string;
+      totalAmount: number;
+      description?: string;
+    },
+  ) {
     return this.service.create(dto);
   }
 
@@ -32,7 +53,15 @@ export class AccountsReceivableController {
   @ApiOperation({ summary: 'Registrar pago a cuenta' })
   addPayment(
     @Param('id') id: string,
-    @Body() dto: { amount: number; paymentMethod?: string; notes?: string; collectedBy?: string; vendorId?: string; vendorName?: string },
+    @Body()
+    dto: {
+      amount: number;
+      paymentMethod?: string;
+      notes?: string;
+      collectedBy?: string;
+      vendorId?: string;
+      vendorName?: string;
+    },
     @Req() req: any,
   ) {
     return this.service.addPayment(id, {

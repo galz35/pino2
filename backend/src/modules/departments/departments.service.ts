@@ -9,7 +9,7 @@ export class DepartmentsService {
     const res = await this.db.query(
       `INSERT INTO departments (store_id, name, description) 
        VALUES ($1, $2, $3) RETURNING *`,
-      [dto.storeId, dto.name, dto.description]
+      [dto.storeId, dto.name, dto.description],
     );
     return res.rows[0];
   }
@@ -27,32 +27,45 @@ export class DepartmentsService {
       const res = await this.db.query(sql, params);
       return res.rows;
     } catch (error) {
-      console.warn('Departments filter failed, likely missing parent_id column. Returning empty for sub-deps or full list for main.', error.message);
+      console.warn(
+        'Departments filter failed, likely missing parent_id column. Returning empty for sub-deps or full list for main.',
+        error.message,
+      );
       // If we are looking for sub-departments and it fails, return empty
       if (type === 'sub') return [];
       // If we are looking for main or general, return all without filtering
-      const res = await this.db.query('SELECT * FROM departments WHERE store_id = $1 ORDER BY name ASC', [storeId]);
+      const res = await this.db.query(
+        'SELECT * FROM departments WHERE store_id = $1 ORDER BY name ASC',
+        [storeId],
+      );
       return res.rows;
     }
   }
 
   async findOne(id: string) {
-    const res = await this.db.query('SELECT * FROM departments WHERE id = $1', [id]);
-    if (res.rowCount === 0) throw new NotFoundException('Departamento no encontrado');
+    const res = await this.db.query('SELECT * FROM departments WHERE id = $1', [
+      id,
+    ]);
+    if (res.rowCount === 0)
+      throw new NotFoundException('Departamento no encontrado');
     return res.rows[0];
   }
 
   async remove(id: string) {
-    await this.db.query('UPDATE departments SET is_active = false WHERE id = $1', [id]);
+    await this.db.query(
+      'UPDATE departments SET is_active = false WHERE id = $1',
+      [id],
+    );
     return { success: true };
   }
 
   async update(id: string, dto: any) {
     const res = await this.db.query(
       'UPDATE departments SET name = $1 WHERE id = $2 RETURNING *',
-      [dto.name, id]
+      [dto.name, id],
     );
-    if (res.rowCount === 0) throw new NotFoundException('Departamento no encontrado');
+    if (res.rowCount === 0)
+      throw new NotFoundException('Departamento no encontrado');
     return res.rows[0];
   }
 }

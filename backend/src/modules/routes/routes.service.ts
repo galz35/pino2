@@ -18,7 +18,14 @@ export class RoutesService {
     return res.rows.map(this.mapRow);
   }
 
-  async create(dto: { storeId: string; vendorId: string; clientIds?: string[]; date?: string; notes?: string; status?: string }) {
+  async create(dto: {
+    storeId: string;
+    vendorId: string;
+    clientIds?: string[];
+    date?: string;
+    notes?: string;
+    status?: string;
+  }) {
     if (!dto.storeId || !dto.vendorId) {
       throw new BadRequestException('La tienda y el vendedor son requeridos');
     }
@@ -32,8 +39,14 @@ export class RoutesService {
     const res = await this.db.query(
       `INSERT INTO routes (store_id, vendor_id, client_ids, route_date, notes, status) 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [dto.storeId, dto.vendorId, JSON.stringify(dto.clientIds || []),
-       routeDate, dto.notes || null, dto.status || 'pending'],
+      [
+        dto.storeId,
+        dto.vendorId,
+        JSON.stringify(dto.clientIds || []),
+        routeDate,
+        dto.notes || null,
+        dto.status || 'pending',
+      ],
     );
     const route = this.mapRow(res.rows[0]);
 
@@ -49,7 +62,7 @@ export class RoutesService {
           type: 'ROUTE_ASSIGNMENT',
           routeId: route.id,
           date: routeDate,
-        }
+        },
       });
     } catch (e) {
       console.error('Error enviando notificación de ruta:', e);
@@ -62,12 +75,21 @@ export class RoutesService {
     const sets: string[] = [];
     const params: any[] = [];
     let idx = 1;
-    if (dto.status) { sets.push(`status = $${idx++}`); params.push(dto.status); }
-    if (dto.notes !== undefined) { sets.push(`notes = $${idx++}`); params.push(dto.notes); }
+    if (dto.status) {
+      sets.push(`status = $${idx++}`);
+      params.push(dto.status);
+    }
+    if (dto.notes !== undefined) {
+      sets.push(`notes = $${idx++}`);
+      params.push(dto.notes);
+    }
     if (sets.length === 0) return;
     sets.push('updated_at = NOW()');
     params.push(id);
-    await this.db.query(`UPDATE routes SET ${sets.join(', ')} WHERE id = $${idx}`, params);
+    await this.db.query(
+      `UPDATE routes SET ${sets.join(', ')} WHERE id = $${idx}`,
+      params,
+    );
     return { success: true };
   }
 
@@ -76,7 +98,10 @@ export class RoutesService {
       id: row.id,
       storeId: row.store_id,
       vendorId: row.vendor_id,
-      clientIds: typeof row.client_ids === 'string' ? JSON.parse(row.client_ids) : (row.client_ids || []),
+      clientIds:
+        typeof row.client_ids === 'string'
+          ? JSON.parse(row.client_ids)
+          : row.client_ids || [],
       routeDate: row.route_date,
       notes: row.notes,
       status: row.status,

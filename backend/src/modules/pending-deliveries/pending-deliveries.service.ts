@@ -6,17 +6,28 @@ export class PendingDeliveriesService {
   constructor(private readonly db: DatabaseService) {}
 
   private normalizeItems(items: any): any[] {
-    const parsed = typeof items === 'string' ? JSON.parse(items) : Array.isArray(items) ? items : [];
+    const parsed =
+      typeof items === 'string'
+        ? JSON.parse(items)
+        : Array.isArray(items)
+          ? items
+          : [];
     return parsed.map((item: any, index: number) => ({
       id: item?.id || item?.productId || `item-${index + 1}`,
       productId: item?.productId || item?.id || null,
       description: item?.description || '',
       quantity: Number.parseInt(String(item?.quantity ?? 0), 10) || 0,
-      salePrice: Number.parseFloat(String(item?.salePrice ?? item?.unitPrice ?? 0)) || 0,
+      salePrice:
+        Number.parseFloat(String(item?.salePrice ?? item?.unitPrice ?? 0)) || 0,
     }));
   }
 
-  async findAll(filters: { storeId?: string; status?: string; ruteroId?: string; unassigned?: boolean }) {
+  async findAll(filters: {
+    storeId?: string;
+    status?: string;
+    ruteroId?: string;
+    unassigned?: boolean;
+  }) {
     let sql = `SELECT pd.*, COALESCE(c.name, o.client_name) as client_name, COALESCE(pd.address, c.address) as client_address, o.total as order_total, o.sales_manager_name, o.payment_type,
                   COALESCE(
                     json_agg(
@@ -39,9 +50,12 @@ export class PendingDeliveriesService {
                WHERE 1=1`;
     const params: any[] = [];
 
-    if (filters.storeId) sql += ` AND pd.store_id = $${params.push(filters.storeId)}`;
-    if (filters.status) sql += ` AND pd.status = $${params.push(filters.status)}`;
-    if (filters.ruteroId) sql += ` AND pd.rutero_id = $${params.push(filters.ruteroId)}`;
+    if (filters.storeId)
+      sql += ` AND pd.store_id = $${params.push(filters.storeId)}`;
+    if (filters.status)
+      sql += ` AND pd.status = $${params.push(filters.status)}`;
+    if (filters.ruteroId)
+      sql += ` AND pd.rutero_id = $${params.push(filters.ruteroId)}`;
     if (filters.unassigned) sql += ' AND pd.rutero_id IS NULL';
 
     sql += ` GROUP BY pd.id, c.name, c.address, o.client_name, o.total, o.sales_manager_name, o.payment_type
@@ -50,11 +64,23 @@ export class PendingDeliveriesService {
     return res.rows.map((row) => this.mapRow(row));
   }
 
-  async create(dto: { storeId: string; orderId: string; clientId?: string; address?: string; notes?: string }) {
+  async create(dto: {
+    storeId: string;
+    orderId: string;
+    clientId?: string;
+    address?: string;
+    notes?: string;
+  }) {
     const res = await this.db.query(
       `INSERT INTO pending_deliveries (store_id, order_id, client_id, address, notes, status) 
        VALUES ($1, $2, $3, $4, $5, 'Pendiente') RETURNING *`,
-      [dto.storeId, dto.orderId, dto.clientId || null, dto.address || null, dto.notes || null],
+      [
+        dto.storeId,
+        dto.orderId,
+        dto.clientId || null,
+        dto.address || null,
+        dto.notes || null,
+      ],
     );
     return this.mapRow(res.rows[0]);
   }
@@ -64,17 +90,30 @@ export class PendingDeliveriesService {
     const params: any[] = [];
     let idx = 1;
 
-    if (dto.status) { sets.push(`status = $${idx++}`); params.push(dto.status); }
-    if (dto.ruteroId) { sets.push(`rutero_id = $${idx++}`); params.push(dto.ruteroId); }
+    if (dto.status) {
+      sets.push(`status = $${idx++}`);
+      params.push(dto.status);
+    }
+    if (dto.ruteroId) {
+      sets.push(`rutero_id = $${idx++}`);
+      params.push(dto.ruteroId);
+    }
     if (sets.length === 0) return;
 
     sets.push('updated_at = NOW()');
     params.push(id);
-    await this.db.query(`UPDATE pending_deliveries SET ${sets.join(', ')} WHERE id = $${idx}`, params);
+    await this.db.query(
+      `UPDATE pending_deliveries SET ${sets.join(', ')} WHERE id = $${idx}`,
+      params,
+    );
     return { success: true };
   }
 
-  async assignRoute(dto: { deliveryIds: string[]; ruteroId: string; date?: string }) {
+  async assignRoute(dto: {
+    deliveryIds: string[];
+    ruteroId: string;
+    date?: string;
+  }) {
     return await this.db.withTransaction(async (client) => {
       for (const deliveryId of dto.deliveryIds) {
         await client.query(

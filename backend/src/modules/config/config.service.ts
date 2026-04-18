@@ -6,7 +6,9 @@ export class ConfigService {
   constructor(private readonly db: DatabaseService) {}
 
   async getByKey(key: string) {
-    const res = await this.db.query('SELECT * FROM config WHERE key = $1', [key]);
+    const res = await this.db.query('SELECT * FROM config WHERE key = $1', [
+      key,
+    ]);
     if (res.rowCount === 0) return { key, value: {} };
     return { key: res.rows[0].key, value: res.rows[0].value };
   }

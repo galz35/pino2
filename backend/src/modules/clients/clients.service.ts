@@ -9,7 +9,13 @@ export class ClientsService {
     const res = await this.db.query(
       `INSERT INTO clients (store_id, name, email, phone, address) 
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [dto.storeId, dto.name, dto.email || null, dto.phone || null, dto.address || null],
+      [
+        dto.storeId,
+        dto.name,
+        dto.email || null,
+        dto.phone || null,
+        dto.address || null,
+      ],
     );
     return this.mapRow(res.rows[0]);
   }
@@ -23,8 +29,11 @@ export class ClientsService {
   }
 
   async findOne(id: string) {
-    const res = await this.db.query('SELECT * FROM clients WHERE id = $1', [id]);
-    if (res.rowCount === 0) throw new NotFoundException('Cliente no encontrado');
+    const res = await this.db.query('SELECT * FROM clients WHERE id = $1', [
+      id,
+    ]);
+    if (res.rowCount === 0)
+      throw new NotFoundException('Cliente no encontrado');
     return this.mapRow(res.rows[0]);
   }
 

@@ -21,13 +21,15 @@ describe('Auth & Sync Flow (e2e)', () => {
     app = moduleFixture.createNestApplication<NestFastifyApplication>(
       new FastifyAdapter(),
     );
-    
+
     // Crucial: replicate main.ts logic
     app.setGlobalPrefix('api');
-    app.useGlobalPipes(new ValidationPipe({
-      whitelist: true,
-      transform: true,
-    }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+      }),
+    );
 
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
@@ -45,7 +47,7 @@ describe('Auth & Sync Flow (e2e)', () => {
     email: `test_pino_${Date.now()}@example.com`,
     password: 'password123',
     name: 'PDA Test User',
-    role: 'preventa'
+    role: 'preventa',
   };
 
   let jwtToken: string;
@@ -56,7 +58,7 @@ describe('Auth & Sync Flow (e2e)', () => {
         .post('/api/auth/register')
         .send(testUser)
         .expect(201)
-        .then(res => {
+        .then((res) => {
           createdEmail = testUser.email;
           expect(res.body.user.email).toBe(testUser.email);
         });
@@ -67,10 +69,10 @@ describe('Auth & Sync Flow (e2e)', () => {
         .post('/api/auth/login')
         .send({
           email: testUser.email,
-          password: testUser.password
+          password: testUser.password,
         })
         .expect(201)
-        .then(res => {
+        .then((res) => {
           expect(res.body.access_token).toBeDefined();
           jwtToken = res.body.access_token;
         });
@@ -81,7 +83,7 @@ describe('Auth & Sync Flow (e2e)', () => {
         .get('/api/auth/me')
         .set('Authorization', `Bearer ${jwtToken}`)
         .expect(200)
-        .then(res => {
+        .then((res) => {
           expect(res.body.email).toBe(testUser.email);
         });
     });
@@ -93,7 +95,7 @@ describe('Auth & Sync Flow (e2e)', () => {
         .get('/api/products')
         .set('Authorization', `Bearer ${jwtToken}`)
         .expect(200)
-        .then(res => {
+        .then((res) => {
           expect(Array.isArray(res.body)).toBe(true);
         });
     });

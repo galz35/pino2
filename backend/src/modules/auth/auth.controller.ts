@@ -1,9 +1,23 @@
-import { Controller, Post, Body, Get, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
-import { IsEmail, IsNotEmpty, IsOptional, IsArray, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsArray,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 class RegisterDto {
   @IsEmail()
@@ -71,7 +85,9 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Alias de /auth/me — perfil del usuario autenticado' })
+  @ApiOperation({
+    summary: 'Alias de /auth/me — perfil del usuario autenticado',
+  })
   getProfileAlias(@Request() req: any) {
     return this.authService.getProfile(req.user.sub);
   }

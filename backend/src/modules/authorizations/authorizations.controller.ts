@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthorizationsService } from './authorizations.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -12,7 +21,15 @@ export class AuthorizationsController {
 
   @Post()
   @ApiOperation({ summary: 'Crear solicitud de autorización' })
-  create(@Body() dto: { storeId: string; requesterId: string; type: string; details: any }) {
+  create(
+    @Body()
+    dto: {
+      storeId: string;
+      requesterId: string;
+      type: string;
+      details: any;
+    },
+  ) {
     return this.service.create(dto);
   }
 
@@ -24,7 +41,10 @@ export class AuthorizationsController {
 
   @Patch(':id/status')
   @ApiOperation({ summary: 'Aprobar o rechazar autorización' })
-  updateStatus(@Param('id') id: string, @Body() dto: { status: 'APPROVED' | 'REJECTED' }) {
+  updateStatus(
+    @Param('id') id: string,
+    @Body() dto: { status: 'APPROVED' | 'REJECTED' },
+  ) {
     return this.service.updateStatus(id, dto.status);
   }
 }

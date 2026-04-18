@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../../database/database.service';
 import { EventsGateway } from '../../common/gateways/events.gateway';
@@ -12,24 +16,35 @@ export class OrdersService {
     private readonly notifications: NotificationsService,
   ) {}
 
-
-  async create(dto: {
-    storeId: string;
-    clientId?: string;
-    clientName?: string;
-    vendorId?: string;
-    salesManagerName?: string;
-    paymentType?: string;
-    priceLevel?: number;
-    items: { productId: string; quantity: number; unitPrice: number; presentation?: string; priceLevel?: number }[];
-    notes?: string;
-    externalId?: string;
-    type?: 'pedido' | 'venta_directa'; // Nuevo campo
-  }, transactionalClient?: PoolClient) {
+  async create(
+    dto: {
+      storeId: string;
+      clientId?: string;
+      clientName?: string;
+      vendorId?: string;
+      salesManagerName?: string;
+      paymentType?: string;
+      priceLevel?: number;
+      items: {
+        productId: string;
+        quantity: number;
+        unitPrice: number;
+        presentation?: string;
+        priceLevel?: number;
+      }[];
+      notes?: string;
+      externalId?: string;
+      type?: 'pedido' | 'venta_directa'; // Nuevo campo
+    },
+    transactionalClient?: PoolClient,
+  ) {
     const execute = async (client: PoolClient) => {
       // Check idempotency
       if (dto.externalId) {
-        const existing = await client.query('SELECT * FROM orders WHERE external_id = $1', [dto.externalId]);
+        const existing = await client.query(
+          'SELECT * FROM orders WHERE external_id = $1',
+          [dto.externalId],
+        );
         if (existing.rowCount > 0) {
           await client.query(
             'INSERT INTO sync_idempotency_log (store_id, external_id, entity_type) VALUES ($1, $2, $3)',
@@ -43,33 +58,37 @@ export class OrdersService {
         }
       }
 
-      const total = dto.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+      const total = dto.items.reduce(
+        (sum, i) => sum + i.quantity * i.unitPrice,
+        0,
+      );
 
       const orderType = dto.type || 'pedido';
-      const initialStatus = orderType === 'venta_directa' ? 'ENTREGADO' : 'RECIBIDO';
+      const initialStatus =
+        orderType === 'venta_directa' ? 'ENTREGADO' : 'RECIBIDO';
 
       const res = await client.query(
         `INSERT INTO orders (store_id, client_id, client_name, vendor_id, sales_manager_name, total, notes, status, payment_type, price_level, external_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
         [
-          dto.storeId, 
-          dto.clientId || null, 
-          dto.clientName || null, 
-          dto.vendorId || null, 
-          dto.salesManagerName || null, 
-          total, 
-          dto.notes || null, 
-          initialStatus, 
-          dto.paymentType || 'CONTADO', 
-          dto.priceLevel || 1, 
-          dto.externalId
+          dto.storeId,
+          dto.clientId || null,
+          dto.clientName || null,
+          dto.vendorId || null,
+          dto.salesManagerName || null,
+          total,
+          dto.notes || null,
+          initialStatus,
+          dto.paymentType || 'CONTADO',
+          dto.priceLevel || 1,
+          dto.externalId,
         ],
       );
       const order = res.rows[0];
 
       await client.query(
         `INSERT INTO order_status_history (order_id, status, user_id) VALUES ($1, $2, $3)`,
-        [order.id, 'RECIBIDO', dto.vendorId || null]
+        [order.id, 'RECIBIDO', dto.vendorId || null],
       );
 
       if ((dto.paymentType || 'CONTADO').toUpperCase() === 'CREDITO') {
@@ -90,7 +109,15 @@ export class OrdersService {
         await client.query(
           `INSERT INTO order_items (order_id, product_id, quantity, unit_price, subtotal, presentation, price_level)
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [order.id, item.productId, item.quantity, item.unitPrice, item.quantity * item.unitPrice, item.presentation || 'UNIT', item.priceLevel || 1],
+          [
+            order.id,
+            item.productId,
+            item.quantity,
+            item.unitPrice,
+            item.quantity * item.unitPrice,
+            item.presentation || 'UNIT',
+            item.priceLevel || 1,
+          ],
         );
       }
 
@@ -98,38 +125,44 @@ export class OrdersService {
       if (orderType === 'venta_directa' && dto.vendorId) {
         for (const item of dto.items) {
           // Descontar del stock del vendedor
-          await client.query(`
+          await client.query(
+            `
             UPDATE vendor_inventories 
             SET current_quantity = GREATEST(current_quantity - $1, 0),
                 sold_quantity = sold_quantity + $1,
                 updated_at = NOW()
             WHERE vendor_id = $2 AND product_id = $3
-          `, [item.quantity, dto.vendorId, item.productId]);
+          `,
+            [item.quantity, dto.vendorId, item.productId],
+          );
         }
       }
 
       // IMPORTANTE: Crear el registro en pending_deliveries para que aparezca en "Asignar Ruta"
       // Solo si es un 'pedido' normal
       if (orderType === 'pedido') {
-        const clientAddressRes = dto.clientId 
-          ? await client.query('SELECT address FROM clients WHERE id = $1', [dto.clientId])
+        const clientAddressRes = dto.clientId
+          ? await client.query('SELECT address FROM clients WHERE id = $1', [
+              dto.clientId,
+            ])
           : { rows: [] };
-        const address = clientAddressRes.rows[0]?.address || 'Entrega en tienda / Calle';
+        const address =
+          clientAddressRes.rows[0]?.address || 'Entrega en tienda / Calle';
 
         await client.query(
           `INSERT INTO pending_deliveries (store_id, order_id, client_id, address, status)
            VALUES ($1, $2, $3, $4, 'Pendiente')`,
-          [dto.storeId, order.id, dto.clientId || null, address]
+          [dto.storeId, order.id, dto.clientId || null, address],
         );
       }
 
       const finalOrder = this.mapRow(order);
-      
+
       // Notify Web Dashboards in Real-Time
       this.eventsGateway.emitSyncUpdate({
         type: 'NEW_ORDER',
         storeId: finalOrder.storeId,
-        payload: finalOrder
+        payload: finalOrder,
       });
 
       return finalOrder;
@@ -186,7 +219,8 @@ export class OrdersService {
 
   async findOne(id: string) {
     const res = await this.db.query('SELECT * FROM orders WHERE id = $1', [id]);
-    if ((res.rowCount ?? 0) === 0) throw new NotFoundException('Pedido no encontrado');
+    if ((res.rowCount ?? 0) === 0)
+      throw new NotFoundException('Pedido no encontrado');
 
     const order = this.mapRow(res.rows[0]);
 
@@ -216,7 +250,7 @@ export class OrdersService {
        LEFT JOIN users u ON u.id = h.user_id 
        WHERE h.order_id = $1 
        ORDER BY h.created_at ASC`,
-      [id]
+      [id],
     );
 
     order.history = historyRes.rows.map((r) => ({
@@ -228,21 +262,30 @@ export class OrdersService {
     return order;
   }
 
-  async updateStatus(id: string, newStatus: string, updatedBy?: string, vendorId?: string) {
+  async updateStatus(
+    id: string,
+    newStatus: string,
+    updatedBy?: string,
+    vendorId?: string,
+  ) {
     const validTransitions: Record<string, string[]> = {
-      'RECIBIDO': ['EN_PREPARACION', 'CANCELADO'],
-      'EN_PREPARACION': ['ALISTADO', 'CANCELADO'],
-      'ALISTADO': ['CARGADO_CAMION'],
-      'CARGADO_CAMION': ['EN_ENTREGA'],
-      'EN_ENTREGA': ['ENTREGADO', 'DEVUELTO', 'RECHAZADO'],
-      'PENDING': ['RECIBIDO', 'CANCELADO'],
+      RECIBIDO: ['EN_PREPARACION', 'CANCELADO'],
+      EN_PREPARACION: ['ALISTADO', 'CANCELADO'],
+      ALISTADO: ['CARGADO_CAMION'],
+      CARGADO_CAMION: ['EN_ENTREGA'],
+      EN_ENTREGA: ['ENTREGADO', 'DEVUELTO', 'RECHAZADO'],
+      PENDING: ['RECIBIDO', 'CANCELADO'],
     };
 
     return this.db.withTransaction(async (client) => {
       // 1. Check current status
-      const res = await client.query('SELECT store_id, status, vendor_id FROM orders WHERE id = $1 FOR UPDATE', [id]);
-      if ((res.rowCount ?? 0) === 0) throw new NotFoundException('Pedido no encontrado');
-      
+      const res = await client.query(
+        'SELECT store_id, status, vendor_id FROM orders WHERE id = $1 FOR UPDATE',
+        [id],
+      );
+      if ((res.rowCount ?? 0) === 0)
+        throw new NotFoundException('Pedido no encontrado');
+
       const currentStatus = res.rows[0].status.toUpperCase();
       const targetStatus = newStatus.toUpperCase();
       const storeId = res.rows[0].store_id;
@@ -259,7 +302,10 @@ export class OrdersService {
         );
       }
 
-      if (targetStatus === 'CARGADO_CAMION' && currentStatus !== 'CARGADO_CAMION') {
+      if (
+        targetStatus === 'CARGADO_CAMION' &&
+        currentStatus !== 'CARGADO_CAMION'
+      ) {
         if (vendorId) {
           await client.query(
             'UPDATE orders SET vendor_id = $1, updated_at = NOW() WHERE id = $2',
@@ -268,8 +314,14 @@ export class OrdersService {
           effectiveVendorId = vendorId;
         }
 
-        if (!effectiveVendorId) throw new NotFoundException('El pedido requiere un vendor_id para cargar al camión.');
-        const itemsRes = await client.query('SELECT oi.*, p.units_per_bulk FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1', [id]);
+        if (!effectiveVendorId)
+          throw new NotFoundException(
+            'El pedido requiere un vendor_id para cargar al camión.',
+          );
+        const itemsRes = await client.query(
+          'SELECT oi.*, p.units_per_bulk FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1',
+          [id],
+        );
         for (const item of itemsRes.rows) {
           const upb = parseInt(item.units_per_bulk, 10) || 1;
           const isBulk = item.presentation === 'BULTO';
@@ -279,24 +331,41 @@ export class OrdersService {
           const qtyUnits = totalUnits % upb;
 
           // Restar de products
-          await client.query(`
+          await client.query(
+            `
             UPDATE products 
             SET current_stock = GREATEST(current_stock - $1, 0),
                 stock_bulks = GREATEST(current_stock - $1, 0) / units_per_bulk,
                 stock_units = GREATEST(current_stock - $1, 0) % units_per_bulk,
                 updated_at = NOW()
             WHERE id = $2
-          `, [totalUnits, item.product_id]);
+          `,
+            [totalUnits, item.product_id],
+          );
 
           // Sumar a vendor_inventories
-          const viRes = await client.query('SELECT id FROM vendor_inventories WHERE vendor_id = $1 AND product_id = $2 FOR UPDATE', [effectiveVendorId, item.product_id]);
+          const viRes = await client.query(
+            'SELECT id FROM vendor_inventories WHERE vendor_id = $1 AND product_id = $2 FOR UPDATE',
+            [effectiveVendorId, item.product_id],
+          );
           if (viRes.rowCount === 0) {
-            await client.query(`
+            await client.query(
+              `
               INSERT INTO vendor_inventories (vendor_id, product_id, store_id, assigned_quantity, current_quantity, assigned_bulks, assigned_units, current_bulks, current_units)
               VALUES ($1, $2, $3, $4, $4, $5, $6, $5, $6)
-            `, [effectiveVendorId, item.product_id, storeId, totalUnits, qtyBulks, qtyUnits]);
+            `,
+              [
+                effectiveVendorId,
+                item.product_id,
+                storeId,
+                totalUnits,
+                qtyBulks,
+                qtyUnits,
+              ],
+            );
           } else {
-            await client.query(`
+            await client.query(
+              `
               UPDATE vendor_inventories 
               SET assigned_quantity = assigned_quantity + $1,
                   current_quantity = current_quantity + $1,
@@ -306,28 +375,48 @@ export class OrdersService {
                   current_units = current_units + $3,
                   updated_at = NOW()
               WHERE id = $4
-            `, [totalUnits, qtyBulks, qtyUnits, viRes.rows[0].id]);
+            `,
+              [totalUnits, qtyBulks, qtyUnits, viRes.rows[0].id],
+            );
           }
 
           // Kardex
-          await client.query(`
+          await client.query(
+            `
             INSERT INTO movements (store_id, product_id, user_id, type, quantity, quantity_bulks, quantity_units, balance, balance_bulks, balance_units, reference)
             SELECT $1, $2, $3, 'OUT', $4, $5, $6, current_stock, stock_bulks, stock_units, $7
             FROM products WHERE id = $2
-          `, [storeId, item.product_id, updatedBy || null, totalUnits, qtyBulks, qtyUnits, `Cargado a camión - Pedido ${id}`]);
+          `,
+            [
+              storeId,
+              item.product_id,
+              updatedBy || null,
+              totalUnits,
+              qtyBulks,
+              qtyUnits,
+              `Cargado a camión - Pedido ${id}`,
+            ],
+          );
         }
       }
 
       if (targetStatus === 'ENTREGADO' && currentStatus !== 'ENTREGADO') {
-        if (!effectiveVendorId) throw new NotFoundException('El pedido requiere un vendor_id para la entrega.');
-        const itemsRes = await client.query('SELECT oi.*, p.units_per_bulk FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1', [id]);
+        if (!effectiveVendorId)
+          throw new NotFoundException(
+            'El pedido requiere un vendor_id para la entrega.',
+          );
+        const itemsRes = await client.query(
+          'SELECT oi.*, p.units_per_bulk FROM order_items oi JOIN products p ON p.id = oi.product_id WHERE oi.order_id = $1',
+          [id],
+        );
         for (const item of itemsRes.rows) {
           const upb = parseInt(item.units_per_bulk, 10) || 1;
           const isBulk = item.presentation === 'BULTO';
           const rawQty = parseInt(item.quantity, 10) || 0;
           const totalUnits = isBulk ? rawQty * upb : rawQty;
-          
-          await client.query(`
+
+          await client.query(
+            `
             UPDATE vendor_inventories 
             SET current_quantity = GREATEST(current_quantity - $1, 0),
                 sold_quantity = sold_quantity + $1,
@@ -335,7 +424,9 @@ export class OrdersService {
                 current_units = GREATEST(current_quantity - $1, 0) % $4,
                 updated_at = NOW()
             WHERE vendor_id = $2 AND product_id = $3
-          `, [totalUnits, effectiveVendorId, item.product_id, upb]);
+          `,
+            [totalUnits, effectiveVendorId, item.product_id, upb],
+          );
         }
       }
 
@@ -343,23 +434,31 @@ export class OrdersService {
         `UPDATE orders SET status = $1, updated_by = $2, updated_at = NOW() WHERE id = $3 RETURNING *`,
         [targetStatus, updatedBy || null, id],
       );
-      
+
       await client.query(
         `INSERT INTO order_status_history (order_id, status, user_id) VALUES ($1, $2, $3)`,
-        [id, targetStatus, updatedBy || null]
+        [id, targetStatus, updatedBy || null],
       );
-      
+
       const order = this.mapRow(updateRes.rows[0]);
 
       // Produce precise realtime event for web dashboards logic tracking
       this.eventsGateway.emitSyncUpdate({
         type: 'ORDER_STATUS_CHANGE',
         storeId: storeId,
-        payload: { orderId: id, status: targetStatus, previousStatus: currentStatus, updatedBy },
+        payload: {
+          orderId: id,
+          status: targetStatus,
+          previousStatus: currentStatus,
+          updatedBy,
+        },
       });
 
       // NOTIFICACIÓN: Si el pedido fue cargado al camión o entregado, avisar al stakeholder
-      if (effectiveVendorId && (targetStatus === 'CARGADO_CAMION' || targetStatus === 'ENTREGADO')) {
+      if (
+        effectiveVendorId &&
+        (targetStatus === 'CARGADO_CAMION' || targetStatus === 'ENTREGADO')
+      ) {
         try {
           await this.notifications.create({
             storeId: storeId,
@@ -371,15 +470,19 @@ export class OrdersService {
               type: 'ORDER_UPDATE',
               orderId: id,
               status: targetStatus,
-            }
+            },
           });
         } catch (e) {
-          this.db['logger'].error(`Error enviando notificación de pedido: ${e.message}`);
+          this.db['logger'].error(
+            `Error enviando notificación de pedido: ${e.message}`,
+          );
         }
       }
 
-
-      if (targetStatus === 'CARGADO_CAMION' && currentStatus !== 'CARGADO_CAMION') {
+      if (
+        targetStatus === 'CARGADO_CAMION' &&
+        currentStatus !== 'CARGADO_CAMION'
+      ) {
         this.eventsGateway.emitSyncUpdate({
           type: 'INVENTORY_TRANSFER',
           storeId,

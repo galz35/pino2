@@ -98,7 +98,9 @@ export class VendorInventoriesService {
 
       if (normalizedType === 'ASSIGN') {
         if (currentStoreStock < quantity) {
-          throw new BadRequestException('Stock insuficiente en tienda para asignar');
+          throw new BadRequestException(
+            'Stock insuficiente en tienda para asignar',
+          );
         }
         newStoreStock = currentStoreStock - quantity;
         newAssigned = currentAssigned + quantity;
@@ -106,14 +108,18 @@ export class VendorInventoriesService {
         movementType = 'OUT';
       } else if (normalizedType === 'RETURN') {
         if (currentVendorStock < quantity) {
-          throw new BadRequestException('El vendedor no tiene suficiente inventario para devolver');
+          throw new BadRequestException(
+            'El vendedor no tiene suficiente inventario para devolver',
+          );
         }
         newStoreStock = currentStoreStock + quantity;
         newVendorStock = currentVendorStock - quantity;
         movementType = 'IN';
       } else {
         if (currentVendorStock < quantity) {
-          throw new BadRequestException('El vendedor no tiene suficiente inventario para vender');
+          throw new BadRequestException(
+            'El vendedor no tiene suficiente inventario para vender',
+          );
         }
         newSold = currentSold + quantity;
         newVendorStock = currentVendorStock - quantity;
@@ -221,7 +227,11 @@ export class VendorInventoriesService {
 
   private normalizeType(type: string): 'ASSIGN' | 'RETURN' | 'SALE' {
     const normalized = (type || '').toString().trim().toUpperCase();
-    if (normalized === 'ASSIGN' || normalized === 'RETURN' || normalized === 'SALE') {
+    if (
+      normalized === 'ASSIGN' ||
+      normalized === 'RETURN' ||
+      normalized === 'SALE'
+    ) {
       return normalized;
     }
     throw new BadRequestException('Tipo de transacción inválido');
@@ -245,7 +255,10 @@ export class VendorInventoriesService {
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
-  private toSplit(totalUnits: number, unitsPerBulk: number): { bulks: number; units: number } {
+  private toSplit(
+    totalUnits: number,
+    unitsPerBulk: number,
+  ): { bulks: number; units: number } {
     const safeUnitsPerBulk = this.toUnitsPerBulk(unitsPerBulk);
     const safeTotal = Math.max(0, this.toInt(totalUnits));
     return {

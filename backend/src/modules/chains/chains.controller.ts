@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ChainsService } from './chains.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -14,8 +23,18 @@ export class ChainsController {
 
   @Post()
   @Roles('master-admin')
-  @ApiOperation({ summary: 'Crear una nueva cadena de tiendas (Solo Master Admin)' })
-  create(@Body() dto: { name: string; logoUrl?: string; ownerName?: string; ownerEmail?: string }) {
+  @ApiOperation({
+    summary: 'Crear una nueva cadena de tiendas (Solo Master Admin)',
+  })
+  create(
+    @Body()
+    dto: {
+      name: string;
+      logoUrl?: string;
+      ownerName?: string;
+      ownerEmail?: string;
+    },
+  ) {
     return this.chainsService.create(dto);
   }
 

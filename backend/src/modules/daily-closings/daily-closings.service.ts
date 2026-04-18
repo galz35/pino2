@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 
 @Injectable()
@@ -16,7 +20,9 @@ export class DailyClosingsService {
     notes?: string;
   }) {
     if (!dto.ruteroId) {
-      throw new BadRequestException('El rutero es requerido para registrar el cierre');
+      throw new BadRequestException(
+        'El rutero es requerido para registrar el cierre',
+      );
     }
 
     const res = await this.db.query(
@@ -36,7 +42,11 @@ export class DailyClosingsService {
     return this.mapRow(res.rows[0]);
   }
 
-  async findAll(filters: { storeId?: string; ruteroId?: string; date?: string }) {
+  async findAll(filters: {
+    storeId?: string;
+    ruteroId?: string;
+    date?: string;
+  }) {
     let sql = `SELECT dc.*, u.name as rutero_name
                FROM daily_closings dc
                LEFT JOIN users u ON u.id = dc.rutero_id
@@ -44,9 +54,18 @@ export class DailyClosingsService {
     const params: any[] = [];
     let idx = 1;
 
-    if (filters.storeId) { sql += ` AND dc.store_id = $${idx++}`; params.push(filters.storeId); }
-    if (filters.ruteroId) { sql += ` AND dc.rutero_id = $${idx++}`; params.push(filters.ruteroId); }
-    if (filters.date) { sql += ` AND dc.closing_date = $${idx++}`; params.push(filters.date); }
+    if (filters.storeId) {
+      sql += ` AND dc.store_id = $${idx++}`;
+      params.push(filters.storeId);
+    }
+    if (filters.ruteroId) {
+      sql += ` AND dc.rutero_id = $${idx++}`;
+      params.push(filters.ruteroId);
+    }
+    if (filters.date) {
+      sql += ` AND dc.closing_date = $${idx++}`;
+      params.push(filters.date);
+    }
 
     sql += ' ORDER BY dc.closing_date DESC, dc.created_at DESC';
     const res = await this.db.query(sql, params);
@@ -62,8 +81,12 @@ export class DailyClosingsService {
        FROM daily_closings dc LEFT JOIN users u ON u.id = dc.rutero_id WHERE dc.id = $1`,
       [id],
     );
-    if ((res.rowCount ?? 0) === 0) throw new NotFoundException('Cierre no encontrado');
-    return { ...this.mapRow(res.rows[0]), ruteroName: res.rows[0].rutero_name || '' };
+    if ((res.rowCount ?? 0) === 0)
+      throw new NotFoundException('Cierre no encontrado');
+    return {
+      ...this.mapRow(res.rows[0]),
+      ruteroName: res.rows[0].rutero_name || '',
+    };
   }
 
   private mapRow(row: any): any {

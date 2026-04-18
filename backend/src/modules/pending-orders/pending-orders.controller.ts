@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PendingOrdersService } from './pending-orders.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -18,11 +27,23 @@ export class PendingOrdersController {
 
   @Post()
   @ApiOperation({ summary: 'Crear pedido de despacho' })
-  create(@Body() dto: {
-    storeId: string; clientId?: string; clientName?: string;
-    items: any[]; total?: number; notes?: string; paymentMethod?: string;
-    dispatcherId?: string; dispatcherName?: string; subtotal?: number; tax?: number; status?: string;
-  }) {
+  create(
+    @Body()
+    dto: {
+      storeId: string;
+      clientId?: string;
+      clientName?: string;
+      items: any[];
+      total?: number;
+      notes?: string;
+      paymentMethod?: string;
+      dispatcherId?: string;
+      dispatcherName?: string;
+      subtotal?: number;
+      tax?: number;
+      status?: string;
+    },
+  ) {
     return this.service.create(dto);
   }
 

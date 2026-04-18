@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ZonesService } from './zones.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -18,13 +28,18 @@ export class ZonesController {
 
   @Post()
   @ApiOperation({ summary: 'Crear zona' })
-  create(@Body() dto: { name: string; storeId?: string; description?: string }) {
+  create(
+    @Body() dto: { name: string; storeId?: string; description?: string },
+  ) {
     return this.service.createZone(dto);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar zona' })
-  update(@Param('id') id: string, @Body() dto: { name?: string; description?: string }) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: { name?: string; description?: string },
+  ) {
     return this.service.updateZone(id, dto);
   }
 
@@ -56,7 +71,10 @@ export class SubZonesController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar sub-zona' })
-  update(@Param('id') id: string, @Body() dto: { name?: string; description?: string }) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: { name?: string; description?: string },
+  ) {
     return this.service.updateSubZone(id, dto);
   }
 

@@ -5,17 +5,29 @@ import { DatabaseService } from '../../database/database.service';
 export class ChainsService {
   constructor(private readonly db: DatabaseService) {}
 
-  async create(dto: { name: string; logoUrl?: string; ownerName?: string; ownerEmail?: string }) {
+  async create(dto: {
+    name: string;
+    logoUrl?: string;
+    ownerName?: string;
+    ownerEmail?: string;
+  }) {
     const res = await this.db.query(
       `INSERT INTO chains (name, logo_url, owner_name, owner_email) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [dto.name, dto.logoUrl || null, dto.ownerName || null, dto.ownerEmail || null],
+      [
+        dto.name,
+        dto.logoUrl || null,
+        dto.ownerName || null,
+        dto.ownerEmail || null,
+      ],
     );
     return this.mapRow(res.rows[0]);
   }
 
   async findAll() {
-    const res = await this.db.query("SELECT * FROM chains WHERE status = 'active' ORDER BY name ASC");
+    const res = await this.db.query(
+      "SELECT * FROM chains WHERE status = 'active' ORDER BY name ASC",
+    );
     return res.rows.map(this.mapRow);
   }
 
@@ -74,7 +86,10 @@ export class ChainsService {
   }
 
   async remove(id: string) {
-    await this.db.query("UPDATE chains SET status = 'inactive', updated_at = NOW() WHERE id = $1", [id]);
+    await this.db.query(
+      "UPDATE chains SET status = 'inactive', updated_at = NOW() WHERE id = $1",
+      [id],
+    );
     return this.findOne(id);
   }
 

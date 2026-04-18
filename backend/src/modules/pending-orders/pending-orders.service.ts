@@ -6,14 +6,21 @@ export class PendingOrdersService {
   constructor(private readonly db: DatabaseService) {}
 
   private normalizeItems(items: any): any[] {
-    const parsed = typeof items === 'string' ? JSON.parse(items) : Array.isArray(items) ? items : [];
+    const parsed =
+      typeof items === 'string'
+        ? JSON.parse(items)
+        : Array.isArray(items)
+          ? items
+          : [];
     return parsed.map((item: any, index: number) => ({
       id: item?.id || item?.productId || `item-${index + 1}`,
       productId: item?.productId || item?.id || null,
       description: item?.description || '',
       quantity: Number.parseInt(String(item?.quantity ?? 0), 10) || 0,
-      salePrice: Number.parseFloat(String(item?.salePrice ?? item?.unitPrice ?? 0)) || 0,
-      unitPrice: Number.parseFloat(String(item?.unitPrice ?? item?.salePrice ?? 0)) || 0,
+      salePrice:
+        Number.parseFloat(String(item?.salePrice ?? item?.unitPrice ?? 0)) || 0,
+      unitPrice:
+        Number.parseFloat(String(item?.unitPrice ?? item?.salePrice ?? 0)) || 0,
       costPrice: Number.parseFloat(String(item?.costPrice ?? 0)) || 0,
     }));
   }
@@ -31,20 +38,39 @@ export class PendingOrdersService {
   }
 
   async create(dto: {
-    storeId: string; clientId?: string; clientName?: string;
-    items: any[]; total?: number; notes?: string; paymentMethod?: string;
-    dispatcherId?: string; dispatcherName?: string; subtotal?: number; tax?: number; status?: string;
+    storeId: string;
+    clientId?: string;
+    clientName?: string;
+    items: any[];
+    total?: number;
+    notes?: string;
+    paymentMethod?: string;
+    dispatcherId?: string;
+    dispatcherName?: string;
+    subtotal?: number;
+    tax?: number;
+    status?: string;
   }) {
     const normalizedItems = this.normalizeItems(dto.items || []);
     const computedTotal =
       dto.total ??
-      ((Number.parseFloat(String(dto.subtotal ?? 0)) || 0) + (Number.parseFloat(String(dto.tax ?? 0)) || 0));
+      (Number.parseFloat(String(dto.subtotal ?? 0)) || 0) +
+        (Number.parseFloat(String(dto.tax ?? 0)) || 0);
 
     const res = await this.db.query(
       `INSERT INTO pending_orders (store_id, client_id, client_name, items, total, notes, payment_method, status, dispatched_by) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [dto.storeId, dto.clientId || null, dto.clientName || null,
-       JSON.stringify(normalizedItems), computedTotal, dto.notes || null, dto.paymentMethod || 'Efectivo', dto.status || 'Pendiente', dto.dispatcherName || null],
+      [
+        dto.storeId,
+        dto.clientId || null,
+        dto.clientName || null,
+        JSON.stringify(normalizedItems),
+        computedTotal,
+        dto.notes || null,
+        dto.paymentMethod || 'Efectivo',
+        dto.status || 'Pendiente',
+        dto.dispatcherName || null,
+      ],
     );
     return this.mapRow(res.rows[0]);
   }
@@ -62,7 +88,10 @@ export class PendingOrdersService {
   }
 
   async updateStatus(id: string, status: string) {
-    await this.db.query('UPDATE pending_orders SET status = $1, updated_at = NOW() WHERE id = $2', [status, id]);
+    await this.db.query(
+      'UPDATE pending_orders SET status = $1, updated_at = NOW() WHERE id = $2',
+      [status, id],
+    );
     return { success: true };
   }
 

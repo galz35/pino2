@@ -13,12 +13,12 @@ import rateLimit from '@fastify/rate-limit';
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ 
+    new FastifyAdapter({
       logger: true,
-      trustProxy: true 
+      trustProxy: true,
     }),
   );
-  
+
   const config = app.get(ConfigService);
 
   // Global prefix
@@ -33,20 +33,29 @@ async function bootstrap() {
     }),
   );
 
-  const corsOrigins = (config.get('CORS_ORIGIN') || 'http://localhost:5173,http://localhost:9002').split(',');
+  const corsOrigins = (
+    config.get('CORS_ORIGIN') || 'http://localhost:5173,http://localhost:9002'
+  ).split(',');
 
   // CORS
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+    ],
   });
 
   // Swagger
   const swaggerConfig = new DocumentBuilder()
     .setTitle('MultiTienda API (Fastify)')
-    .setDescription('API del sistema de punto de venta y gestión multi-tienda - Motor Fastify de alto rendimiento')
+    .setDescription(
+      'API del sistema de punto de venta y gestión multi-tienda - Motor Fastify de alto rendimiento',
+    )
     .setVersion('1.1')
     .addBearerAuth()
     .build();
@@ -74,11 +83,13 @@ async function bootstrap() {
   // --------------------------------
 
   const port = config.get('PORT') || 3010;
-  
+
   // Important for Fastify: listen on 0.0.0.0 for external access (like Flutter app)
   await app.listen(port, '0.0.0.0');
-  
-  console.log(`⚡ MultiTienda API (FASTIFY) running on http://localhost:${port}`);
+
+  console.log(
+    `⚡ MultiTienda API (FASTIFY) running on http://localhost:${port}`,
+  );
   console.log(`📖 Swagger docs at http://localhost:${port}/docs`);
 }
 bootstrap();

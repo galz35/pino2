@@ -9,6 +9,8 @@ import {
   RefreshCw,
   ReceiptText,
   Trash2,
+  Plus,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/auth-context';
+import apiClient from '@/services/api-client';
 import { alert, toast } from '@/lib/swalert';
 import { formatCurrency } from '@/lib/utils';
 import financeService, {
@@ -114,6 +117,30 @@ export default function SupplierInvoicesPage() {
     paymentMethod: 'TRANSFER',
     notes: '',
   });
+  const [dialogView, setDialogView] = useState<'invoice' | 'supplier'>('invoice');
+  const [quickSupplierForm, setQuickSupplierForm] = useState({ name: '', contactName: '', phone: '', email: '', address: '' });
+  const [savingSupplier, setSavingSupplier] = useState(false);
+
+  const submitQuickSupplier = async () => {
+    if (!quickSupplierForm.name) {
+       toast.error('Nombre requerido', 'El proveedor debe tener nombre.'); return;
+    }
+    setSavingSupplier(true);
+    try {
+      const resp = await apiClient.post('/suppliers', { ...quickSupplierForm, storeId });
+      toast.success('Proveedor creado', 'Ya puedes seleccionarlo en la factura.');
+      await loadReferenceData();
+      if (resp.data?.id) {
+         setInvoiceDraft(prev => ({...prev, supplierId: resp.data.id}));
+      }
+      setDialogView('invoice');
+      setQuickSupplierForm({ name: '', contactName: '', phone: '', email: '', address: '' });
+    } catch (e: any) {
+      toast.error('Error', e.response?.data?.message || 'Error al crear proveedor');
+    } finally {
+      setSavingSupplier(false);
+    }
+  };
 
   const loadReferenceData = async () => {
     if (!storeId) return;
@@ -231,6 +258,7 @@ export default function SupplierInvoicesPage() {
   };
 
   const resetInvoiceDraft = () => {
+    setDialogView('invoice');
     setInvoiceDraft({
       supplierId: supplierFilter === 'all' ? '' : supplierFilter,
       invoiceNumber: '',
@@ -621,33 +649,70 @@ export default function SupplierInvoicesPage() {
       <Dialog open={createDialogOpen} onOpenChange={(open) => !open ? (setCreateDialogOpen(false), resetInvoiceDraft()) : setCreateDialogOpen(true)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Nueva factura de proveedor</DialogTitle>
+            <DialogTitle>{dialogView === 'supplier' ? 'Crear Proveedor Rápido' : 'Nueva factura de proveedor'}</DialogTitle>
             <DialogDescription>
-              Registra la compra, el detalle de productos y el compromiso financiero en una sola acción.
+              {dialogView === 'supplier' 
+                ? 'Agrega a tu proveedor sin perder el progreso de la factura actual.' 
+                : 'Registra la compra, el detalle de productos y el compromiso financiero en una sola acción.'}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-2 md:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>Proveedor</Label>
-              <Select
-                value={invoiceDraft.supplierId}
-                onValueChange={(value) => setInvoiceDraft((prev) => ({ ...prev, supplierId: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona proveedor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {suppliers.map((supplier) => (
-                    <SelectItem key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {dialogView === 'supplier' && (
+            <div className="space-y-4 py-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label>Nombre del Proveedor</Label>
+                  <Input value={quickSupplierForm.name} onChange={e => setQuickSupplierForm(p => ({...p, name: e.target.value}))} placeholder="Ej. Distribuidora del Norte" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Contacto</Label>
+                  <Input value={quickSupplierForm.contactName} onChange={e => setQuickSupplierForm(p => ({...p, contactName: e.target.value}))} placeholder="Ej. Juan Pérez" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Teléfono</Label>
+                  <Input value={quickSupplierForm.phone} onChange={e => setQuickSupplierForm(p => ({...p, phone: e.target.value}))} placeholder="+505 0000 0000" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Correo</Label>
+                  <Input value={quickSupplierForm.email} onChange={e => setQuickSupplierForm(p => ({...p, email: e.target.value}))} placeholder="ventas@proveedor.com" type="email" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="ghost" onClick={() => setDialogView('invoice')}>Cancelar</Button>
+                <Button onClick={submitQuickSupplier} disabled={savingSupplier}>
+                  {savingSupplier ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <CheckCircle2 className="h-4 w-4 mr-2"/> } Guardar y Seleccionar
+                </Button>
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="invoiceNumber">Número de factura</Label>
+          )}
+
+          <div className={dialogView === 'invoice' ? 'block' : 'hidden'}>
+            <div className="grid gap-4 py-2 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Proveedor</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={invoiceDraft.supplierId}
+                    onValueChange={(value) => setInvoiceDraft((prev) => ({ ...prev, supplierId: value }))}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Selecciona proveedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suppliers.map((supplier) => (
+                        <SelectItem key={supplier.id} value={supplier.id}>
+                          {supplier.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" size="icon" onClick={() => setDialogView('supplier')} title="Crear proveedor rápido" className="shrink-0">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="invoiceNumber">Número de factura</Label>
               <Input
                 id="invoiceNumber"
                 value={invoiceDraft.invoiceNumber}
@@ -770,15 +835,16 @@ export default function SupplierInvoicesPage() {
             <div className="text-3xl font-bold">{formatCurrency(invoiceTotal)}</div>
           </div>
 
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => { setCreateDialogOpen(false); resetInvoiceDraft(); }}>
-              Cancelar
-            </Button>
-            <Button onClick={submitInvoice} disabled={processingInvoice}>
-              {processingInvoice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FilePlus2 className="mr-2 h-4 w-4" />}
-              Guardar factura
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => { setCreateDialogOpen(false); resetInvoiceDraft(); }}>
+                Cancelar
+              </Button>
+              <Button onClick={submitInvoice} disabled={processingInvoice}>
+                {processingInvoice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FilePlus2 className="mr-2 h-4 w-4" />}
+                Guardar factura
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

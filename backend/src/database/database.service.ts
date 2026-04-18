@@ -5,13 +5,11 @@ import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 @Injectable()
 export class DatabaseService implements OnModuleInit {
   private readonly logger = new Logger(DatabaseService.name);
-  private slowQueryConfigCache:
-    | {
-        active: boolean;
-        thresholdMs: number;
-        loadedAt: number;
-      }
-    | null = null;
+  private slowQueryConfigCache: {
+    active: boolean;
+    thresholdMs: number;
+    loadedAt: number;
+  } | null = null;
   private readonly slowQueryConfigTtlMs = 30_000;
 
   constructor(
@@ -19,7 +17,10 @@ export class DatabaseService implements OnModuleInit {
     private readonly configService: ConfigService,
   ) {
     this.pool.on('error', (err) => {
-      this.logger.warn('A database connection was dropped (possibly closed by the cloud provider). Pool will recover automatically.', err.message);
+      this.logger.warn(
+        'A database connection was dropped (possibly closed by the cloud provider). Pool will recover automatically.',
+        err.message,
+      );
     });
   }
 
@@ -30,17 +31,33 @@ export class DatabaseService implements OnModuleInit {
   /**
    * Ejecuta una consulta directa usando el Pool
    */
-  async query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
+  async query<T extends QueryResultRow = any>(
+    text: string,
+    params?: any[],
+  ): Promise<QueryResult<T>> {
     const start = Date.now();
     try {
       const res = await this.pool.query<T>(text, params);
       const duration = Date.now() - start;
       // this.logger.debug(`Executed query: { text: ${text}, time: ${duration}ms, rows: ${res.rowCount} }`);
-      await this.maybeCaptureSlowQuery(text, params, duration, res.rowCount ?? 0, 'pool');
+      await this.maybeCaptureSlowQuery(
+        text,
+        params,
+        duration,
+        res.rowCount ?? 0,
+        'pool',
+      );
       return res;
     } catch (error) {
       const duration = Date.now() - start;
-      await this.maybeCaptureSlowQuery(text, params, duration, 0, 'pool', error);
+      await this.maybeCaptureSlowQuery(
+        text,
+        params,
+        duration,
+        0,
+        'pool',
+        error,
+      );
       throw error;
     }
   }
@@ -58,29 +75,45 @@ export class DatabaseService implements OnModuleInit {
    * Si la función tira error, hace ROLLBACK automáticamente.
    */
   async withTransaction<T>(
-    callback: (client: PoolClient) => Promise<T>
+    callback: (client: PoolClient) => Promise<T>,
   ): Promise<T> {
     const client = await this.getClient();
     const rawQuery = client.query.bind(client);
     try {
-      (client as PoolClient & { query: any }).query = async (text: string, params?: any[]) => {
+      (client as PoolClient & { query: any }).query = async (
+        text: string,
+        params?: any[],
+      ) => {
         const start = Date.now();
         try {
           const result = await rawQuery(text, params);
           const duration = Date.now() - start;
-          await this.maybeCaptureSlowQuery(text, params, duration, result.rowCount ?? 0, 'transaction');
+          await this.maybeCaptureSlowQuery(
+            text,
+            params,
+            duration,
+            result.rowCount ?? 0,
+            'transaction',
+          );
           return result;
         } catch (error) {
           const duration = Date.now() - start;
-          await this.maybeCaptureSlowQuery(text, params, duration, 0, 'transaction', error);
+          await this.maybeCaptureSlowQuery(
+            text,
+            params,
+            duration,
+            0,
+            'transaction',
+            error,
+          );
           throw error;
         }
       };
 
       await rawQuery('BEGIN');
-      
+
       const result = await callback(client);
-      
+
       await rawQuery('COMMIT');
       return result;
     } catch (e) {
@@ -224,7 +257,11 @@ export class DatabaseService implements OnModuleInit {
     const trimmedText = text.trim().replace(/\s+/g, ' ').slice(0, 4000);
     const serializedParams = this.serializeParams(params);
     const errorMessage =
-      error instanceof Error ? error.message : typeof error === 'string' ? error : null;
+      error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+          ? error
+          : null;
 
     await this.pool.query(
       `INSERT INTO consultasql_historial (

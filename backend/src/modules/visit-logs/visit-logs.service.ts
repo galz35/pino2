@@ -20,19 +20,35 @@ export class VisitLogsService {
     return res.rows.map(this.mapRow);
   }
 
-  async create(dto: { storeId: string; vendorId: string; clientId: string; notes?: string; latitude?: number; longitude?: number; status?: string; clientName?: string }) {
+  async create(dto: {
+    storeId: string;
+    vendorId: string;
+    clientId: string;
+    notes?: string;
+    latitude?: number;
+    longitude?: number;
+    status?: string;
+    clientName?: string;
+  }) {
     const res = await this.db.query(
       `INSERT INTO visit_logs (store_id, vendor_id, client_id, notes, latitude, longitude) 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [dto.storeId, dto.vendorId, dto.clientId, dto.notes || null, dto.latitude || null, dto.longitude || null],
+      [
+        dto.storeId,
+        dto.vendorId,
+        dto.clientId,
+        dto.notes || null,
+        dto.latitude || null,
+        dto.longitude || null,
+      ],
     );
     const log = this.mapRow(res.rows[0]);
-    
+
     // Broadcast for Real-time Dashboard
     this.eventsGateway.emitSyncUpdate({
       type: 'NEW_VISIT',
       storeId: log.storeId,
-      payload: log
+      payload: log,
     });
 
     return log;

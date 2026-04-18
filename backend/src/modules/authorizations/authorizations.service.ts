@@ -9,7 +9,13 @@ export class AuthorizationsService {
     const res = await this.db.query(
       `INSERT INTO authorizations (store_id, requester_id, type, details, status)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [dto.storeId, dto.requesterId, dto.type, JSON.stringify(dto.details), 'PENDING']
+      [
+        dto.storeId,
+        dto.requesterId,
+        dto.type,
+        JSON.stringify(dto.details),
+        'PENDING',
+      ],
     );
     return res.rows[0];
   }
@@ -33,9 +39,10 @@ export class AuthorizationsService {
   async updateStatus(id: string, status: 'APPROVED' | 'REJECTED') {
     const res = await this.db.query(
       'UPDATE authorizations SET status = $1 WHERE id = $2 RETURNING *',
-      [status, id]
+      [status, id],
     );
-    if (res.rowCount === 0) throw new NotFoundException('Autorización no encontrada');
+    if (res.rowCount === 0)
+      throw new NotFoundException('Autorización no encontrada');
     return res.rows[0];
   }
 }

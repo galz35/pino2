@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Param, Patch, Delete, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Patch,
+  Delete,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DepartmentsService } from './departments.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -18,7 +28,9 @@ export class DepartmentsController {
   }
 
   @Get('sub-departments')
-  @ApiOperation({ summary: 'Obtener sub-departamentos (alias para el frontend)' })
+  @ApiOperation({
+    summary: 'Obtener sub-departamentos (alias para el frontend)',
+  })
   findSub(@Query('storeId') storeId: string) {
     return this.service.findAll(storeId, 'sub');
   }
@@ -28,7 +40,6 @@ export class DepartmentsController {
   findAll(@Query('storeId') storeId: string, @Query('type') type?: string) {
     return this.service.findAll(storeId, type);
   }
-
 
   @Delete('departments/:id')
   @ApiOperation({ summary: 'Eliminar departamento' })

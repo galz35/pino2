@@ -23,7 +23,9 @@ export class NotificationsService implements OnModuleInit {
     const credInline = process.env.FIREBASE_KEY_JSON;
 
     if (!credPath && !credInline) {
-      this.logger.warn('⚠️ Firebase no configurado. Agregue FIREBASE_CREDENTIALS_PATH o FIREBASE_KEY_JSON en .env');
+      this.logger.warn(
+        '⚠️ Firebase no configurado. Agregue FIREBASE_CREDENTIALS_PATH o FIREBASE_KEY_JSON en .env',
+      );
       return;
     }
 
@@ -32,11 +34,15 @@ export class NotificationsService implements OnModuleInit {
         let serviceAccount: any;
         if (credInline) {
           serviceAccount = JSON.parse(credInline);
-          this.logger.log(`📱 Firebase: Usando credenciales desde variable FIREBASE_KEY_JSON (proyecto: ${serviceAccount.project_id})`);
+          this.logger.log(
+            `📱 Firebase: Usando credenciales desde variable FIREBASE_KEY_JSON (proyecto: ${serviceAccount.project_id})`,
+          );
         } else {
-          const fullPath = path.resolve(process.cwd(), credPath!);
+          const fullPath = path.resolve(process.cwd(), credPath);
           serviceAccount = require(fullPath);
-          this.logger.log(`📱 Firebase: Usando archivo ${credPath} (proyecto: ${serviceAccount.project_id})`);
+          this.logger.log(
+            `📱 Firebase: Usando archivo ${credPath} (proyecto: ${serviceAccount.project_id})`,
+          );
         }
 
         admin.initializeApp({
@@ -48,7 +54,10 @@ export class NotificationsService implements OnModuleInit {
         this.fcmInitialized = true;
       }
     } catch (error) {
-      this.logger.error('❌ Error inicializando Firebase Admin:', error.message);
+      this.logger.error(
+        '❌ Error inicializando Firebase Admin:',
+        error.message,
+      );
     }
   }
 
@@ -97,15 +106,23 @@ export class NotificationsService implements OnModuleInit {
 
     // Also send PUSH if userId is present
     if (dto.userId) {
-      this.sendPushToUser(dto.userId, dto.title, dto.message, dto.metadata).catch(
-        (err) => this.logger.error('Background Push Error', err.message),
-      );
+      this.sendPushToUser(
+        dto.userId,
+        dto.title,
+        dto.message,
+        dto.metadata,
+      ).catch((err) => this.logger.error('Background Push Error', err.message));
     }
 
     return notification;
   }
 
-  async sendPushToUser(userId: string, title: string, body: string, data?: any) {
+  async sendPushToUser(
+    userId: string,
+    title: string,
+    body: string,
+    data?: any,
+  ) {
     if (!this.fcmInitialized) return;
 
     const tokens = await this.getTokensForUser(userId);
@@ -118,14 +135,19 @@ export class NotificationsService implements OnModuleInit {
         data: this.sanitizeData(data || {}),
         android: {
           priority: 'high',
-          notification: { sound: 'default', clickAction: 'FLUTTER_NOTIFICATION_CLICK' },
+          notification: {
+            sound: 'default',
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+          },
         },
         apns: { payload: { aps: { sound: 'default', badge: 1 } } },
       };
 
       const response = await admin.messaging().sendEachForMulticast(message);
-      this.logger.log(`Push sent: ${response.successCount} success, ${response.failureCount} failed.`);
-      
+      this.logger.log(
+        `Push sent: ${response.successCount} success, ${response.failureCount} failed.`,
+      );
+
       // Optional: Cleanup dead tokens if response.failureCount > 0
     } catch (error) {
       this.logger.error('Error sending push', error.message);
@@ -136,7 +158,10 @@ export class NotificationsService implements OnModuleInit {
     const result: Record<string, string> = {};
     for (const key in data) {
       if (data[key] !== null && data[key] !== undefined) {
-        result[key] = typeof data[key] === 'object' ? JSON.stringify(data[key]) : String(data[key]);
+        result[key] =
+          typeof data[key] === 'object'
+            ? JSON.stringify(data[key])
+            : String(data[key]);
       }
     }
     return result;
@@ -193,7 +218,10 @@ export class NotificationsService implements OnModuleInit {
       type: row.type,
       title: row.title,
       message: row.message,
-      metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : (row.metadata || {}),
+      metadata:
+        typeof row.metadata === 'string'
+          ? JSON.parse(row.metadata)
+          : row.metadata || {},
       read: row.read,
       createdAt: row.created_at,
     };

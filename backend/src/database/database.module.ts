@@ -17,7 +17,8 @@ import { DatabaseService } from './database.service';
           user: configService.get<string>('DATABASE_USER'),
           password: configService.get<string>('DATABASE_PASSWORD'),
           database: configService.get<string>('DATABASE_NAME'),
-          application_name: configService.get<string>('DATABASE_APP_NAME') || 'pino-backend',
+          application_name:
+            configService.get<string>('DATABASE_APP_NAME') || 'pino-backend',
           keepAlive: true,
           max: Number(configService.get<string>('DATABASE_POOL_MAX') || 20),
           idleTimeoutMillis: Number(
@@ -29,7 +30,9 @@ import { DatabaseService } from './database.service';
           statement_timeout: Number(
             configService.get<string>('DATABASE_STATEMENT_TIMEOUT_MS') || 0,
           ),
-          query_timeout: Number(configService.get<string>('DATABASE_QUERY_TIMEOUT_MS') || 0),
+          query_timeout: Number(
+            configService.get<string>('DATABASE_QUERY_TIMEOUT_MS') || 0,
+          ),
         });
 
         return pool;

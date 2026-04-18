@@ -1,5 +1,20 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { StoresService } from './stores.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -14,7 +29,9 @@ export class StoresController {
 
   @Post()
   @Roles('master-admin', 'chain-admin')
-  @ApiOperation({ summary: 'Requisitar creación de tienda (Master/Chain Admin)' })
+  @ApiOperation({
+    summary: 'Requisitar creación de tienda (Master/Chain Admin)',
+  })
   create(@Body() dto: any) {
     return this.storesService.create(dto);
   }
@@ -42,7 +59,10 @@ export class StoresController {
   @Patch(':id/settings')
   @Roles('master-admin', 'chain-admin', 'store-admin')
   @ApiOperation({ summary: 'Actualizar configuración JSONB de la tienda' })
-  updateSettings(@Param('id') id: string, @Body() settings: Record<string, any>) {
+  updateSettings(
+    @Param('id') id: string,
+    @Body() settings: Record<string, any>,
+  ) {
     return this.storesService.updateSettings(id, settings);
   }
 

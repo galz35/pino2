@@ -18,7 +18,17 @@ export class ErrorsController {
 
   @Post()
   @ApiOperation({ summary: 'Registrar un error' })
-  create(@Body() dto: { message: string; stack?: string; location?: string; userId?: string; storeId?: string; additionalInfo?: any }) {
+  create(
+    @Body()
+    dto: {
+      message: string;
+      stack?: string;
+      location?: string;
+      userId?: string;
+      storeId?: string;
+      additionalInfo?: any;
+    },
+  ) {
     return this.service.create(dto);
   }
 }

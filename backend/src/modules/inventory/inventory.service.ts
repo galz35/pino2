@@ -28,13 +28,22 @@ export class InventoryService {
     storeId: string;
     productId: string;
     userId: string;
-    type: 'IN' | 'OUT' | 'MERMA' | 'AJUSTE_POSITIVO' | 'AJUSTE_NEGATIVO' | 'TRASLADO_IN' | 'TRASLADO_OUT';
+    type:
+      | 'IN'
+      | 'OUT'
+      | 'MERMA'
+      | 'AJUSTE_POSITIVO'
+      | 'AJUSTE_NEGATIVO'
+      | 'TRASLADO_IN'
+      | 'TRASLADO_OUT';
     quantity: number;
     reference: string;
   }) {
     return await this.db.withTransaction(async (client) => {
       if (!dto.storeId || !dto.productId || !dto.userId) {
-        throw new BadRequestException('storeId, productId y userId son obligatorios');
+        throw new BadRequestException(
+          'storeId, productId y userId son obligatorios',
+        );
       }
 
       const quantity = this.parseInteger(dto.quantity, 'quantity');
@@ -44,14 +53,21 @@ export class InventoryService {
 
       const prodRes = await client.query(
         'SELECT current_stock, units_per_bulk FROM products WHERE id = $1 AND store_id = $2 FOR UPDATE',
-        [dto.productId, dto.storeId]
+        [dto.productId, dto.storeId],
       );
-      if (prodRes.rowCount === 0) throw new BadRequestException('Producto no encontrado en esta tienda');
+      if (prodRes.rowCount === 0)
+        throw new BadRequestException('Producto no encontrado en esta tienda');
 
-      const currentStock = this.parseInteger(prodRes.rows[0].current_stock, 'current_stock');
+      const currentStock = this.parseInteger(
+        prodRes.rows[0].current_stock,
+        'current_stock',
+      );
       const unitsPerBulk = Math.max(
         1,
-        this.parseInteger(prodRes.rows[0].units_per_bulk ?? 1, 'units_per_bulk'),
+        this.parseInteger(
+          prodRes.rows[0].units_per_bulk ?? 1,
+          'units_per_bulk',
+        ),
       );
 
       let newStock = currentStock;
@@ -62,9 +78,14 @@ export class InventoryService {
         newStock += quantity;
       } else if (subTypes.includes(dto.type)) {
         newStock -= quantity;
-        if (newStock < 0) throw new BadRequestException(`El ajuste resulta en stock negativo. Stock actual: ${currentStock}, Cantidad: ${quantity}`);
+        if (newStock < 0)
+          throw new BadRequestException(
+            `El ajuste resulta en stock negativo. Stock actual: ${currentStock}, Cantidad: ${quantity}`,
+          );
       } else {
-        throw new BadRequestException(`Tipo de movimiento no reconocido: ${dto.type}`);
+        throw new BadRequestException(
+          `Tipo de movimiento no reconocido: ${dto.type}`,
+        );
       }
 
       const balanceBulks = Math.floor(newStock / unitsPerBulk);
@@ -75,13 +96,25 @@ export class InventoryService {
 
       await client.query(
         'UPDATE products SET current_stock = $1, stock_bulks = $2, stock_units = $3, updated_at = NOW() WHERE id = $4',
-        [newStock, balanceBulks, balanceUnits, dto.productId]
+        [newStock, balanceBulks, balanceUnits, dto.productId],
       );
 
       const movRes = await client.query(
         `INSERT INTO movements (store_id, product_id, user_id, type, quantity, quantity_bulks, quantity_units, balance, balance_bulks, balance_units, reference) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-        [dto.storeId, dto.productId, dto.userId, dto.type, quantity, qtyBulks, qtyUnits, newStock, balanceBulks, balanceUnits, dto.reference]
+        [
+          dto.storeId,
+          dto.productId,
+          dto.userId,
+          dto.type,
+          quantity,
+          qtyBulks,
+          qtyUnits,
+          newStock,
+          balanceBulks,
+          balanceUnits,
+          dto.reference,
+        ],
       );
 
       const result = {
@@ -119,7 +152,7 @@ export class InventoryService {
        LEFT JOIN users u ON m.user_id = u.id 
        WHERE m.store_id = $1 AND m.product_id = $2 
        ORDER BY m.created_at DESC`,
-      [storeId, productId]
+      [storeId, productId],
     );
     return res.rows;
   }
@@ -133,20 +166,20 @@ export class InventoryService {
       WHERE m.store_id = $1
     `;
     const params: any[] = [storeId];
-    
+
     if (date) {
-      sql += ' AND m.created_at::date = $' + (params.push(date));
+      sql += ' AND m.created_at::date = $' + params.push(date);
     }
-    
+
     if (type && type !== 'all') {
-      sql += ' AND m.type = $' + (params.push(type.toUpperCase()));
+      sql += ' AND m.type = $' + params.push(type.toUpperCase());
     }
-    
+
     sql += ' ORDER BY m.created_at DESC LIMIT 200';
-    
+
     const res = await this.db.query(sql, params);
-    
-    return res.rows.map(row => ({
+
+    return res.rows.map((row) => ({
       id: row.id,
       storeId: row.store_id,
       productId: row.product_id,
@@ -157,7 +190,7 @@ export class InventoryService {
       quantity: Number.parseInt(row.quantity, 10),
       balance: Number.parseInt(row.balance, 10),
       reference: row.reference,
-      createdAt: row.created_at
+      createdAt: row.created_at,
     }));
   }
 
@@ -189,7 +222,10 @@ export class InventoryService {
       currentStock: this.parseInteger(row.current_stock ?? 0, 'current_stock'),
       stockBulks: this.parseInteger(row.stock_bulks ?? 0, 'stock_bulks'),
       stockUnits: this.parseInteger(row.stock_units ?? 0, 'stock_units'),
-      unitsPerBulk: Math.max(1, this.parseInteger(row.units_per_bulk ?? 1, 'units_per_bulk')),
+      unitsPerBulk: Math.max(
+        1,
+        this.parseInteger(row.units_per_bulk ?? 1, 'units_per_bulk'),
+      ),
       minStock: this.parseInteger(row.min_stock ?? 0, 'min_stock'),
     }));
   }
@@ -226,14 +262,29 @@ export class InventoryService {
       storeId: row.store_id,
       description: row.description,
       barcode: row.barcode,
-      assignedQuantity: this.parseInteger(row.assigned_quantity ?? 0, 'assigned_quantity'),
+      assignedQuantity: this.parseInteger(
+        row.assigned_quantity ?? 0,
+        'assigned_quantity',
+      ),
       soldQuantity: this.parseInteger(row.sold_quantity ?? 0, 'sold_quantity'),
-      currentQuantity: this.parseInteger(row.current_quantity ?? 0, 'current_quantity'),
-      assignedBulks: this.parseInteger(row.assigned_bulks ?? 0, 'assigned_bulks'),
-      assignedUnits: this.parseInteger(row.assigned_units ?? 0, 'assigned_units'),
+      currentQuantity: this.parseInteger(
+        row.current_quantity ?? 0,
+        'current_quantity',
+      ),
+      assignedBulks: this.parseInteger(
+        row.assigned_bulks ?? 0,
+        'assigned_bulks',
+      ),
+      assignedUnits: this.parseInteger(
+        row.assigned_units ?? 0,
+        'assigned_units',
+      ),
       currentBulks: this.parseInteger(row.current_bulks ?? 0, 'current_bulks'),
       currentUnits: this.parseInteger(row.current_units ?? 0, 'current_units'),
-      unitsPerBulk: Math.max(1, this.parseInteger(row.units_per_bulk ?? 1, 'units_per_bulk')),
+      unitsPerBulk: Math.max(
+        1,
+        this.parseInteger(row.units_per_bulk ?? 1, 'units_per_bulk'),
+      ),
       updatedAt: row.updated_at,
     }));
   }
@@ -252,24 +303,33 @@ export class InventoryService {
 
     return await this.db.withTransaction(async (client) => {
       const quantity = this.parseInteger(dto.quantity, 'quantity');
-      if (quantity <= 0) throw new BadRequestException('quantity debe ser mayor que cero');
+      if (quantity <= 0)
+        throw new BadRequestException('quantity debe ser mayor que cero');
 
       // 1. Lock and validate source product
       const srcRes = await client.query(
         'SELECT current_stock, description FROM products WHERE id = $1 AND store_id = $2 FOR UPDATE',
         [dto.productId, dto.fromStoreId],
       );
-      if (srcRes.rowCount === 0) throw new BadRequestException('Producto no encontrado en la tienda origen');
+      if (srcRes.rowCount === 0)
+        throw new BadRequestException(
+          'Producto no encontrado en la tienda origen',
+        );
 
-      const srcStock = this.parseInteger(srcRes.rows[0].current_stock, 'current_stock');
+      const srcStock = this.parseInteger(
+        srcRes.rows[0].current_stock,
+        'current_stock',
+      );
       const productDesc = srcRes.rows[0].description;
 
       if (srcStock < quantity) {
-        throw new BadRequestException(`Stock insuficiente en origen. Disponible: ${srcStock}, Solicitado: ${quantity}`);
+        throw new BadRequestException(
+          `Stock insuficiente en origen. Disponible: ${srcStock}, Solicitado: ${quantity}`,
+        );
       }
 
       // 2. Find or create product in destination store
-      let destProdRes = await client.query(
+      const destProdRes = await client.query(
         'SELECT id, current_stock FROM products WHERE store_id = $1 AND description = $2 FOR UPDATE',
         [dto.toStoreId, productDesc],
       );
@@ -298,15 +358,24 @@ export class InventoryService {
         destCurrentStock = 0;
       } else {
         destProductId = destProdRes.rows[0].id;
-        destCurrentStock = this.parseInteger(destProdRes.rows[0].current_stock ?? 0, 'current_stock');
+        destCurrentStock = this.parseInteger(
+          destProdRes.rows[0].current_stock ?? 0,
+          'current_stock',
+        );
       }
 
       // 3. Update stocks
       const newSrcStock = srcStock - quantity;
       const newDestStock = destCurrentStock + quantity;
 
-      await client.query('UPDATE products SET current_stock = $1, updated_at = NOW() WHERE id = $2', [newSrcStock, dto.productId]);
-      await client.query('UPDATE products SET current_stock = $1, updated_at = NOW() WHERE id = $2', [newDestStock, destProductId]);
+      await client.query(
+        'UPDATE products SET current_stock = $1, updated_at = NOW() WHERE id = $2',
+        [newSrcStock, dto.productId],
+      );
+      await client.query(
+        'UPDATE products SET current_stock = $1, updated_at = NOW() WHERE id = $2',
+        [newDestStock, destProductId],
+      );
 
       const ref = dto.reference || `Traslado entre tiendas`;
 
@@ -314,13 +383,27 @@ export class InventoryService {
       await client.query(
         `INSERT INTO movements (store_id, product_id, user_id, type, quantity, balance, reference)
          VALUES ($1, $2, $3, 'TRASLADO_OUT', $4, $5, $6)`,
-        [dto.fromStoreId, dto.productId, dto.userId, quantity, newSrcStock, `${ref}`],
+        [
+          dto.fromStoreId,
+          dto.productId,
+          dto.userId,
+          quantity,
+          newSrcStock,
+          `${ref}`,
+        ],
       );
 
       await client.query(
         `INSERT INTO movements (store_id, product_id, user_id, type, quantity, balance, reference)
          VALUES ($1, $2, $3, 'TRASLADO_IN', $4, $5, $6)`,
-        [dto.toStoreId, destProductId, dto.userId, quantity, newDestStock, `${ref}`],
+        [
+          dto.toStoreId,
+          destProductId,
+          dto.userId,
+          quantity,
+          newDestStock,
+          `${ref}`,
+        ],
       );
 
       // 5. Emit real-time events to both stores

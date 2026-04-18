@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -12,17 +21,26 @@ export class OrdersController {
 
   @Post()
   @ApiOperation({ summary: 'Crear un nuevo pedido' })
-  create(@Body() dto: {
-    storeId: string;
-    clientId?: string;
-    clientName?: string;
-    vendorId?: string;
-    salesManagerName?: string;
-    paymentType?: string;
-    priceLevel?: number;
-    items: { productId: string; quantity: number; unitPrice: number; presentation?: string; priceLevel?: number }[];
-    notes?: string;
-  }) {
+  create(
+    @Body()
+    dto: {
+      storeId: string;
+      clientId?: string;
+      clientName?: string;
+      vendorId?: string;
+      salesManagerName?: string;
+      paymentType?: string;
+      priceLevel?: number;
+      items: {
+        productId: string;
+        quantity: number;
+        unitPrice: number;
+        presentation?: string;
+        priceLevel?: number;
+      }[];
+      notes?: string;
+    },
+  ) {
     return this.service.create(dto);
   }
 
@@ -36,7 +54,14 @@ export class OrdersController {
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
   ) {
-    return this.service.findAll({ storeId, status, vendorId, clientId, fromDate, toDate });
+    return this.service.findAll({
+      storeId,
+      status,
+      vendorId,
+      clientId,
+      fromDate,
+      toDate,
+    });
   }
 
   @Get(':id')
@@ -51,7 +76,12 @@ export class OrdersController {
     @Param('id') id: string,
     @Body() dto: { status: string; updatedBy?: string; vendorId?: string },
   ) {
-    return this.service.updateStatus(id, dto.status, dto.updatedBy, dto.vendorId);
+    return this.service.updateStatus(
+      id,
+      dto.status,
+      dto.updatedBy,
+      dto.vendorId,
+    );
   }
 
   @Patch(':id/prepare')
@@ -68,8 +98,16 @@ export class OrdersController {
 
   @Patch(':id/load-truck')
   @ApiOperation({ summary: 'Marcar pedido como cargado al camión' })
-  loadTruck(@Param('id') id: string, @Body() dto: { updatedBy?: string; vendorId?: string }) {
-    return this.service.updateStatus(id, 'CARGADO_CAMION', dto.updatedBy, dto.vendorId);
+  loadTruck(
+    @Param('id') id: string,
+    @Body() dto: { updatedBy?: string; vendorId?: string },
+  ) {
+    return this.service.updateStatus(
+      id,
+      'CARGADO_CAMION',
+      dto.updatedBy,
+      dto.vendorId,
+    );
   }
 
   @Patch(':id/dispatch')

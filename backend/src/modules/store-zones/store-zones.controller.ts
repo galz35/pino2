@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { StoreZonesService } from './store-zones.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -24,13 +34,31 @@ export class StoreZonesController {
 
   @Post()
   @ApiOperation({ summary: 'Crear zona de tienda' })
-  create(@Body() dto: { name: string; storeId: string; description?: string; color?: string; visitDay?: string }) {
+  create(
+    @Body()
+    dto: {
+      name: string;
+      storeId: string;
+      description?: string;
+      color?: string;
+      visitDay?: string;
+    },
+  ) {
     return this.service.create(dto);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar zona de tienda' })
-  update(@Param('id') id: string, @Body() dto: { name?: string; description?: string; color?: string; visitDay?: string }) {
+  update(
+    @Param('id') id: string,
+    @Body()
+    dto: {
+      name?: string;
+      description?: string;
+      color?: string;
+      visitDay?: string;
+    },
+  ) {
     return this.service.update(id, dto);
   }
 

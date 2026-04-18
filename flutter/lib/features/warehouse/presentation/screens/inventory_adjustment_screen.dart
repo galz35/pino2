@@ -8,15 +8,13 @@ class _AdjustmentItem {
   final String productId;
   final String description;
   final double currentStock;
-  int diffQuantity;
-  String reason;
+  int diffQuantity = 1;
+  String reason = 'Ajuste In-situ App';
 
   _AdjustmentItem({
     required this.productId,
     required this.description,
     required this.currentStock,
-    this.diffQuantity = 1,
-    this.reason = 'Ajuste In-situ App',
   });
 }
 
@@ -75,15 +73,18 @@ class _InventoryAdjustmentScreenState extends ConsumerState<InventoryAdjustmentS
           }
         });
         
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
            const SnackBar(content: Text('Producto agregado'), duration: Duration(milliseconds: 500))
         );
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
            const SnackBar(content: Text('Producto no encontrado'), backgroundColor: Colors.red)
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al buscar: $e'), backgroundColor: Colors.red)
       );
@@ -125,11 +126,13 @@ class _InventoryAdjustmentScreenState extends ConsumerState<InventoryAdjustmentS
       setState(() {
         _items.clear();
       });
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Se procesaron $successCount ajustes correctamente.'), backgroundColor: Colors.green)
       );
 
     } catch(e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al aplicar ajustes: $e'), backgroundColor: Colors.red)
       );
@@ -196,7 +199,7 @@ class _InventoryAdjustmentScreenState extends ConsumerState<InventoryAdjustmentS
                 )
               : ListView.separated(
                   itemCount: _items.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (context, index) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final item = _items[index];
                     final newExpectedStock = item.currentStock + item.diffQuantity;

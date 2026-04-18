@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -12,23 +22,23 @@ export class NotificationsController {
 
   @Get()
   @ApiOperation({ summary: 'Listar notificaciones' })
-  findAll(
-    @Query('storeId') storeId?: string,
-    @Query('limit') limit?: string,
-  ) {
+  findAll(@Query('storeId') storeId?: string, @Query('limit') limit?: string) {
     return this.service.findAll(storeId, limit ? parseInt(limit) : undefined);
   }
 
   @Post()
   @ApiOperation({ summary: 'Crear notificación (y broadcast via WebSocket)' })
-  create(@Body() dto: {
-    storeId: string;
-    userId?: string;
-    type: string;
-    title: string;
-    message: string;
-    metadata?: any;
-  }) {
+  create(
+    @Body()
+    dto: {
+      storeId: string;
+      userId?: string;
+      type: string;
+      title: string;
+      message: string;
+      metadata?: any;
+    },
+  ) {
     return this.service.create(dto);
   }
 
@@ -60,4 +70,3 @@ export class NotificationsController {
     return this.service.unregisterToken(dto.token);
   }
 }
-

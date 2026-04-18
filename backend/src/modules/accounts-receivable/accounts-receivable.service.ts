@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { CollectionsService } from '../collections/collections.service';
 
@@ -33,7 +37,13 @@ export class AccountsReceivableService {
     return this.mapRow(res.rows[0]);
   }
 
-  async create(dto: { storeId: string; clientId: string; orderId?: string; totalAmount: number; description?: string }) {
+  async create(dto: {
+    storeId: string;
+    clientId: string;
+    orderId?: string;
+    totalAmount: number;
+    description?: string;
+  }) {
     if (Number(dto.totalAmount) <= 0) {
       throw new BadRequestException('El monto total debe ser mayor a 0');
     }
@@ -41,50 +51,85 @@ export class AccountsReceivableService {
     const res = await this.db.query(
       `INSERT INTO accounts_receivable (store_id, client_id, order_id, total_amount, remaining_amount, description) 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [dto.storeId, dto.clientId, dto.orderId || null, dto.totalAmount, dto.totalAmount, dto.description || null],
+      [
+        dto.storeId,
+        dto.clientId,
+        dto.orderId || null,
+        dto.totalAmount,
+        dto.totalAmount,
+        dto.description || null,
+      ],
     );
     return this.mapRow(res.rows[0]);
   }
 
-  async addPayment(accountId: string, dto: { amount: number; paymentMethod?: string; notes?: string; collectedBy?: string, externalId?: string }) {
+  async addPayment(
+    accountId: string,
+    dto: {
+      amount: number;
+      paymentMethod?: string;
+      notes?: string;
+      collectedBy?: string;
+      externalId?: string;
+    },
+  ) {
     if (Number(dto.amount) <= 0) {
       throw new BadRequestException('El monto del pago debe ser mayor a 0');
     }
 
     return await this.db.withTransaction(async (client) => {
-      const accRes = await client.query('SELECT * FROM accounts_receivable WHERE id = $1 FOR UPDATE', [accountId]);
-      if (accRes.rowCount === 0) throw new NotFoundException('Cuenta no encontrada');
+      const accRes = await client.query(
+        'SELECT * FROM accounts_receivable WHERE id = $1 FOR UPDATE',
+        [accountId],
+      );
+      if (accRes.rowCount === 0)
+        throw new NotFoundException('Cuenta no encontrada');
 
       const account = accRes.rows[0];
       const currentRemaining = parseFloat(account.remaining_amount);
       if (dto.amount > currentRemaining) {
-        throw new BadRequestException('El pago no puede superar el saldo pendiente');
+        throw new BadRequestException(
+          'El pago no puede superar el saldo pendiente',
+        );
       }
 
       const newRemaining = currentRemaining - dto.amount;
 
       if (dto.collectedBy) {
-        await this.collectionsService.create({
-          storeId: account.store_id,
-          accountId,
-          ruteroId: dto.collectedBy,
-          clientId: account.client_id,
-          amount: dto.amount,
-          paymentMethod: dto.paymentMethod,
-          notes: dto.notes,
-          externalId: dto.externalId,
-        }, client);
+        await this.collectionsService.create(
+          {
+            storeId: account.store_id,
+            accountId,
+            ruteroId: dto.collectedBy,
+            clientId: account.client_id,
+            amount: dto.amount,
+            paymentMethod: dto.paymentMethod,
+            notes: dto.notes,
+            externalId: dto.externalId,
+          },
+          client,
+        );
       }
 
       await client.query(
         'UPDATE accounts_receivable SET remaining_amount = $1, status = $2, updated_at = NOW() WHERE id = $3',
-        [Math.max(0, newRemaining), newRemaining <= 0 ? 'PAID' : 'PARTIAL', accountId],
+        [
+          Math.max(0, newRemaining),
+          newRemaining <= 0 ? 'PAID' : 'PARTIAL',
+          accountId,
+        ],
       );
 
       await client.query(
         `INSERT INTO account_payments (account_id, amount, payment_method, notes, collected_by) 
          VALUES ($1, $2, $3, $4, $5)`,
-        [accountId, dto.amount, dto.paymentMethod || 'CASH', dto.notes || null, dto.collectedBy || null],
+        [
+          accountId,
+          dto.amount,
+          dto.paymentMethod || 'CASH',
+          dto.notes || null,
+          dto.collectedBy || null,
+        ],
       );
 
       return { success: true, remainingAmount: Math.max(0, newRemaining) };

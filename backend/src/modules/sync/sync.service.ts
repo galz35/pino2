@@ -19,7 +19,9 @@ export class SyncService {
   ) {}
 
   async getStatuses() {
-    const res = await this.db.query('SELECT * FROM sync_status ORDER BY last_sync DESC');
+    const res = await this.db.query(
+      'SELECT * FROM sync_status ORDER BY last_sync DESC',
+    );
     return res.rows;
   }
 
@@ -39,8 +41,10 @@ export class SyncService {
   }
 
   async processBatchSync(storeId: string, operations: any[]) {
-    this.logger.log(`Procesando lote de sincronización para tienda ${storeId}: ${operations.length} operaciones`);
-    
+    this.logger.log(
+      `Procesando lote de sincronización para tienda ${storeId}: ${operations.length} operaciones`,
+    );
+
     const results: any[] = [];
 
     await this.db.withTransaction(async (client: PoolClient) => {
@@ -58,44 +62,74 @@ export class SyncService {
       for (const op of operations) {
         try {
           const opData = { ...op.data, storeId, externalId: op.id };
-          
+
           switch (op.type) {
             case 'SALE': {
               const res = await this.salesService.processSale(opData, client);
-              results.push({ opId: op.id, serverId: res.id, status: 'SUCCESS', isDuplicate: !!res.isDuplicate });
-              if (res.isDuplicate) duplicateCount++; else successCount++;
+              results.push({
+                opId: op.id,
+                serverId: res.id,
+                status: 'SUCCESS',
+                isDuplicate: !!res.isDuplicate,
+              });
+              if (res.isDuplicate) duplicateCount++;
+              else successCount++;
               break;
             }
             case 'ORDER': {
               const res = await this.ordersService.create(opData, client);
-              results.push({ opId: op.id, serverId: res.id, status: 'SUCCESS', isDuplicate: !!res.isDuplicate });
-              if (res.isDuplicate) duplicateCount++; else successCount++;
+              results.push({
+                opId: op.id,
+                serverId: res.id,
+                status: 'SUCCESS',
+                isDuplicate: !!res.isDuplicate,
+              });
+              if (res.isDuplicate) duplicateCount++;
+              else successCount++;
               break;
             }
             case 'COLLECTION': {
               const res = await this.collectionsService.create(opData, client);
-              results.push({ opId: op.id, serverId: res.id, status: 'SUCCESS', isDuplicate: !!res.isDuplicate });
-              if (res.isDuplicate) duplicateCount++; else successCount++;
+              results.push({
+                opId: op.id,
+                serverId: res.id,
+                status: 'SUCCESS',
+                isDuplicate: !!res.isDuplicate,
+              });
+              if (res.isDuplicate) duplicateCount++;
+              else successCount++;
               break;
             }
             case 'RETURN': {
               const res = await this.returnsService.create(opData, client);
-              results.push({ opId: op.id, serverId: res.id, status: 'SUCCESS', isDuplicate: !!res.isDuplicate });
-              if (res.isDuplicate) duplicateCount++; else successCount++;
+              results.push({
+                opId: op.id,
+                serverId: res.id,
+                status: 'SUCCESS',
+                isDuplicate: !!res.isDuplicate,
+              });
+              if (res.isDuplicate) duplicateCount++;
+              else successCount++;
               break;
             }
             default:
               this.logger.warn(`Tipo de operación no soportado: ${op.type}`);
-              results.push({ opId: op.id, status: 'SKIPPED', error: 'Unsupported type' });
+              results.push({
+                opId: op.id,
+                status: 'SKIPPED',
+                error: 'Unsupported type',
+              });
           }
         } catch (error) {
-          this.logger.error(`Error procesando operación ${op.id} (${op.type}): ${error.message}`);
+          this.logger.error(
+            `Error procesando operación ${op.id} (${op.type}): ${error.message}`,
+          );
           results.push({ opId: op.id, status: 'FAILED', error: error.message });
           // Importante: No lanzamos error aquí para permitir que otras operaciones del lote se procesen,
           // pero como estamos en una transacción, si quisiéramos que todo falle o nada, deberíamos relanzar.
           // En sincronización offline-first, usualmente queremos que lo que es válido pase.
-          // SIN EMBARGO, withTransaction hará ROLLBACK si algo falla. 
-          // Para permitir fallos individuales, deberíamos manejar SAVEPOINTS o procesar fuera de una transacción global 
+          // SIN EMBARGO, withTransaction hará ROLLBACK si algo falla.
+          // Para permitir fallos individuales, deberíamos manejar SAVEPOINTS o procesar fuera de una transacción global
           // (aunque la transacción global es mejor para integridad).
         }
       }
@@ -119,6 +153,9 @@ export class SyncService {
       'UPDATE sync_status SET status = $1, last_sync = NOW() WHERE store_id = $2',
       ['FORCED', storeId],
     );
-    return { success: true, message: `Sincronización forzada para la tienda ${storeId}` };
+    return {
+      success: true,
+      message: `Sincronización forzada para la tienda ${storeId}`,
+    };
   }
 }

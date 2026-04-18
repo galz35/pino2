@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -15,7 +25,17 @@ export class UsersController {
   @Post()
   @Roles('master-admin', 'store-admin')
   @ApiOperation({ summary: 'Crear un nuevo usuario (admin crea staff)' })
-  create(@Body() dto: { email: string; password: string; name: string; role: string; storeId?: string; storeIds?: string[] }) {
+  create(
+    @Body()
+    dto: {
+      email: string;
+      password: string;
+      name: string;
+      role: string;
+      storeId?: string;
+      storeIds?: string[];
+    },
+  ) {
     return this.service.createUser(dto);
   }
 

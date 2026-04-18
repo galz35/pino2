@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SuppliersService } from './suppliers.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -18,7 +28,10 @@ export class SuppliersController {
 
   @Get()
   @ApiOperation({ summary: 'Listar proveedores de una cadena o tienda' })
-  findAll(@Query('chainId') chainId?: string, @Query('storeId') storeId?: string) {
+  findAll(
+    @Query('chainId') chainId?: string,
+    @Query('storeId') storeId?: string,
+  ) {
     return this.service.findAll(chainId, storeId);
   }
 

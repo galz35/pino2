@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 
 @Injectable()
@@ -17,7 +21,9 @@ export class SuppliersService {
         [dto.storeId],
       );
       if ((storeRes.rowCount ?? 0) === 0) {
-        throw new NotFoundException('Tienda no encontrada para derivar la cadena del proveedor');
+        throw new NotFoundException(
+          'Tienda no encontrada para derivar la cadena del proveedor',
+        );
       }
       chainId = storeRes.rows[0].chain_id;
     }
@@ -25,7 +31,14 @@ export class SuppliersService {
     const res = await this.db.query(
       `INSERT INTO suppliers (chain_id, name, contact_name, email, phone, address) 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [chainId || null, dto.name, dto.contactName, dto.email, dto.phone, dto.address],
+      [
+        chainId || null,
+        dto.name,
+        dto.contactName,
+        dto.email,
+        dto.phone,
+        dto.address,
+      ],
     );
     return this.mapRow(res.rows[0]);
   }
@@ -50,8 +63,11 @@ export class SuppliersService {
   }
 
   async findOne(id: string) {
-    const res = await this.db.query('SELECT * FROM suppliers WHERE id = $1', [id]);
-    if (res.rowCount === 0) throw new NotFoundException('Proveedor no encontrado');
+    const res = await this.db.query('SELECT * FROM suppliers WHERE id = $1', [
+      id,
+    ]);
+    if (res.rowCount === 0)
+      throw new NotFoundException('Proveedor no encontrado');
     return this.mapRow(res.rows[0]);
   }
 

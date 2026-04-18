@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Get, Query, Param, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Query,
+  Param,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CashShiftsService } from './cash-shifts.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -16,7 +25,11 @@ export class CashShiftsController {
     @Body() dto: { storeId: string; userId?: string; startingCash: number },
     @Req() req: any,
   ) {
-    return this.service.openShift(dto.storeId, dto.userId || req.user?.sub, dto.startingCash);
+    return this.service.openShift(
+      dto.storeId,
+      dto.userId || req.user?.sub,
+      dto.startingCash,
+    );
   }
 
   @Post('close')
@@ -75,7 +88,14 @@ export class CashShiftsController {
   @ApiOperation({ summary: 'Cerrar un turno de caja por ID en URL' })
   closeShiftById(
     @Param('id') id: string,
-    @Body() dto: { storeId: string; expectedCash: number; actualCash: number; difference: number; userId?: string },
+    @Body()
+    dto: {
+      storeId: string;
+      expectedCash: number;
+      actualCash: number;
+      difference: number;
+      userId?: string;
+    },
     @Req() req: any,
   ) {
     return this.service.closeShift(

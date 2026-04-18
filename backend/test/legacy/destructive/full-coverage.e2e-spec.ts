@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
-import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import {
+  FastifyAdapter,
+  NestFastifyApplication,
+} from '@nestjs/platform-fastify';
 const request = require('supertest');
 import { AppModule } from '../src/app.module';
 import { DatabaseService } from '../src/database/database.service';
@@ -16,19 +19,30 @@ describe('UNIVERSAL BACKEND COVERAGE (25/25)', () => {
   const API = '/api';
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+    app = moduleFixture.createNestApplication<NestFastifyApplication>(
+      new FastifyAdapter(),
+    );
     app.setGlobalPrefix('api');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
     db = app.get<DatabaseService>(DatabaseService);
-    
+
     // Seed
     const email = `m${Date.now()}@t.com`;
-    const regRes = await request(app.getHttpServer()).post(`${API}/auth/register`).send({
-      email, password: 'password123', name: 'Master', role: 'master-admin'
-    });
+    const regRes = await request(app.getHttpServer())
+      .post(`${API}/auth/register`)
+      .send({
+        email,
+        password: 'password123',
+        name: 'Master',
+        role: 'master-admin',
+      });
     token = regRes.body.access_token;
     testUserId = regRes.body.user.id;
 
@@ -218,31 +232,41 @@ describe('UNIVERSAL BACKEND COVERAGE (25/25)', () => {
         metadata JSONB DEFAULT '{}',
         read BOOLEAN DEFAULT false,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )`
+      )`,
     ];
     for (const sql of tables) {
-      await db.query(sql).catch(e => {});
+      await db.query(sql).catch((e) => {});
     }
     // Seed Chain & Store
     const { ChainsService } = require('../src/modules/chains/chains.service');
     const { StoresService } = require('../src/modules/stores/stores.service');
     const chain = await app.get(ChainsService).create({ name: 'UNIV' });
-    const store = await app.get(StoresService).create({ chainId: chain.id, name: 'UNIV', address: 'T', code: 'U'+Date.now() });
+    const store = await app.get(StoresService).create({
+      chainId: chain.id,
+      name: 'UNIV',
+      address: 'T',
+      code: 'U' + Date.now(),
+    });
     testStoreId = store.id;
   });
 
-  afterAll(async () => { await app.close(); });
+  afterAll(async () => {
+    await app.close();
+  });
 
   const runTest = (name: string, routeGen: () => string, method = 'get') => {
     it(`[${name}] ${method.toUpperCase()} ${name}`, async () => {
       const route = routeGen();
-      const req = method === 'get' ? request(app.getHttpServer()).get(`${API}${route}`) : request(app.getHttpServer()).post(`${API}${route}`).send({});
+      const req =
+        method === 'get'
+          ? request(app.getHttpServer()).get(`${API}${route}`)
+          : request(app.getHttpServer()).post(`${API}${route}`).send({});
       const res = await req.set('Authorization', `Bearer ${token}`);
-      
+
       if (res.status === 500) {
         // Failing silently for clear output
       }
-      
+
       expect(res.status).not.toBe(500);
       expect(res.status).not.toBe(404);
     });
@@ -254,7 +278,10 @@ describe('UNIVERSAL BACKEND COVERAGE (25/25)', () => {
     runTest('Stores', () => '/stores');
     runTest('Chains', () => '/chains');
     runTest('Products', () => '/products');
-    runTest('Sales Stats', () => `/sales/dashboard-stats?storeId=${testStoreId}`);
+    runTest(
+      'Sales Stats',
+      () => `/sales/dashboard-stats?storeId=${testStoreId}`,
+    );
     runTest('Cash Shifts', () => `/cash-shifts/active?storeId=${testStoreId}`);
     runTest('Clients', () => `/clients?storeId=${testStoreId}`);
     runTest('Suppliers', () => '/suppliers');

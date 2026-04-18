@@ -77,4 +77,3 @@ import { DailyClosingsModule } from './modules/daily-closings/daily-closings.mod
   ],
 })
 export class AppModule {}
-

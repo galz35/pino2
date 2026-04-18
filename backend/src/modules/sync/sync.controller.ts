@@ -1,4 +1,12 @@
-import { Controller, Post, Get, Body, UseGuards, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  UseGuards,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SyncService } from './sync.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -11,7 +19,9 @@ export class SyncController {
   constructor(private readonly service: SyncService) {}
 
   @Get('statuses')
-  @ApiOperation({ summary: 'Obtener el estado de sincronización de todas las tiendas' })
+  @ApiOperation({
+    summary: 'Obtener el estado de sincronización de todas las tiendas',
+  })
   getStatuses() {
     return this.service.getStatuses();
   }
@@ -29,7 +39,9 @@ export class SyncController {
   }
 
   @Post('force/:storeId')
-  @ApiOperation({ summary: 'Forzar un nuevo ciclo de sincronización para una tienda' })
+  @ApiOperation({
+    summary: 'Forzar un nuevo ciclo de sincronización para una tienda',
+  })
   forceSync(@Param('storeId') storeId: string) {
     return this.service.forceSync(storeId);
   }

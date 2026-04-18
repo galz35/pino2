@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 
 @Injectable()
@@ -33,7 +37,11 @@ export class AccountsPayableService {
     return this.mapRow(res.rows[0]);
   }
 
-  async findAll(filters: { storeId?: string; supplierId?: string; pending?: string }) {
+  async findAll(filters: {
+    storeId?: string;
+    supplierId?: string;
+    pending?: string;
+  }) {
     let sql = `SELECT ap.*, s.name as supplier_name
                FROM accounts_payable ap
                LEFT JOIN suppliers s ON s.id = ap.supplier_id
@@ -41,9 +49,17 @@ export class AccountsPayableService {
     const params: any[] = [];
     let idx = 1;
 
-    if (filters.storeId) { sql += ` AND ap.store_id = $${idx++}`; params.push(filters.storeId); }
-    if (filters.supplierId) { sql += ` AND ap.supplier_id = $${idx++}`; params.push(filters.supplierId); }
-    if (filters.pending === 'true') { sql += ` AND ap.status != 'PAID'`; }
+    if (filters.storeId) {
+      sql += ` AND ap.store_id = $${idx++}`;
+      params.push(filters.storeId);
+    }
+    if (filters.supplierId) {
+      sql += ` AND ap.supplier_id = $${idx++}`;
+      params.push(filters.supplierId);
+    }
+    if (filters.pending === 'true') {
+      sql += ` AND ap.status != 'PAID'`;
+    }
 
     sql += ' ORDER BY ap.due_date ASC NULLS LAST, ap.created_at DESC';
     const res = await this.db.query(sql, params);
@@ -59,19 +75,30 @@ export class AccountsPayableService {
     });
   }
 
-  async addPayment(accountId: string, dto: { amount: number; paymentMethod?: string; notes?: string; paidBy?: string }) {
-    if (dto.amount <= 0) throw new BadRequestException('El monto debe ser mayor a 0');
+  async addPayment(
+    accountId: string,
+    dto: {
+      amount: number;
+      paymentMethod?: string;
+      notes?: string;
+      paidBy?: string;
+    },
+  ) {
+    if (dto.amount <= 0)
+      throw new BadRequestException('El monto debe ser mayor a 0');
 
     return this.db.withTransaction(async (client) => {
       const accRes = await client.query(
         'SELECT * FROM accounts_payable WHERE id = $1 FOR UPDATE',
         [accountId],
       );
-      if ((accRes.rowCount ?? 0) === 0) throw new NotFoundException('Cuenta por pagar no encontrada');
+      if ((accRes.rowCount ?? 0) === 0)
+        throw new NotFoundException('Cuenta por pagar no encontrada');
 
       const account = accRes.rows[0];
       const remaining = parseFloat(account.remaining_amount);
-      if (dto.amount > remaining) throw new BadRequestException('El monto excede el saldo pendiente');
+      if (dto.amount > remaining)
+        throw new BadRequestException('El monto excede el saldo pendiente');
 
       const newRemaining = Math.max(0, remaining - dto.amount);
       const newStatus = newRemaining <= 0 ? 'PAID' : 'PARTIAL';
@@ -84,7 +111,13 @@ export class AccountsPayableService {
       await client.query(
         `INSERT INTO payable_payments (account_id, amount, payment_method, notes, paid_by)
          VALUES ($1, $2, $3, $4, $5)`,
-        [accountId, dto.amount, dto.paymentMethod || 'TRANSFER', dto.notes || null, dto.paidBy || null],
+        [
+          accountId,
+          dto.amount,
+          dto.paymentMethod || 'TRANSFER',
+          dto.notes || null,
+          dto.paidBy || null,
+        ],
       );
 
       return this.findOneWithExecutor(accountId, client);
@@ -102,9 +135,13 @@ export class AccountsPayableService {
        WHERE ap.id = $1`,
       [id],
     );
-    if ((res.rowCount ?? 0) === 0) throw new NotFoundException('Cuenta por pagar no encontrada');
+    if ((res.rowCount ?? 0) === 0)
+      throw new NotFoundException('Cuenta por pagar no encontrada');
 
-    const account = { ...this.mapRow(res.rows[0]), supplierName: res.rows[0].supplier_name || '' };
+    const account = {
+      ...this.mapRow(res.rows[0]),
+      supplierName: res.rows[0].supplier_name || '',
+    };
 
     // Get payments history
     const paymentsRes = await executor.query(

@@ -43,13 +43,19 @@ export class CashShiftsService {
       throw new BadRequestException('storeId y userId son obligatorios');
     }
 
-    const normalizedStartingCash = this.validateMoney(startingCash, 'startingCash');
+    const normalizedStartingCash = this.validateMoney(
+      startingCash,
+      'startingCash',
+    );
 
     const openRes = await this.db.query(
       "SELECT id FROM cash_shifts WHERE store_id = $1 AND status = 'OPEN'",
       [storeId],
     );
-    if (openRes.rowCount > 0) throw new BadRequestException('Ya existe un turno de caja abierto en esta tienda');
+    if (openRes.rowCount > 0)
+      throw new BadRequestException(
+        'Ya existe un turno de caja abierto en esta tienda',
+      );
 
     const res = await this.db.query(
       `INSERT INTO cash_shifts (store_id, opened_by, starting_cash, actual_cash, status) 
@@ -69,10 +75,15 @@ export class CashShiftsService {
     userId: string,
   ) {
     if (!shiftId || !storeId || !userId) {
-      throw new BadRequestException('shiftId, storeId y userId son obligatorios');
+      throw new BadRequestException(
+        'shiftId, storeId y userId son obligatorios',
+      );
     }
 
-    const normalizedExpectedCash = this.validateMoney(expectedCash, 'expectedCash');
+    const normalizedExpectedCash = this.validateMoney(
+      expectedCash,
+      'expectedCash',
+    );
     const normalizedActualCash = this.validateMoney(actualCash, 'actualCash');
     const normalizedDifference = this.parseMoney(difference, Number.NaN);
 
@@ -84,10 +95,18 @@ export class CashShiftsService {
       `UPDATE cash_shifts 
        SET closed_by = $1, closed_at = NOW(), expected_cash = $2, actual_cash = $3, difference = $4, status = 'CLOSED' 
        WHERE id = $5 AND store_id = $6 AND status = 'OPEN' RETURNING *`,
-      [userId, normalizedExpectedCash, normalizedActualCash, normalizedDifference, shiftId, storeId],
+      [
+        userId,
+        normalizedExpectedCash,
+        normalizedActualCash,
+        normalizedDifference,
+        shiftId,
+        storeId,
+      ],
     );
 
-    if (res.rowCount === 0) throw new BadRequestException('Turno de caja no válido o ya cerrado');
+    if (res.rowCount === 0)
+      throw new BadRequestException('Turno de caja no válido o ya cerrado');
     return this.findOne(res.rows[0].id);
   }
 
@@ -98,10 +117,7 @@ export class CashShiftsService {
       ORDER BY cs.opened_at DESC
       LIMIT 1
     `;
-    const res = await this.db.query(
-      sql,
-      [storeId],
-    );
+    const res = await this.db.query(sql, [storeId]);
     return res.rowCount > 0 ? this.mapRow(res.rows[0]) : null;
   }
 

@@ -19,7 +19,11 @@ export class ZonesService {
     return res.rows.map(this.mapZone);
   }
 
-  async createZone(dto: { name: string; storeId?: string; description?: string }) {
+  async createZone(dto: {
+    name: string;
+    storeId?: string;
+    description?: string;
+  }) {
     const res = await this.db.query(
       `INSERT INTO zones (name, store_id, description) VALUES ($1, $2, $3) RETURNING *`,
       [dto.name, dto.storeId || null, dto.description || null],
@@ -31,8 +35,14 @@ export class ZonesService {
     const sets: string[] = [];
     const params: any[] = [];
     let idx = 1;
-    if (dto.name) { sets.push(`name = $${idx++}`); params.push(dto.name); }
-    if (dto.description !== undefined) { sets.push(`description = $${idx++}`); params.push(dto.description); }
+    if (dto.name) {
+      sets.push(`name = $${idx++}`);
+      params.push(dto.name);
+    }
+    if (dto.description !== undefined) {
+      sets.push(`description = $${idx++}`);
+      params.push(dto.description);
+    }
     if (sets.length === 0) throw new NotFoundException('Nada que actualizar');
     sets.push(`updated_at = NOW()`);
     params.push(id);
@@ -40,20 +50,26 @@ export class ZonesService {
       `UPDATE zones SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
       params,
     );
-    if ((res.rowCount ?? 0) === 0) throw new NotFoundException('Zona no encontrada');
+    if ((res.rowCount ?? 0) === 0)
+      throw new NotFoundException('Zona no encontrada');
     return this.mapZone(res.rows[0]);
   }
 
   async deleteZone(id: string) {
-    const res = await this.db.query('DELETE FROM zones WHERE id = $1 RETURNING id', [id]);
-    if ((res.rowCount ?? 0) === 0) throw new NotFoundException('Zona no encontrada');
+    const res = await this.db.query(
+      'DELETE FROM zones WHERE id = $1 RETURNING id',
+      [id],
+    );
+    if ((res.rowCount ?? 0) === 0)
+      throw new NotFoundException('Zona no encontrada');
     return { deleted: true, id };
   }
 
   // ─── SUB-ZONES ───────────────────────────────────────────
 
   async findAllSubZones(zoneId?: string) {
-    let sql = 'SELECT sz.*, z.name as zone_name FROM sub_zones sz LEFT JOIN zones z ON z.id = sz.zone_id';
+    let sql =
+      'SELECT sz.*, z.name as zone_name FROM sub_zones sz LEFT JOIN zones z ON z.id = sz.zone_id';
     const params: any[] = [];
     if (zoneId) {
       sql += ' WHERE sz.zone_id = $1';
@@ -64,7 +80,11 @@ export class ZonesService {
     return res.rows.map(this.mapSubZone);
   }
 
-  async createSubZone(dto: { name: string; zoneId: string; description?: string }) {
+  async createSubZone(dto: {
+    name: string;
+    zoneId: string;
+    description?: string;
+  }) {
     const res = await this.db.query(
       `INSERT INTO sub_zones (name, zone_id, description) VALUES ($1, $2, $3) RETURNING *`,
       [dto.name, dto.zoneId, dto.description || null],
@@ -72,12 +92,21 @@ export class ZonesService {
     return this.mapSubZone(res.rows[0]);
   }
 
-  async updateSubZone(id: string, dto: { name?: string; description?: string }) {
+  async updateSubZone(
+    id: string,
+    dto: { name?: string; description?: string },
+  ) {
     const sets: string[] = [];
     const params: any[] = [];
     let idx = 1;
-    if (dto.name) { sets.push(`name = $${idx++}`); params.push(dto.name); }
-    if (dto.description !== undefined) { sets.push(`description = $${idx++}`); params.push(dto.description); }
+    if (dto.name) {
+      sets.push(`name = $${idx++}`);
+      params.push(dto.name);
+    }
+    if (dto.description !== undefined) {
+      sets.push(`description = $${idx++}`);
+      params.push(dto.description);
+    }
     if (sets.length === 0) throw new NotFoundException('Nada que actualizar');
     sets.push(`updated_at = NOW()`);
     params.push(id);
@@ -85,13 +114,18 @@ export class ZonesService {
       `UPDATE sub_zones SET ${sets.join(', ')} WHERE id = $${idx} RETURNING *`,
       params,
     );
-    if ((res.rowCount ?? 0) === 0) throw new NotFoundException('Sub-zona no encontrada');
+    if ((res.rowCount ?? 0) === 0)
+      throw new NotFoundException('Sub-zona no encontrada');
     return this.mapSubZone(res.rows[0]);
   }
 
   async deleteSubZone(id: string) {
-    const res = await this.db.query('DELETE FROM sub_zones WHERE id = $1 RETURNING id', [id]);
-    if ((res.rowCount ?? 0) === 0) throw new NotFoundException('Sub-zona no encontrada');
+    const res = await this.db.query(
+      'DELETE FROM sub_zones WHERE id = $1 RETURNING id',
+      [id],
+    );
+    if ((res.rowCount ?? 0) === 0)
+      throw new NotFoundException('Sub-zona no encontrada');
     return { deleted: true, id };
   }
 

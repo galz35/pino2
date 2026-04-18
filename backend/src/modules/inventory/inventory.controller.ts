@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -72,7 +80,9 @@ export class InventoryController {
   }
 
   @Post('quick-entry')
-  @ApiOperation({ summary: 'Entrada rápida de producto sin factura ni proveedor' })
+  @ApiOperation({
+    summary: 'Entrada rápida de producto sin factura ni proveedor',
+  })
   quickEntry(
     @Body()
     dto: {
@@ -94,7 +104,9 @@ export class InventoryController {
   }
 
   @Post('merma')
-  @ApiOperation({ summary: 'Registrar merma (producto dañado, vencido o perdido)' })
+  @ApiOperation({
+    summary: 'Registrar merma (producto dañado, vencido o perdido)',
+  })
   registerMerma(
     @Body()
     dto: {
@@ -132,9 +144,12 @@ export class InventoryController {
       storeId: dto.storeId,
       productId: dto.productId,
       userId: req.user?.sub,
-      type: dto.direction === 'positive' ? 'AJUSTE_POSITIVO' : 'AJUSTE_NEGATIVO',
+      type:
+        dto.direction === 'positive' ? 'AJUSTE_POSITIVO' : 'AJUSTE_NEGATIVO',
       quantity: dto.quantity,
-      reference: dto.reference || `Ajuste Manual ${dto.direction === 'positive' ? '(+)' : '(-)'}`,
+      reference:
+        dto.reference ||
+        `Ajuste Manual ${dto.direction === 'positive' ? '(+)' : '(-)'}`,
     });
   }
 }

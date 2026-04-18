@@ -74,7 +74,10 @@ export class StoresService {
   }
 
   async remove(id: string) {
-    await this.db.query('UPDATE stores SET is_active = false, updated_at = NOW() WHERE id = $1', [id]);
+    await this.db.query(
+      'UPDATE stores SET is_active = false, updated_at = NOW() WHERE id = $1',
+      [id],
+    );
     return this.findOne(id);
   }
 

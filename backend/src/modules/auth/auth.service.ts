@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  Logger,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { DatabaseService } from '../../database/database.service';
@@ -28,7 +33,8 @@ export class AuthService {
         'SELECT id FROM users WHERE email = $1',
         [dto.email],
       );
-      if ((existing.rowCount ?? 0) > 0) throw new ConflictException('Email ya registrado');
+      if ((existing.rowCount ?? 0) > 0)
+        throw new ConflictException('Email ya registrado');
 
       // 2. Hash e Insertar usuario
       const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -49,7 +55,8 @@ export class AuthService {
         }
       }
 
-      savedUser.userStores = dto.storeIds?.map(storeId => ({ storeId })) || [];
+      savedUser.userStores =
+        dto.storeIds?.map((storeId) => ({ storeId })) || [];
       return this.generateTokens(client, savedUser);
     });
   }
@@ -60,7 +67,8 @@ export class AuthService {
         'SELECT * FROM users WHERE email = $1 AND is_active = true',
         [email],
       );
-      if ((resUser.rowCount ?? 0) === 0) throw new UnauthorizedException('Credenciales inválidas');
+      if ((resUser.rowCount ?? 0) === 0)
+        throw new UnauthorizedException('Credenciales inválidas');
 
       const user = resUser.rows[0];
 
@@ -70,9 +78,9 @@ export class AuthService {
       // Obtener sus tiendas
       const resStores = await this.db.query(
         'SELECT store_id FROM user_stores WHERE user_id = $1',
-        [user.id]
+        [user.id],
       );
-      user.userStores = resStores.rows.map(r => ({ storeId: r.store_id }));
+      user.userStores = resStores.rows.map((r) => ({ storeId: r.store_id }));
 
       // Reutilizamos el pool principal para generar tokens
       const client = await this.db.getClient();
@@ -95,14 +103,15 @@ export class AuthService {
       'SELECT * FROM users WHERE id = $1 AND is_active = true',
       [userId],
     );
-    if (resUser.rowCount === 0) throw new UnauthorizedException('Usuario no encontrado');
-    
+    if (resUser.rowCount === 0)
+      throw new UnauthorizedException('Usuario no encontrado');
+
     const user = resUser.rows[0];
     const resStores = await this.db.query(
       'SELECT store_id FROM user_stores WHERE user_id = $1',
-      [user.id]
+      [user.id],
     );
-    user.userStores = resStores.rows.map(r => ({ storeId: r.store_id }));
+    user.userStores = resStores.rows.map((r) => ({ storeId: r.store_id }));
 
     const client = await this.db.getClient();
     try {
@@ -113,19 +122,22 @@ export class AuthService {
   }
 
   async getProfile(userId: string) {
-    const resUser = await this.db.query('SELECT * FROM users WHERE id = $1', [userId]);
-    if (resUser.rowCount === 0) throw new UnauthorizedException('Usuario no encontrado');
+    const resUser = await this.db.query('SELECT * FROM users WHERE id = $1', [
+      userId,
+    ]);
+    if (resUser.rowCount === 0)
+      throw new UnauthorizedException('Usuario no encontrado');
 
     const user = resUser.rows[0];
     const resStores = await this.db.query(
       'SELECT store_id FROM user_stores WHERE user_id = $1',
-      [user.id]
+      [user.id],
     );
 
     const { password_hash, refresh_token, ...profile } = user;
     return {
       ...profile,
-      storeIds: resStores.rows.map(r => r.store_id) || [],
+      storeIds: resStores.rows.map((r) => r.store_id) || [],
     };
   }
 
@@ -144,10 +156,10 @@ export class AuthService {
     });
 
     // Store refresh token en la BD
-    await client.query(
-      'UPDATE users SET refresh_token = $1 WHERE id = $2',
-      [refreshTokenValue, user.id]
-    );
+    await client.query('UPDATE users SET refresh_token = $1 WHERE id = $2', [
+      refreshTokenValue,
+      user.id,
+    ]);
 
     return {
       accessToken,

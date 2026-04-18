@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ReturnsService } from './returns.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -11,7 +20,9 @@ export class ReturnsController {
   constructor(private readonly service: ReturnsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Registrar devolución de rutero o devolución POS basada en venta' })
+  @ApiOperation({
+    summary: 'Registrar devolución de rutero o devolución POS basada en venta',
+  })
   create(
     @Body()
     dto: {
@@ -52,7 +63,13 @@ export class ReturnsController {
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
   ) {
-    return this.service.findAll({ storeId, ruteroId, orderId, fromDate, toDate });
+    return this.service.findAll({
+      storeId,
+      ruteroId,
+      orderId,
+      fromDate,
+      toDate,
+    });
   }
 
   @Get(':id')

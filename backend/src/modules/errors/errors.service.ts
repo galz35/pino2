@@ -13,12 +13,25 @@ export class ErrorsService {
     return res.rows.map(this.mapRow);
   }
 
-  async create(dto: { message: string; stack?: string; location?: string; userId?: string; storeId?: string; additionalInfo?: any }) {
+  async create(dto: {
+    message: string;
+    stack?: string;
+    location?: string;
+    userId?: string;
+    storeId?: string;
+    additionalInfo?: any;
+  }) {
     const res = await this.db.query(
       `INSERT INTO error_logs (message, stack, location, user_id, store_id, additional_info) 
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [dto.message, dto.stack || null, dto.location || null,
-       dto.userId || null, dto.storeId || null, JSON.stringify(dto.additionalInfo || {})],
+      [
+        dto.message,
+        dto.stack || null,
+        dto.location || null,
+        dto.userId || null,
+        dto.storeId || null,
+        JSON.stringify(dto.additionalInfo || {}),
+      ],
     );
     return this.mapRow(res.rows[0]);
   }
@@ -31,7 +44,10 @@ export class ErrorsService {
       location: row.location,
       userId: row.user_id,
       storeId: row.store_id,
-      additionalInfo: typeof row.additional_info === 'string' ? JSON.parse(row.additional_info) : (row.additional_info || {}),
+      additionalInfo:
+        typeof row.additional_info === 'string'
+          ? JSON.parse(row.additional_info)
+          : row.additional_info || {},
       createdAt: row.created_at,
     };
   }

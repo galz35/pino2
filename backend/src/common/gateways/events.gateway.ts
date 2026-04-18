@@ -44,7 +44,7 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(`Broadcasting sync event: ${data.type}`);
     // Emit to all connected Dashboards
     this.server.emit('sync_update', data);
-    
+
     // If store-specific, emit to that room
     if (data.storeId) {
       this.server.to(`store_${data.storeId}`).emit('store_update', data);

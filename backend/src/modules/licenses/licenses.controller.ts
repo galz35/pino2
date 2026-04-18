@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { LicensesService } from './licenses.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -24,13 +34,31 @@ export class LicensesController {
 
   @Post()
   @ApiOperation({ summary: 'Crear licencia' })
-  create(@Body() dto: { storeId: string; licenseKey?: string; type?: string; maxUsers?: number; endDate?: string }) {
+  create(
+    @Body()
+    dto: {
+      storeId: string;
+      licenseKey?: string;
+      type?: string;
+      maxUsers?: number;
+      endDate?: string;
+    },
+  ) {
     return this.service.create(dto);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar licencia' })
-  update(@Param('id') id: string, @Body() dto: { status?: string; type?: string; maxUsers?: number; endDate?: string }) {
+  update(
+    @Param('id') id: string,
+    @Body()
+    dto: {
+      status?: string;
+      type?: string;
+      maxUsers?: number;
+      endDate?: string;
+    },
+  ) {
     return this.service.update(id, dto);
   }
 

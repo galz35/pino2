@@ -14,35 +14,72 @@ export class StoreZonesService {
   }
 
   async findOne(id: string) {
-    const res = await this.db.query('SELECT * FROM store_zones WHERE id = $1', [id]);
+    const res = await this.db.query('SELECT * FROM store_zones WHERE id = $1', [
+      id,
+    ]);
     if (res.rowCount === 0) throw new NotFoundException('Zona no encontrada');
     return this.mapRow(res.rows[0]);
   }
 
-  async create(dto: { name: string; storeId: string; description?: string; color?: string; visitDay?: string }) {
+  async create(dto: {
+    name: string;
+    storeId: string;
+    description?: string;
+    color?: string;
+    visitDay?: string;
+  }) {
     const res = await this.db.query(
       `INSERT INTO store_zones (store_id, name, description, color, visit_day) 
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [dto.storeId, dto.name, dto.description || null, dto.color || null, dto.visitDay || 'Ninguno'],
+      [
+        dto.storeId,
+        dto.name,
+        dto.description || null,
+        dto.color || null,
+        dto.visitDay || 'Ninguno',
+      ],
     );
     return this.mapRow(res.rows[0]);
   }
 
-  async update(id: string, dto: { name?: string; description?: string; color?: string; visitDay?: string }) {
+  async update(
+    id: string,
+    dto: {
+      name?: string;
+      description?: string;
+      color?: string;
+      visitDay?: string;
+    },
+  ) {
     const sets: string[] = [];
     const params: any[] = [];
     let idx = 1;
 
-    if (dto.name !== undefined) { sets.push(`name = $${idx++}`); params.push(dto.name); }
-    if (dto.description !== undefined) { sets.push(`description = $${idx++}`); params.push(dto.description); }
-    if (dto.color !== undefined) { sets.push(`color = $${idx++}`); params.push(dto.color); }
-    if (dto.visitDay !== undefined) { sets.push(`visit_day = $${idx++}`); params.push(dto.visitDay); }
+    if (dto.name !== undefined) {
+      sets.push(`name = $${idx++}`);
+      params.push(dto.name);
+    }
+    if (dto.description !== undefined) {
+      sets.push(`description = $${idx++}`);
+      params.push(dto.description);
+    }
+    if (dto.color !== undefined) {
+      sets.push(`color = $${idx++}`);
+      params.push(dto.color);
+    }
+    if (dto.visitDay !== undefined) {
+      sets.push(`visit_day = $${idx++}`);
+      params.push(dto.visitDay);
+    }
 
     if (sets.length === 0) return this.findOne(id);
 
     sets.push('updated_at = NOW()');
     params.push(id);
-    await this.db.query(`UPDATE store_zones SET ${sets.join(', ')} WHERE id = $${idx}`, params);
+    await this.db.query(
+      `UPDATE store_zones SET ${sets.join(', ')} WHERE id = $${idx}`,
+      params,
+    );
     return this.findOne(id);
   }
 

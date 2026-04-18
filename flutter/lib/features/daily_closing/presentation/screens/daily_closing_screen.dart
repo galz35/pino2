@@ -63,8 +63,6 @@ class _DailyClosingScreenState extends ConsumerState<DailyClosingScreen> {
 
   int get _deliveredCount =>
       _deliveries.where((d) => d['status'] == 'Entregado').length;
-  int get _notDeliveredCount =>
-      _deliveries.where((d) => d['status'] == 'No Entregado').length;
   int get _pendingCount =>
       _deliveries.where((d) => d['status'] == 'Pendiente').length;
 

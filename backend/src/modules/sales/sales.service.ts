@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../../database/database.service';
 import { EventsGateway } from '../../common/gateways/events.gateway';
@@ -18,22 +22,31 @@ export class SalesService {
    * 4. Registra `movements` (Kárdex)
    * 5. Actualiza `actual_cash` en `cash_shifts` si es en efectivo
    */
-  async processSale(dto: {
-    storeId: string;
-    cashShiftId?: string;
-    shiftId?: string;
-    cashierId: string;
-    cashierName?: string;
-    ticketNumber?: string;
-    clientId?: string;
-    clientName?: string;
-    items: Array<{ id?: string; productId?: string; quantity: number; unitPrice?: number; salePrice?: number }>;
-    paymentMethod: string;
-    paymentCurrency?: string;
-    amountReceived?: number;
-    change?: number;
-    externalId?: string;
-  }, transactionalClient?: PoolClient) {
+  async processSale(
+    dto: {
+      storeId: string;
+      cashShiftId?: string;
+      shiftId?: string;
+      cashierId: string;
+      cashierName?: string;
+      ticketNumber?: string;
+      clientId?: string;
+      clientName?: string;
+      items: Array<{
+        id?: string;
+        productId?: string;
+        quantity: number;
+        unitPrice?: number;
+        salePrice?: number;
+      }>;
+      paymentMethod: string;
+      paymentCurrency?: string;
+      amountReceived?: number;
+      change?: number;
+      externalId?: string;
+    },
+    transactionalClient?: PoolClient,
+  ) {
     const cashShiftId = dto.cashShiftId || dto.shiftId;
     const ticketNumber = dto.ticketNumber || `T-${Date.now()}`;
 
@@ -41,7 +54,7 @@ export class SalesService {
       // 1. Validar caja abierta
       const shiftRes = await client.query(
         'SELECT status, actual_cash, starting_cash FROM cash_shifts WHERE id = $1 AND store_id = $2 FOR UPDATE',
-        [cashShiftId, dto.storeId]
+        [cashShiftId, dto.storeId],
       );
       if (shiftRes.rowCount === 0 || shiftRes.rows[0].status !== 'OPEN') {
         throw new BadRequestException('La caja está inactiva o cerrada');
@@ -50,15 +63,18 @@ export class SalesService {
       // 2. Calcular totales localmente para seguridad
       let subtotal = 0;
       for (const item of dto.items) {
-          const price = item.unitPrice ?? item.salePrice ?? 0;
-          subtotal += item.quantity * price;
+        const price = item.unitPrice ?? item.salePrice ?? 0;
+        subtotal += item.quantity * price;
       }
       const tax = subtotal * 0.15; // IVA 15% quemado temporalmente para pruebas
       const total = subtotal + tax;
 
       // 3. Comprobar idempotencia si viene externalId
       if (dto.externalId) {
-        const existingSale = await client.query('SELECT * FROM sales WHERE external_id = $1', [dto.externalId]);
+        const existingSale = await client.query(
+          'SELECT * FROM sales WHERE external_id = $1',
+          [dto.externalId],
+        );
         if (existingSale.rowCount > 0) {
           await client.query(
             'INSERT INTO sync_idempotency_log (store_id, external_id, entity_type) VALUES ($1, $2, $3)',
@@ -74,7 +90,17 @@ export class SalesService {
 
       const sql = `INSERT INTO sales (store_id, cash_shift_id, cashier_id, ticket_number, subtotal, tax, total, payment_method, external_id)
                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`;
-      const vals = [dto.storeId, cashShiftId, dto.cashierId, ticketNumber, subtotal, tax, total, dto.paymentMethod, dto.externalId];
+      const vals = [
+        dto.storeId,
+        cashShiftId,
+        dto.cashierId,
+        ticketNumber,
+        subtotal,
+        tax,
+        total,
+        dto.paymentMethod,
+        dto.externalId,
+      ];
       const saleRes = await client.query(sql, vals);
       const sale = saleRes.rows[0];
 
@@ -83,35 +109,39 @@ export class SalesService {
         const productId = item.productId || item.id;
         const price = item.unitPrice ?? item.salePrice ?? 0;
         const lineTotal = item.quantity * price;
-        
+
         // A. Insertar linea de compra
         await client.query(
           `INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, subtotal) 
            VALUES ($1, $2, $3, $4, $5)`,
-          [sale.id, productId, item.quantity, price, lineTotal]
+          [sale.id, productId, item.quantity, price, lineTotal],
         );
 
         // B. Extraer stock actual y restar (con bloqueo concurrente preventivo)
         const prodRes = await client.query(
           'SELECT current_stock, uses_inventory, units_per_bulk FROM products WHERE id = $1 FOR UPDATE',
-          [productId]
+          [productId],
         );
         if (prodRes.rowCount === 0) continue; // producto puede no tener inventario
-        
+
         if (!prodRes.rows[0].uses_inventory) continue;
-        
+
         const oldStock = this.toInt(prodRes.rows[0].current_stock);
         const newStock = oldStock - item.quantity;
         if (newStock < 0) {
-          throw new BadRequestException('Stock insuficiente para completar la venta');
+          throw new BadRequestException(
+            'Stock insuficiente para completar la venta',
+          );
         }
-        const unitsPerBulk = this.toUnitsPerBulk(prodRes.rows[0].units_per_bulk);
+        const unitsPerBulk = this.toUnitsPerBulk(
+          prodRes.rows[0].units_per_bulk,
+        );
         const stockSplit = this.toSplit(newStock, unitsPerBulk);
         const soldSplit = this.toSplit(item.quantity, unitsPerBulk);
 
         await client.query(
           'UPDATE products SET current_stock = $1, stock_bulks = $2, stock_units = $3, updated_at = NOW() WHERE id = $4',
-          [newStock, stockSplit.bulks, stockSplit.units, productId]
+          [newStock, stockSplit.bulks, stockSplit.units, productId],
         );
 
         // C. Asentar en Kárdex
@@ -129,7 +159,7 @@ export class SalesService {
             stockSplit.bulks,
             stockSplit.units,
             `Venta Ticket: ${ticketNumber}`,
-          ]
+          ],
         );
       }
 
@@ -139,11 +169,13 @@ export class SalesService {
         const startingCash = parseFloat(shiftRes.rows[0].starting_cash);
         const currentCash = Number.isFinite(actualCash)
           ? actualCash
-          : (Number.isFinite(startingCash) ? startingCash : 0);
+          : Number.isFinite(startingCash)
+            ? startingCash
+            : 0;
         const newCash = currentCash + total;
         await client.query(
           'UPDATE cash_shifts SET actual_cash = $1 WHERE id = $2',
-          [newCash, cashShiftId]
+          [newCash, cashShiftId],
         );
       }
 
@@ -179,28 +211,39 @@ export class SalesService {
     return await this.db.withTransaction(execute);
   }
 
-  async findAll(storeId?: string, shiftId?: string, startDate?: string, endDate?: string, storeIds?: string) {
+  async findAll(
+    storeId?: string,
+    shiftId?: string,
+    startDate?: string,
+    endDate?: string,
+    storeIds?: string,
+  ) {
     let sql = 'SELECT * FROM sales WHERE 1=1';
     const params = [];
     if (storeId) {
-      sql += ' AND store_id = $' + (params.push(storeId));
+      sql += ' AND store_id = $' + params.push(storeId);
     }
     if (storeIds) {
-      const ids = storeIds.split(',').map(s => s.trim()).filter(Boolean);
+      const ids = storeIds
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       if (ids.length > 0) {
-        const placeholders = ids.map((_, i) => `$${params.length + i + 1}`).join(',');
+        const placeholders = ids
+          .map((_, i) => `$${params.length + i + 1}`)
+          .join(',');
         sql += ` AND store_id IN (${placeholders})`;
         params.push(...ids);
       }
     }
     if (shiftId) {
-      sql += ' AND cash_shift_id = $' + (params.push(shiftId));
+      sql += ' AND cash_shift_id = $' + params.push(shiftId);
     }
     if (startDate) {
-      sql += ' AND created_at >= $' + (params.push(startDate));
+      sql += ' AND created_at >= $' + params.push(startDate);
     }
     if (endDate) {
-      sql += ' AND created_at <= $' + (params.push(endDate));
+      sql += ' AND created_at <= $' + params.push(endDate);
     }
     sql += ' ORDER BY created_at DESC';
     const res = await this.db.query(sql, params);
@@ -217,18 +260,19 @@ export class SalesService {
     sql += ' ORDER BY created_at DESC LIMIT 1';
 
     const saleRes = await this.db.query(sql, params);
-    if (saleRes.rowCount === 0) throw new NotFoundException('Venta no encontrada');
+    if (saleRes.rowCount === 0)
+      throw new NotFoundException('Venta no encontrada');
 
     const itemsRes = await this.db.query(
       `SELECT si.*, p.description, p.barcode 
        FROM sale_items si 
        LEFT JOIN products p ON si.product_id = p.id 
        WHERE si.sale_id = $1`,
-      [saleRes.rows[0].id]
+      [saleRes.rows[0].id],
     );
 
     const sale = this.mapSaleRow(saleRes.rows[0]);
-    sale.items = itemsRes.rows.map(r => ({
+    sale.items = itemsRes.rows.map((r) => ({
       id: r.product_id,
       saleItemId: r.id,
       productId: r.product_id,
@@ -244,11 +288,17 @@ export class SalesService {
     return sale;
   }
 
-  async processReturn(saleId: string, dto: { items: { productId: string; quantity: number }[]; reason?: string }) {
+  async processReturn(
+    saleId: string,
+    dto: { items: { productId: string; quantity: number }[]; reason?: string },
+  ) {
     return await this.db.withTransaction(async (client) => {
       // Verify sale exists
-      const saleRes = await client.query('SELECT * FROM sales WHERE id = $1', [saleId]);
-      if (saleRes.rowCount === 0) throw new NotFoundException('Venta no encontrada');
+      const saleRes = await client.query('SELECT * FROM sales WHERE id = $1', [
+        saleId,
+      ]);
+      if (saleRes.rowCount === 0)
+        throw new NotFoundException('Venta no encontrada');
       const sale = saleRes.rows[0];
 
       let totalRefund = 0;
@@ -257,10 +307,11 @@ export class SalesService {
         // Get original sale item price
         const siRes = await client.query(
           'SELECT product_id, unit_price FROM sale_items WHERE sale_id = $1 AND (product_id = $2 OR id = $2)',
-          [saleId, item.productId]
+          [saleId, item.productId],
         );
         const resolvedProductId = siRes.rows[0]?.product_id || item.productId;
-        const unitPrice = siRes.rowCount > 0 ? parseFloat(siRes.rows[0].unit_price) : 0;
+        const unitPrice =
+          siRes.rowCount > 0 ? parseFloat(siRes.rows[0].unit_price) : 0;
         totalRefund += unitPrice * item.quantity;
 
         const prodLockRes = await client.query(
@@ -272,7 +323,9 @@ export class SalesService {
         }
 
         const currentStock = this.toInt(prodLockRes.rows[0].current_stock);
-        const unitsPerBulk = this.toUnitsPerBulk(prodLockRes.rows[0].units_per_bulk);
+        const unitsPerBulk = this.toUnitsPerBulk(
+          prodLockRes.rows[0].units_per_bulk,
+        );
         const newBalance = currentStock + item.quantity;
         const stockSplit = this.toSplit(newBalance, unitsPerBulk);
         const returnedSplit = this.toSplit(item.quantity, unitsPerBulk);
@@ -297,11 +350,16 @@ export class SalesService {
             stockSplit.bulks,
             stockSplit.units,
             `Devolución Venta: ${sale.ticket_number}. ${dto.reason || ''}`,
-          ]
+          ],
         );
       }
 
-      return { success: true, saleId, totalRefund, message: 'Devolución procesada correctamente' };
+      return {
+        success: true,
+        saleId,
+        totalRefund,
+        message: 'Devolución procesada correctamente',
+      };
     });
   }
 
@@ -315,7 +373,7 @@ export class SalesService {
        WHERE s.store_id = $1 AND s.created_at BETWEEN $2 AND $3
        GROUP BY p.description
        ORDER BY total DESC LIMIT 10`,
-      [storeId, startDate, endDate]
+      [storeId, startDate, endDate],
     );
 
     // 2. Ventas por Método
@@ -324,19 +382,35 @@ export class SalesService {
        FROM sales
        WHERE store_id = $1 AND created_at BETWEEN $2 AND $3
        GROUP BY payment_method`,
-      [storeId, startDate, endDate]
+      [storeId, startDate, endDate],
     );
 
     return {
-      topProducts: productsRes.rows.map(r => ({ name: r.name, value: parseFloat(r.total), count: parseInt(r.count) })),
-      byMethod: methodsRes.rows.map(r => ({ method: r.payment_method, total: parseFloat(r.total), count: parseInt(r.count) }))
+      topProducts: productsRes.rows.map((r) => ({
+        name: r.name,
+        value: parseFloat(r.total),
+        count: parseInt(r.count),
+      })),
+      byMethod: methodsRes.rows.map((r) => ({
+        method: r.payment_method,
+        total: parseFloat(r.total),
+        count: parseInt(r.count),
+      })),
     };
   }
 
   async getDashboardStats(storeId: string) {
     const today = new Date();
-    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
+    const startOfToday = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    ).toISOString();
+    const startOfMonth = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      1,
+    ).toISOString();
     const startOfYear = new Date(today.getFullYear(), 0, 1).toISOString();
 
     const statsRes = await this.db.query(
@@ -346,10 +420,14 @@ export class SalesService {
         COALESCE(SUM(CASE WHEN created_at >= $4 THEN total ELSE 0 END), 0) as yearly
        FROM sales 
        WHERE store_id = $1`,
-      [storeId, startOfToday, startOfMonth, startOfYear]
+      [storeId, startOfToday, startOfMonth, startOfYear],
     );
 
-    const report = await this.getSalesReport(storeId, startOfMonth, today.toISOString());
+    const report = await this.getSalesReport(
+      storeId,
+      startOfMonth,
+      today.toISOString(),
+    );
 
     return {
       dailySales: parseFloat(statsRes.rows[0].daily),
@@ -390,7 +468,10 @@ export class SalesService {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
   }
 
-  private toSplit(totalUnits: number, unitsPerBulk: number): { bulks: number; units: number } {
+  private toSplit(
+    totalUnits: number,
+    unitsPerBulk: number,
+  ): { bulks: number; units: number } {
     const safeTotal = Math.max(0, this.toInt(totalUnits));
     const safeUnitsPerBulk = this.toUnitsPerBulk(unitsPerBulk);
     return {

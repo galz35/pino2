@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import * as bcrypt from 'bcrypt';
 
@@ -38,16 +42,28 @@ export class UsersService {
     if (conditions.length > 0) {
       sql += ' WHERE ' + conditions.join(' AND ');
     }
-    sql += ' GROUP BY u.id, u.email, u.name, u.role, u.is_active, u.created_at ORDER BY u.name ASC';
+    sql +=
+      ' GROUP BY u.id, u.email, u.name, u.role, u.is_active, u.created_at ORDER BY u.name ASC';
 
     const res = await this.db.query(sql, params);
     return res.rows.map(this.mapRow);
   }
 
-  async createUser(dto: { email: string; password: string; name: string; role: string; storeId?: string; storeIds?: string[] }) {
+  async createUser(dto: {
+    email: string;
+    password: string;
+    name: string;
+    role: string;
+    storeId?: string;
+    storeIds?: string[];
+  }) {
     return await this.db.withTransaction(async (client) => {
-      const existing = await client.query('SELECT id FROM users WHERE email = $1', [dto.email]);
-      if ((existing.rowCount ?? 0) > 0) throw new ConflictException('Email ya registrado');
+      const existing = await client.query(
+        'SELECT id FROM users WHERE email = $1',
+        [dto.email],
+      );
+      if ((existing.rowCount ?? 0) > 0)
+        throw new ConflictException('Email ya registrado');
 
       const passwordHash = await bcrypt.hash(dto.password, 10);
       const resUser = await client.query(
@@ -59,7 +75,10 @@ export class UsersService {
       // Assign stores
       const storeIds = dto.storeIds || (dto.storeId ? [dto.storeId] : []);
       for (const sid of storeIds) {
-        await client.query('INSERT INTO user_stores (user_id, store_id) VALUES ($1, $2)', [user.id, sid]);
+        await client.query(
+          'INSERT INTO user_stores (user_id, store_id) VALUES ($1, $2)',
+          [user.id, sid],
+        );
       }
 
       return this.mapRow(user);
@@ -71,7 +90,8 @@ export class UsersService {
       'SELECT id, email, name, role, is_active, created_at FROM users WHERE id = $1',
       [id],
     );
-    if (res.rowCount === 0) throw new NotFoundException('Usuario no encontrado');
+    if (res.rowCount === 0)
+      throw new NotFoundException('Usuario no encontrado');
 
     const user = this.mapRow(res.rows[0]);
 
@@ -89,7 +109,9 @@ export class UsersService {
   }
 
   async findByEmail(email: string) {
-    const res = await this.db.query('SELECT * FROM users WHERE email = $1', [email]);
+    const res = await this.db.query('SELECT * FROM users WHERE email = $1', [
+      email,
+    ]);
     return res.rowCount > 0 ? res.rows[0] : null;
   }
 
@@ -150,13 +172,19 @@ export class UsersService {
 
   async remove(id: string) {
     await this.db.query('DELETE FROM user_stores WHERE user_id = $1', [id]);
-    const res = await this.db.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
-    if (res.rowCount === 0) throw new NotFoundException('Usuario no encontrado');
+    const res = await this.db.query(
+      'DELETE FROM users WHERE id = $1 RETURNING id',
+      [id],
+    );
+    if (res.rowCount === 0)
+      throw new NotFoundException('Usuario no encontrado');
     return { success: true, message: 'Usuario eliminado correctamente' };
   }
 
   private mapRow(row: any): any {
-    const storeIds = Array.isArray(row.store_ids) ? row.store_ids.filter(Boolean) : [];
+    const storeIds = Array.isArray(row.store_ids)
+      ? row.store_ids.filter(Boolean)
+      : [];
     return {
       id: row.id,
       email: row.email,
