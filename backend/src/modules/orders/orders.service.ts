@@ -7,6 +7,7 @@ import { PoolClient } from 'pg';
 import { DatabaseService } from '../../database/database.service';
 import { EventsGateway } from '../../common/gateways/events.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
+import { GruposEconomicosService } from '../grupos-economicos/grupos-economicos.service';
 
 @Injectable()
 export class OrdersService {
@@ -14,6 +15,7 @@ export class OrdersService {
     private readonly db: DatabaseService,
     private readonly eventsGateway: EventsGateway,
     private readonly notifications: NotificationsService,
+    private readonly gruposEconomicos: GruposEconomicosService,
   ) {}
 
   async create(
@@ -34,7 +36,8 @@ export class OrdersService {
       }[];
       notes?: string;
       externalId?: string;
-      type?: 'pedido' | 'venta_directa'; // Nuevo campo
+      type?: 'pedido' | 'venta_directa'; // Legacy option
+      tipoPedido?: 'VENTA_ESTANDAR' | 'ABASTECIMIENTO_INTERNO' | 'ENTREGA_POR_CUENTA';
     },
     transactionalClient?: PoolClient,
   ) {
@@ -64,12 +67,33 @@ export class OrdersService {
       );
 
       const orderType = dto.type || 'pedido';
-      const initialStatus =
-        orderType === 'venta_directa' ? 'ENTREGADO' : 'RECIBIDO';
+      const isDirectSale = orderType === 'venta_directa';
+      const tipoPedido = dto.tipoPedido || 'VENTA_ESTANDAR';
+      const priceLevel = dto.priceLevel || 1;
+      
+      const requiereAsignacionDirecta = isDirectSale;
+      const requiereAutorizacion = priceLevel >= 4;
+      const requiereCobro = tipoPedido !== 'ENTREGA_POR_CUENTA';
+
+      // 1. Cross-mora check (only for VENTA_ESTANDAR credit)
+      if (tipoPedido === 'VENTA_ESTANDAR' && (dto.paymentType || 'CONTADO').toUpperCase() === 'CREDITO' && dto.clientId) {
+        const moraCheck = await this.gruposEconomicos.verificarMoraCruzada(dto.clientId);
+        if (moraCheck.enMora) {
+          throw new BadRequestException(moraCheck.detalle || 'El cliente o su grupo económico tiene facturas en mora');
+        }
+      }
+
+      // 2. Status determination
+      let initialStatus = 'RECIBIDO';
+      if (requiereAsignacionDirecta) {
+        initialStatus = 'ENTREGADO';
+      } else if (requiereAutorizacion) {
+        initialStatus = 'PENDIENTE_AUTORIZACION';
+      }
 
       const res = await client.query(
-        `INSERT INTO orders (store_id, client_id, client_name, vendor_id, sales_manager_name, total, notes, status, payment_type, price_level, external_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        `INSERT INTO orders (store_id, client_id, client_name, vendor_id, sales_manager_name, total, notes, status, payment_type, price_level, external_id, tipo_pedido, requiere_cobro, requiere_autorizacion)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
         [
           dto.storeId,
           dto.clientId || null,
@@ -80,23 +104,31 @@ export class OrdersService {
           dto.notes || null,
           initialStatus,
           dto.paymentType || 'CONTADO',
-          dto.priceLevel || 1,
+          priceLevel,
           dto.externalId,
+          tipoPedido,
+          requiereCobro,
+          requiereAutorizacion,
         ],
       );
       const order = res.rows[0];
 
       await client.query(
         `INSERT INTO order_status_history (order_id, status, user_id) VALUES ($1, $2, $3)`,
-        [order.id, 'RECIBIDO', dto.vendorId || null],
+        [order.id, initialStatus, dto.vendorId || null],
       );
 
-      if ((dto.paymentType || 'CONTADO').toUpperCase() === 'CREDITO') {
+      // Solo generar cuenta por cobrar si NO es ABASTECIMIENTO_INTERNO, SI requiere cobro Y ES CRÉDITO
+      if (
+        (dto.paymentType || 'CONTADO').toUpperCase() === 'CREDITO' &&
+        requiereCobro &&
+        tipoPedido !== 'ABASTECIMIENTO_INTERNO'
+      ) {
         await client.query(
           `INSERT INTO accounts_receivable (store_id, client_id, order_id, total_amount, remaining_amount, description, status)
            VALUES ($1, $2, $3, $4, $4, $5, 'PENDING')`,
           [
-            dto.storeId,
+             dto.storeId,
             dto.clientId || null,
             order.id,
             total,
@@ -269,11 +301,12 @@ export class OrdersService {
     vendorId?: string,
   ) {
     const validTransitions: Record<string, string[]> = {
+      PENDIENTE_AUTORIZACION: ['RECIBIDO', 'CANCELADO'],
       RECIBIDO: ['EN_PREPARACION', 'CANCELADO'],
       EN_PREPARACION: ['ALISTADO', 'CANCELADO'],
       ALISTADO: ['CARGADO_CAMION'],
       CARGADO_CAMION: ['EN_ENTREGA'],
-      EN_ENTREGA: ['ENTREGADO', 'DEVUELTO', 'RECHAZADO'],
+      EN_ENTREGA: ['ENTREGADO', 'DEVUELTO', 'RECHAZADO', 'RECHAZO_TOTAL'],
       PENDING: ['RECIBIDO', 'CANCELADO'],
     };
 
@@ -500,6 +533,32 @@ export class OrdersService {
     });
   }
 
+  async autorizarPrice(id: string, decision: 'aprobar' | 'rechazar', userId: string, motivo?: string) {
+    return this.db.withTransaction(async (client) => {
+      const res = await client.query('SELECT store_id, status FROM orders WHERE id = $1 FOR UPDATE', [id]);
+      if (res.rowCount === 0) throw new NotFoundException('Pedido no encontrado');
+      
+      const currentStatus = res.rows[0].status;
+      if (currentStatus !== 'PENDIENTE_AUTORIZACION') {
+        throw new BadRequestException('El pedido no está pendiente de autorización');
+      }
+
+      const newStatus = decision === 'aprobar' ? 'RECIBIDO' : 'CANCELADO';
+      
+      const updateRes = await client.query(
+        `UPDATE orders SET status = $1, autorizado_por = $2, fecha_autorizacion = NOW(), updated_by = $2, updated_at = NOW() WHERE id = $3 RETURNING *`,
+        [newStatus, userId, id]
+      );
+
+      await client.query(
+        `INSERT INTO order_status_history (order_id, status, user_id) VALUES ($1, $2, $3)`,
+        [id, newStatus, userId],
+      );
+
+      return this.mapRow(updateRes.rows[0]);
+    });
+  }
+
   private mapRow(row: any): any {
     return {
       id: row.id,
@@ -512,6 +571,11 @@ export class OrdersService {
       status: row.status,
       paymentType: row.payment_type || 'CONTADO',
       priceLevel: parseInt(row.price_level || 1),
+      tipoPedido: row.tipo_pedido || 'VENTA_ESTANDAR',
+      requiereCobro: row.requiere_cobro,
+      requiereAutorizacion: row.requiere_autorizacion,
+      ruteroId: row.rutero_id,
+      camionId: row.camion_id,
       notes: row.notes,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

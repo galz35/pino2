@@ -1,0 +1,32 @@
+import { Controller, Get, Post, Put, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { CargasCamionService } from './cargas-camion.service';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+
+@Controller('cargas-camion')
+@UseGuards(JwtAuthGuard)
+export class CargasCamionController {
+  constructor(private readonly service: CargasCamionService) {}
+
+  @Post()
+  create(@Body() dto: any) {
+    return this.service.create(dto);
+  }
+
+  @Get()
+  findAll(
+    @Query('storeId') storeId: string,
+    @Query('fecha') fecha?: string,
+  ) {
+    return this.service.findAll(storeId, fecha);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.service.findOne(id);
+  }
+
+  @Put(':id/salida')
+  despachar(@Param('id') id: string) {
+    return this.service.despachar(id);
+  }
+}

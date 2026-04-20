@@ -1,0 +1,27 @@
+import { Controller, Get, Post, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
+import { LiquidacionesRutaService } from './liquidaciones-ruta.service';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+
+@Controller('liquidaciones-ruta')
+@UseGuards(JwtAuthGuard)
+export class LiquidacionesRutaController {
+  constructor(private readonly service: LiquidacionesRutaService) {}
+
+  @Post()
+  create(@Body() dto: any, @Req() req: any) {
+    return this.service.create({ ...dto, liquidadoPor: req.user.sub });
+  }
+
+  @Get()
+  findAll(
+    @Query('storeId') storeId: string,
+    @Query('fecha') fecha?: string,
+  ) {
+    return this.service.findAll(storeId, fecha);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.service.findOne(id);
+  }
+}

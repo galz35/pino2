@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
@@ -39,6 +40,8 @@ export class OrdersController {
         priceLevel?: number;
       }[];
       notes?: string;
+      externalId?: string;
+      tipoPedido?: 'VENTA_ESTANDAR' | 'ABASTECIMIENTO_INTERNO' | 'ENTREGA_POR_CUENTA';
     },
   ) {
     return this.service.create(dto);
@@ -68,6 +71,16 @@ export class OrdersController {
   @ApiOperation({ summary: 'Obtener detalle de un pedido' })
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
+  }
+
+  @Post(':id/autorizar')
+  @ApiOperation({ summary: 'Autorizar precio especial de un pedido' })
+  autorizar(
+    @Param('id') id: string,
+    @Body() dto: { decision: 'aprobar' | 'rechazar'; motivo?: string },
+    @Req() req: any
+  ) {
+    return this.service.autorizarPrice(id, dto.decision, req.user.sub, dto.motivo);
   }
 
   @Patch(':id/status')

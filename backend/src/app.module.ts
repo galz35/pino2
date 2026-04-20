@@ -36,6 +36,11 @@ import { ReturnsModule } from './modules/returns/returns.module';
 import { CollectionsModule } from './modules/collections/collections.module';
 import { AccountsPayableModule } from './modules/accounts-payable/accounts-payable.module';
 import { DailyClosingsModule } from './modules/daily-closings/daily-closings.module';
+import { GruposEconomicosModule } from './modules/grupos-economicos/grupos-economicos.module';
+import { GruposClientesModule } from './modules/grupos-clientes/grupos-clientes.module';
+import { ArqueosModule } from './modules/arqueos/arqueos.module';
+import { CargasCamionModule } from './modules/cargas-camion/cargas-camion.module';
+import { LiquidacionesRutaModule } from './modules/liquidaciones-ruta/liquidaciones-ruta.module';
 
 @Module({
   imports: [
@@ -74,6 +79,11 @@ import { DailyClosingsModule } from './modules/daily-closings/daily-closings.mod
     CollectionsModule,
     AccountsPayableModule,
     DailyClosingsModule,
+    GruposEconomicosModule,
+    GruposClientesModule,
+    ArqueosModule,
+    CargasCamionModule,
+    LiquidacionesRutaModule,
   ],
 })
 export class AppModule {}

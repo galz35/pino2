@@ -45,4 +45,13 @@ export class SyncController {
   forceSync(@Param('storeId') storeId: string) {
     return this.service.forceSync(storeId);
   }
+
+  @Get('data')
+  @ApiOperation({ summary: 'Obtener datos sincronizados (Delta Sync)' })
+  getDeltaData(
+    @Query('storeId') storeId: string,
+    @Query('lastSyncTimestamp') lastSyncTimestamp?: string,
+  ) {
+    return this.service.getDeltaData(storeId, lastSyncTimestamp);
+  }
 }
