@@ -1,0 +1,193 @@
+================================================================================
+  FASE 4: FLUTTER - ROL PREVENTA (Levantamiento de Pedidos en Campo)
+  Prioridad: ALTA
+  Esfuerzo: 4-5 días
+================================================================================
+
+CONCEPTO CLAVE:
+  El Preventa NO cobra. Solo levanta pedidos visitando clientes en la calle.
+  Ve TODO el inventario de la bodega (no se le asigna inventario propio).
+  Tiene clientes asignados por grupos/áreas.
+  Los pedidos que levanta se entregan 3 días después.
+
+4.1 NUEVO ROL EN AUTH: "preventa"
+====================================
+Archivo: flutter/lib/features/auth/
+
+Modificar:
+  - role_utils.dart → Agregar 'preventa' como rol válido
+  - home_screen.dart → Redirigir preventa a su dashboard específico
+
+Navegación del Preventa:
+  📋 Mi Ruta del Día (clientes a visitar hoy)
+  🛒 Levantar Pedido (catálogo + carrito)
+  📊 Mis Pedidos (historial)
+  👥 Mis Clientes
+  🔄 Sincronizar
+
+4.2 FEATURE: preventa_dashboard (NUEVO)
+==========================================
+Archivo: flutter/lib/features/preventa/presentation/screens/
+
+a) preventa_home_screen.dart
+  - Resumen del día:
+    * Clientes visitados / total asignados
+    * Pedidos levantados hoy
+    * Monto total vendido hoy
+  - Botón destacado: "Iniciar Ruta" → va a la lista de clientes del día
+  - Indicador de sincronización (último sync)
+
+b) preventa_route_screen.dart (Mi Ruta del Día)
+  - Lista de clientes asignados para hoy (filtrado por dia_visita)
+  - Cada cliente muestra:
+    * Nombre del negocio
+    * Dirección
+    * Estado de crédito: 🟢 Al día | 🟡 Por vencer | 🔴 En mora
+    * Último pedido (fecha y monto)
+  - Al tocar un cliente → Navega a pantalla de pedido
+  - Checkbox de "Visitado" / "No encontrado" / "No compró"
+  - Badge de frecuencia: Semanal, Quincenal
+
+c) preventa_order_screen.dart (Levantar Pedido)
+  ESTO ES DIFERENTE AL quick_order_screen.dart EXISTENTE.
+  El preventa ve el inventario de BODEGA, no el de un vendedor.
+
+  Flujo:
+  1. Se muestra el catálogo completo de la bodega (products de la store)
+  2. Buscador por nombre, código, categoría
+  3. Al agregar producto al carrito:
+     - Seleccionar presentación (UNIDAD / BULTO)
+     - Seleccionar nivel de precio (1, 2, 3, 4, 5)
+     - Si nivel 4 o 5: Advertencia visual "⚠ Requiere autorización del admin"
+     - Ingresar cantidad
+  4. Carrito lateral con resumen:
+     - Lista de items con subtotales
+     - Total del pedido
+     - Selector: CONTADO | CRÉDITO
+     - Si CRÉDITO: mostrar disponible de crédito del cliente
+     - Si el cliente o su grupo económico está en mora: BLOQUEAR y mostrar alerta
+  5. Botón "Enviar Pedido":
+     - Si offline: guardar en SQLite local con external_id (UUID v4)
+     - Si online: POST /api/orders con tipo_pedido = VENTA_ESTANDAR
+     - Si precio nivel 4/5: status será PENDIENTE_AUTORIZACION
+  6. Confirmación: Pantalla de resumen con número de pedido
+     - Opción de compartir por WhatsApp al cliente
+
+  Campos del pedido creado:
+  {
+    storeId: string,
+    clientId: string,
+    vendorId: preventaUserId,  // El preventa que levantó
+    items: [{ productId, quantity, unitPrice, presentation, priceLevel }],
+    paymentType: 'CONTADO' | 'CREDITO',
+    priceLevel: 1-5,
+    tipo_pedido: 'VENTA_ESTANDAR',
+    notes: string,
+    externalId: UUID_v4  // Para idempotencia offline
+  }
+
+4.3 FEATURE: preventa_clients (NUEVO)
+========================================
+Archivo: flutter/lib/features/preventa/presentation/screens/
+
+a) preventa_clients_screen.dart (Mis Clientes)
+  - Lista de todos los clientes asignados al preventa
+  - Agrupados por grupo_cliente (tabs o acordeón)
+  - Buscar por nombre, zona
+  - Cada cliente muestra:
+    * Nombre, teléfono, dirección
+    * Saldo pendiente
+    * Días desde última visita
+    * Frecuencia asignada
+  - Botón flotante: "+ Nuevo Cliente" (registra en campo)
+    * Nombre, teléfono, dirección, zona
+    * Capturar ubicación GPS automáticamente
+    * Se guarda con preventa_id = usuario actual
+
+b) preventa_client_detail_screen.dart
+  - Historial de pedidos del cliente
+  - Estado de cuenta (facturas pendientes)
+  - Notas de entrega
+  - Botón "Levantar Pedido" → navega a preventa_order_screen
+
+4.4 DATA LAYER: Sincronización Delta (MODIFICAR)
+===================================================
+Archivo: flutter/lib/core/network/sync_service.dart
+
+Estado actual: El sync descarga TODO cada vez.
+Cambio necesario: Implementar Delta Sync.
+
+Lógica:
+  1. Al iniciar sync, leer last_sync_timestamp de SharedPreferences
+  2. GET /api/sync/data?last_sync_timestamp=ISO8601
+  3. El backend retorna solo registros modificados después de esa fecha
+  4. Insertar/actualizar en SQLite local (UPSERT)
+  5. Guardar nuevo serverTimestamp como last_sync_timestamp
+  6. Para la primera ejecución (sin timestamp): full sync
+
+  Sync bidireccional:
+  1. SUBIR: Pedidos creados offline (tabla local pending_orders)
+     - POST /api/orders con external_id
+     - Si respuesta.isDuplicate = true, marcar como sincronizado sin error
+  2. BAJAR: Productos, clientes, estados de pedidos actualizados
+
+4.5 DATA LAYER: Cache Local del Preventa
+==========================================
+Archivo: flutter/lib/core/database/preventa_cache.dart (NUEVO)
+
+Tablas SQLite locales:
+  - cached_products (espejo de products de la bodega)
+  - cached_clients (solo MIS clientes asignados)
+  - local_orders (pedidos creados offline, pendientes de sync)
+  - visit_log (registro de visitas del día)
+
+Funciones:
+  - upsertProducts(List<Product>) → Actualiza cache de productos
+  - getClientesDelDia(diaSemana) → Filtra por dia_visita
+  - saveOrderLocal(Order) → Guarda para sync posterior
+  - getPendingOrders() → Retorna pedidos sin sincronizar
+  - markAsSynced(externalId) → Marca pedido como enviado
+
+4.6 PRESENTACIÓN: UX del Preventa
+====================================
+Diseño de pantallas:
+
+  HOME:
+  ┌─────────────────────────────┐
+  │  Buenos días, [Nombre]      │
+  │  📅 Martes 20 de Abril      │
+  ├─────────────────────────────┤
+  │  🟢 Sincronizado hace 5min  │
+  ├─────────────────────────────┤
+  │  ┌────────┐ ┌────────┐     │
+  │  │ 8/15   │ │ C$12k  │     │
+  │  │Visitas │ │Vendido │     │
+  │  └────────┘ └────────┘     │
+  │  ┌────────┐ ┌────────┐     │
+  │  │  5     │ │  2     │     │
+  │  │Pedidos │ │Pendien.│     │
+  │  └────────┘ └────────┘     │
+  ├─────────────────────────────┤
+  │  [▶ INICIAR RUTA DEL DÍA]  │
+  ├─────────────────────────────┤
+  │  Últimos pedidos:           │
+  │  • Pulp. Doña María - C$450 │
+  │  • Mini Súper El Sol - C$1.2k│
+  └─────────────────────────────┘
+
+  CARRITO DE PEDIDO:
+  ┌─────────────────────────────┐
+  │ 🛒 Pedido - Pulp. Doña María│
+  ├─────────────────────────────┤
+  │ 🔍 Buscar producto...       │
+  ├─────────────────────────────┤
+  │ Coca Cola 600ml    x12  $60 │
+  │ Galleta María      x5   $25 │
+  │ Aceite 1L          x2   $50 │
+  ├─────────────────────────────┤
+  │ Subtotal:           C$ 135  │
+  │ ○ Contado  ● Crédito        │
+  │ Crédito disp: C$ 2,000      │
+  ├─────────────────────────────┤
+  │ [📤 ENVIAR PEDIDO]          │
+  └─────────────────────────────┘
