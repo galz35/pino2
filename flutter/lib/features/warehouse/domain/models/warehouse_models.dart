@@ -44,6 +44,7 @@ class WarehouseOrder {
     this.salesManagerName,
     this.notes,
     this.createdAt,
+    this.type, // VENTA_ESTANDAR, ABASTECIMIENTO_INTERNO, etc.
     this.items = const [],
   });
 
@@ -56,6 +57,7 @@ class WarehouseOrder {
   final String? salesManagerName;
   final String? notes;
   final DateTime? createdAt;
+  final String? type;
   final List<WarehouseOrderItem> items;
 
   factory WarehouseOrder.fromJson(Map<String, dynamic> json) {
@@ -80,7 +82,77 @@ class WarehouseOrder {
       salesManagerName: json['salesManagerName']?.toString(),
       notes: json['notes']?.toString(),
       createdAt: DateTime.tryParse('${json['createdAt'] ?? ''}'),
+      type: json['type']?.toString() ?? 'VENTA_ESTANDAR',
       items: items,
+    );
+  }
+}
+
+class CargaCamion {
+  const CargaCamion({
+    required this.id,
+    required this.storeId,
+    required this.vendorId,
+    required this.vendorName,
+    required this.plate,
+    required this.status,
+    required this.items,
+    required this.orderCount,
+    required this.clientCount,
+  });
+
+  final String id;
+  final String storeId;
+  final String vendorId;
+  final String vendorName;
+  final String plate;
+  final String status; // PENDIENTE, EN_RUTA, LIQUIDADO
+  final List<CargaCamionItem> items;
+  final int orderCount;
+  final int clientCount;
+
+  factory CargaCamion.fromJson(Map<String, dynamic> json) {
+    final rawItems = json['items'];
+    final itemsList = rawItems is List
+        ? rawItems.map((e) => CargaCamionItem.fromJson(Map<String, dynamic>.from(e))).toList()
+        : <CargaCamionItem>[];
+
+    return CargaCamion(
+      id: json['id']?.toString() ?? '',
+      storeId: json['storeId']?.toString() ?? '',
+      vendorId: json['vendorId']?.toString() ?? '',
+      vendorName: json['vendorName']?.toString() ?? 'Rutero',
+      plate: json['plate']?.toString() ?? '-',
+      status: json['status']?.toString() ?? 'PENDIENTE',
+      items: itemsList,
+      orderCount: int.tryParse('${json['orderCount'] ?? 0}') ?? 0,
+      clientCount: int.tryParse('${json['clientCount'] ?? 0}') ?? 0,
+    );
+  }
+}
+
+class CargaCamionItem {
+  const CargaCamionItem({
+    required this.productId,
+    required this.productName,
+    required this.totalBulks,
+    required this.totalUnits,
+    required this.presentation,
+  });
+
+  final String productId;
+  final String productName;
+  final int totalBulks;
+  final int totalUnits;
+  final String presentation;
+
+  factory CargaCamionItem.fromJson(Map<String, dynamic> json) {
+    return CargaCamionItem(
+      productId: json['productId']?.toString() ?? '',
+      productName: json['productName']?.toString() ?? 'Producto',
+      totalBulks: int.tryParse('${json['totalBulks'] ?? 0}') ?? 0,
+      totalUnits: int.tryParse('${json['totalUnits'] ?? 0}') ?? 0,
+      presentation: json['presentation']?.toString() ?? 'BULTO',
     );
   }
 }

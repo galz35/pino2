@@ -5328,6 +5328,355 @@ class SyncQueueEntriesCompanion extends UpdateCompanion<SyncQueueEntry> {
   }
 }
 
+class $VisitLogsTable extends VisitLogs
+    with TableInfo<$VisitLogsTable, VisitLog> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $VisitLogsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _clientIdMeta = const VerificationMeta(
+    'clientId',
+  );
+  @override
+  late final GeneratedColumn<String> clientId = GeneratedColumn<String>(
+    'client_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _timestampMeta = const VerificationMeta(
+    'timestamp',
+  );
+  @override
+  late final GeneratedColumn<DateTime> timestamp = GeneratedColumn<DateTime>(
+    'timestamp',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    clientId,
+    status,
+    notes,
+    timestamp,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'visit_logs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<VisitLog> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('client_id')) {
+      context.handle(
+        _clientIdMeta,
+        clientId.isAcceptableOrUnknown(data['client_id']!, _clientIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_clientIdMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('timestamp')) {
+      context.handle(
+        _timestampMeta,
+        timestamp.isAcceptableOrUnknown(data['timestamp']!, _timestampMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_timestampMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  VisitLog map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return VisitLog(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      clientId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}client_id'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      timestamp: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}timestamp'],
+      )!,
+    );
+  }
+
+  @override
+  $VisitLogsTable createAlias(String alias) {
+    return $VisitLogsTable(attachedDatabase, alias);
+  }
+}
+
+class VisitLog extends DataClass implements Insertable<VisitLog> {
+  final int id;
+  final String clientId;
+  final String status;
+  final String? notes;
+  final DateTime timestamp;
+  const VisitLog({
+    required this.id,
+    required this.clientId,
+    required this.status,
+    this.notes,
+    required this.timestamp,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['client_id'] = Variable<String>(clientId);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['timestamp'] = Variable<DateTime>(timestamp);
+    return map;
+  }
+
+  VisitLogsCompanion toCompanion(bool nullToAbsent) {
+    return VisitLogsCompanion(
+      id: Value(id),
+      clientId: Value(clientId),
+      status: Value(status),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      timestamp: Value(timestamp),
+    );
+  }
+
+  factory VisitLog.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return VisitLog(
+      id: serializer.fromJson<int>(json['id']),
+      clientId: serializer.fromJson<String>(json['clientId']),
+      status: serializer.fromJson<String>(json['status']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      timestamp: serializer.fromJson<DateTime>(json['timestamp']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'clientId': serializer.toJson<String>(clientId),
+      'status': serializer.toJson<String>(status),
+      'notes': serializer.toJson<String?>(notes),
+      'timestamp': serializer.toJson<DateTime>(timestamp),
+    };
+  }
+
+  VisitLog copyWith({
+    int? id,
+    String? clientId,
+    String? status,
+    Value<String?> notes = const Value.absent(),
+    DateTime? timestamp,
+  }) => VisitLog(
+    id: id ?? this.id,
+    clientId: clientId ?? this.clientId,
+    status: status ?? this.status,
+    notes: notes.present ? notes.value : this.notes,
+    timestamp: timestamp ?? this.timestamp,
+  );
+  VisitLog copyWithCompanion(VisitLogsCompanion data) {
+    return VisitLog(
+      id: data.id.present ? data.id.value : this.id,
+      clientId: data.clientId.present ? data.clientId.value : this.clientId,
+      status: data.status.present ? data.status.value : this.status,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VisitLog(')
+          ..write('id: $id, ')
+          ..write('clientId: $clientId, ')
+          ..write('status: $status, ')
+          ..write('notes: $notes, ')
+          ..write('timestamp: $timestamp')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, clientId, status, notes, timestamp);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is VisitLog &&
+          other.id == this.id &&
+          other.clientId == this.clientId &&
+          other.status == this.status &&
+          other.notes == this.notes &&
+          other.timestamp == this.timestamp);
+}
+
+class VisitLogsCompanion extends UpdateCompanion<VisitLog> {
+  final Value<int> id;
+  final Value<String> clientId;
+  final Value<String> status;
+  final Value<String?> notes;
+  final Value<DateTime> timestamp;
+  const VisitLogsCompanion({
+    this.id = const Value.absent(),
+    this.clientId = const Value.absent(),
+    this.status = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.timestamp = const Value.absent(),
+  });
+  VisitLogsCompanion.insert({
+    this.id = const Value.absent(),
+    required String clientId,
+    required String status,
+    this.notes = const Value.absent(),
+    required DateTime timestamp,
+  }) : clientId = Value(clientId),
+       status = Value(status),
+       timestamp = Value(timestamp);
+  static Insertable<VisitLog> custom({
+    Expression<int>? id,
+    Expression<String>? clientId,
+    Expression<String>? status,
+    Expression<String>? notes,
+    Expression<DateTime>? timestamp,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (clientId != null) 'client_id': clientId,
+      if (status != null) 'status': status,
+      if (notes != null) 'notes': notes,
+      if (timestamp != null) 'timestamp': timestamp,
+    });
+  }
+
+  VisitLogsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? clientId,
+    Value<String>? status,
+    Value<String?>? notes,
+    Value<DateTime>? timestamp,
+  }) {
+    return VisitLogsCompanion(
+      id: id ?? this.id,
+      clientId: clientId ?? this.clientId,
+      status: status ?? this.status,
+      notes: notes ?? this.notes,
+      timestamp: timestamp ?? this.timestamp,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (clientId.present) {
+      map['client_id'] = Variable<String>(clientId.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (timestamp.present) {
+      map['timestamp'] = Variable<DateTime>(timestamp.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('VisitLogsCompanion(')
+          ..write('id: $id, ')
+          ..write('clientId: $clientId, ')
+          ..write('status: $status, ')
+          ..write('notes: $notes, ')
+          ..write('timestamp: $timestamp')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5347,6 +5696,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SyncQueueEntriesTable syncQueueEntries = $SyncQueueEntriesTable(
     this,
   );
+  late final $VisitLogsTable visitLogs = $VisitLogsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5361,6 +5711,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     cachedDeliveries,
     realtimeEventLogs,
     syncQueueEntries,
+    visitLogs,
   ];
 }
 
@@ -8031,6 +8382,194 @@ typedef $$SyncQueueEntriesTableProcessedTableManager =
       SyncQueueEntry,
       PrefetchHooks Function()
     >;
+typedef $$VisitLogsTableCreateCompanionBuilder =
+    VisitLogsCompanion Function({
+      Value<int> id,
+      required String clientId,
+      required String status,
+      Value<String?> notes,
+      required DateTime timestamp,
+    });
+typedef $$VisitLogsTableUpdateCompanionBuilder =
+    VisitLogsCompanion Function({
+      Value<int> id,
+      Value<String> clientId,
+      Value<String> status,
+      Value<String?> notes,
+      Value<DateTime> timestamp,
+    });
+
+class $$VisitLogsTableFilterComposer
+    extends Composer<_$AppDatabase, $VisitLogsTable> {
+  $$VisitLogsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get clientId => $composableBuilder(
+    column: $table.clientId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get timestamp => $composableBuilder(
+    column: $table.timestamp,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$VisitLogsTableOrderingComposer
+    extends Composer<_$AppDatabase, $VisitLogsTable> {
+  $$VisitLogsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get clientId => $composableBuilder(
+    column: $table.clientId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get timestamp => $composableBuilder(
+    column: $table.timestamp,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$VisitLogsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $VisitLogsTable> {
+  $$VisitLogsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get clientId =>
+      $composableBuilder(column: $table.clientId, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get timestamp =>
+      $composableBuilder(column: $table.timestamp, builder: (column) => column);
+}
+
+class $$VisitLogsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $VisitLogsTable,
+          VisitLog,
+          $$VisitLogsTableFilterComposer,
+          $$VisitLogsTableOrderingComposer,
+          $$VisitLogsTableAnnotationComposer,
+          $$VisitLogsTableCreateCompanionBuilder,
+          $$VisitLogsTableUpdateCompanionBuilder,
+          (VisitLog, BaseReferences<_$AppDatabase, $VisitLogsTable, VisitLog>),
+          VisitLog,
+          PrefetchHooks Function()
+        > {
+  $$VisitLogsTableTableManager(_$AppDatabase db, $VisitLogsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$VisitLogsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$VisitLogsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$VisitLogsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> clientId = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<DateTime> timestamp = const Value.absent(),
+              }) => VisitLogsCompanion(
+                id: id,
+                clientId: clientId,
+                status: status,
+                notes: notes,
+                timestamp: timestamp,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String clientId,
+                required String status,
+                Value<String?> notes = const Value.absent(),
+                required DateTime timestamp,
+              }) => VisitLogsCompanion.insert(
+                id: id,
+                clientId: clientId,
+                status: status,
+                notes: notes,
+                timestamp: timestamp,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$VisitLogsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $VisitLogsTable,
+      VisitLog,
+      $$VisitLogsTableFilterComposer,
+      $$VisitLogsTableOrderingComposer,
+      $$VisitLogsTableAnnotationComposer,
+      $$VisitLogsTableCreateCompanionBuilder,
+      $$VisitLogsTableUpdateCompanionBuilder,
+      (VisitLog, BaseReferences<_$AppDatabase, $VisitLogsTable, VisitLog>),
+      VisitLog,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -8059,4 +8598,6 @@ class $AppDatabaseManager {
       $$RealtimeEventLogsTableTableManager(_db, _db.realtimeEventLogs);
   $$SyncQueueEntriesTableTableManager get syncQueueEntries =>
       $$SyncQueueEntriesTableTableManager(_db, _db.syncQueueEntries);
+  $$VisitLogsTableTableManager get visitLogs =>
+      $$VisitLogsTableTableManager(_db, _db.visitLogs);
 }

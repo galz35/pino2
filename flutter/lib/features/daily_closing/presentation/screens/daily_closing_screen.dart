@@ -67,7 +67,7 @@ class _DailyClosingScreenState extends ConsumerState<DailyClosingScreen> {
       _deliveries.where((d) => d['status'] == 'Pendiente').length;
 
   double get _totalSales => _deliveries
-      .where((d) => d['status'] == 'Entregado')
+      .where((d) => d['status'] == 'Entregado' && (d['paymentType']?.toUpperCase() == 'CASH' || d['paymentType']?.toUpperCase() == 'CONTADO'))
       .fold<double>(0, (s, d) => s + (double.tryParse('${d['total']}') ?? 0));
 
   double get _totalReturns => _returns.fold<double>(
@@ -82,8 +82,7 @@ class _DailyClosingScreenState extends ConsumerState<DailyClosingScreen> {
   );
 
   double get _cashTotal {
-    final v = _totalSales + _totalCollections - _totalReturns;
-    return v < 0 ? 0 : v;
+    return _totalSales + _totalCollections;
   }
 
   @override
@@ -282,37 +281,37 @@ class _DailyClosingScreenState extends ConsumerState<DailyClosingScreen> {
 
                   // ── Metric chips ──
                   // ── Simple status card ──
+                  // ── Detailed Summary Card ──
+                  _RouteSummaryDetails(
+                    totalAssigned: _deliveries.length,
+                    delivered: _deliveredCount,
+                    rejected: _deliveries.where((d) => d['status'] == 'RECHAZO_TOTAL').length,
+                    contadoIncome: _totalSales,
+                    creditoIncome: _totalCollections,
+                    returnsValue: _totalReturns,
+                    returnsCount: _returns.length,
+                  ),
+                  const SizedBox(height: 24),
+
                   Container(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEEF2FF),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFC7D2FE)),
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(18),
                     ),
                     child: Column(
                       children: [
-                        const Icon(
-                          Icons.local_shipping_rounded,
-                          size: 48,
-                          color: Color(0xFF4F46E5),
+                        const Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded, color: Color(0xFF475569)),
+                            SizedBox(width: 12),
+                            Text('Información de Cierre', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Jornada de Entregas',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF312E81),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
                         Text(
-                          'Has completado $_deliveredCount entregas hoy. Al finalizar el día, presiona el botón inferior para notificar a la base y proceder con la entrega de dinero y productos en las instalaciones.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: const Color(0xFF312E81).withValues(alpha: 0.8),
-                          ),
+                          'Al confirmar el cierre, se notificará a la administración. Deberás entregar C\$ ${_cashTotal.toStringAsFixed(2)} en efectivo y realizar el arqueo de productos devueltos en bodega.',
+                          style: const TextStyle(fontSize: 13, color: Colors.black87),
                         ),
                       ],
                     ),
@@ -356,7 +355,7 @@ class _ClosingHero extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF312E81)],
+          colors: [Color(0xFF0F172A), Color(0xFF064E3B)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -382,10 +381,10 @@ class _ClosingHero extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'Caja ya cerrada hoy',
+                    'CIERRE FINALIZADO',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: const Color(0xFF86EFAC),
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ],
@@ -393,20 +392,106 @@ class _ClosingHero extends StatelessWidget {
             ),
           Text(
             storeName != null
-                ? 'Cierre de Caja • $storeName'
-                : 'Cierre de Caja',
+                ? 'Arqueo de Ruta • $storeName'
+                : 'Arqueo de Ruta',
             style: theme.textTheme.headlineSmall?.copyWith(
               color: Colors.white,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            todayFormatted,
+            todayFormatted.toUpperCase(),
             style: theme.textTheme.bodyMedium?.copyWith(
               color: Colors.white.withValues(alpha: 0.72),
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.bold,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RouteSummaryDetails extends StatelessWidget {
+  const _RouteSummaryDetails({
+    required this.totalAssigned,
+    required this.delivered,
+    required this.rejected,
+    required this.contadoIncome,
+    required this.creditoIncome,
+    required this.returnsValue,
+    required this.returnsCount,
+  });
+
+  final int totalAssigned;
+  final int delivered;
+  final int rejected;
+  final double contadoIncome;
+  final double creditoIncome;
+  final double returnsValue;
+  final int returnsCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('RESUMEN AUTOMÁTICO DEL DÍA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 1.1, color: Colors.blueGrey)),
+            const Divider(height: 32),
+            _SummaryRow(label: 'Pedidos asignados', value: '$totalAssigned', icon: Icons.assignment),
+            _SummaryRow(label: 'Entregados exitosos', value: '$delivered', icon: Icons.check_circle, color: Colors.green),
+            _SummaryRow(label: 'Rechazos totales', value: '$rejected', icon: Icons.cancel, color: Colors.red),
+            const Divider(height: 32),
+            const Text('INGRESOS DE EFECTIVO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blueGrey)),
+            _SummaryRow(label: 'Cobros contado (Hoy)', value: 'C\$ ${contadoIncome.toStringAsFixed(2)}', icon: Icons.payments),
+            _SummaryRow(label: 'Cobros crédito (Arreglos)', value: 'C\$ ${creditoIncome.toStringAsFixed(2)}', icon: Icons.request_quote),
+            const Divider(height: 32),
+            const Text('CONTROL DE INVENTARIO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blueGrey)),
+            _SummaryRow(label: 'Items para devolver', value: '$returnsCount unids', icon: Icons.inventory),
+            _SummaryRow(label: 'Valor en devoluciones', value: 'C\$ ${returnsValue.toStringAsFixed(2)}', icon: Icons.money_off),
+            const Divider(height: 48),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('EFECTIVO A ENTREGAR', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                Text('C\$ ${(contadoIncome + creditoIncome).toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Color(0xFF0F172A))),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryRow extends StatelessWidget {
+  const _SummaryRow({required this.label, required this.value, required this.icon, this.color});
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: color ?? Colors.grey.shade600),
+          const SizedBox(width: 12),
+          Text(label, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w500)),
+          const Spacer(),
+          Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: color ?? Colors.black87, fontSize: 15)),
         ],
       ),
     );

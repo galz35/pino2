@@ -199,6 +199,11 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Cobros rápidos')),
+      floatingActionButton: bootstrapAsync.maybeWhen(
+        data: (b) => _buildFloatingSummary(b.summary),
+        orElse: () => null,
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(collectionsBootstrapProvider(widget.storeId));
@@ -276,6 +281,57 @@ class _CollectionsScreenState extends ConsumerState<CollectionsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget? _buildFloatingSummary(CollectionsSummary summary) {
+    if (summary.totalAmount <= 0) return null;
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.account_balance_wallet_rounded,
+              color: Colors.greenAccent),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('COBRADO HOY (MÓVIL)',
+                    style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5)),
+                Text('C\$ ${summary.totalAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18)),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () =>
+                ref.invalidate(collectionsBootstrapProvider(widget.storeId)),
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          ),
+        ],
       ),
     );
   }

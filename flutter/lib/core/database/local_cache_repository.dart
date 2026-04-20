@@ -439,6 +439,76 @@ class LocalCacheRepository {
   Future<void> retryFailedSyncEntries() {
     return _database.retryFailedSyncEntries();
   }
+
+  // --- Visit Logs ---
+  Future<void> signVisit({
+    required String clientId,
+    required String status,
+    String? notes,
+  }) async {
+    await _database.into(_database.visitLogs).insert(
+          VisitLogsCompanion.insert(
+            clientId: clientId,
+            status: status,
+            notes: Value(notes),
+            timestamp: DateTime.now().toUtc(),
+          ),
+        );
+  }
+
+  Future<List<VisitLog>> getVisits() {
+    return _database.select(_database.visitLogs).get();
+  }
+
+  // --- Delta Support ---
+  Future<void> upsertProducts(List<CatalogProduct> products) async {
+    final now = DateTime.now().toUtc();
+    final rows = products.map((product) => CachedProductsCompanion.insert(
+      id: product.id,
+      storeId: product.storeId,
+      description: product.description,
+      salePrice: product.salePrice,
+      currentStock: product.currentStock,
+      unitsPerBulk: product.unitsPerBulk,
+      stockBulks: product.stockBulks,
+      stockUnits: product.stockUnits,
+      barcode: Value(product.barcode),
+      brand: Value(product.brand),
+      department: Value(product.department),
+      subDepartment: Value(product.subDepartment),
+      minStock: Value(product.minStock),
+      cachedAt: now,
+    )).toList();
+
+    await _database.batch((batch) {
+      batch.insertAll(
+        _database.cachedProducts,
+        rows,
+        mode: InsertMode.insertOrReplace,
+      );
+    });
+  }
+
+  Future<void> upsertClients(String storeId, List<ClientSummary> clients) async {
+    final now = DateTime.now().toUtc();
+    final rows = clients.map((client) => CachedClientsCompanion.insert(
+      id: client.id,
+      storeId: storeId,
+      name: client.name,
+      email: Value(client.email),
+      phone: Value(client.phone),
+      address: Value(client.address),
+      cachedAt: now,
+    )).toList();
+
+    await _database.batch((batch) {
+      batch.insertAll(
+        _database.cachedClients,
+        rows,
+        mode: InsertMode.insertOrReplace,
+      );
+    });
+  }
 }
 
 final localCacheRepositoryProvider = Provider<LocalCacheRepository>((ref) {

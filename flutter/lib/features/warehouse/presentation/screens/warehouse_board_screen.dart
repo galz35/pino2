@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/database/local_cache_repository.dart';
 import '../../../../core/network/connectivity_service.dart';
@@ -126,18 +127,8 @@ class _WarehouseBoardScreenState extends ConsumerState<WarehouseBoardScreen>
       }
 
       if (detail.status == 'EN_PREPARACION') {
-        final confirmed = await showModalBottomSheet<bool>(
-          context: context,
-          isScrollControlled: true,
-          showDragHandle: true,
-          builder: (context) => _PickingSheet(order: detail),
-        );
+        final confirmed = await context.push<bool>('/picking-checklist', extra: detail);
         if (confirmed == true) {
-          await ref.read(warehouseRepositoryProvider).updateStatus(
-                orderId: order.id,
-                accessToken: session.accessToken,
-                status: 'ALISTADO',
-              );
           await _refresh();
         }
         return;
@@ -202,6 +193,13 @@ class _WarehouseBoardScreenState extends ConsumerState<WarehouseBoardScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bodega rápida'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.local_shipping_rounded),
+            tooltip: 'Gestión de Cargas',
+            onPressed: () => context.push('/carga-camion/${widget.storeId}'),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
@@ -379,6 +377,14 @@ class _WarehouseOrderCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (order.type == 'ABASTECIMIENTO_INTERNO')
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(color: Colors.red.shade600, borderRadius: BorderRadius.circular(8)),
+                child: const Text('ABASTECIMIENTO INTERNO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+              ),
             Row(
               children: [
                 Expanded(
@@ -406,6 +412,12 @@ class _WarehouseOrderCard extends StatelessWidget {
                     icon: Icons.person_outline_rounded,
                     text: order.salesManagerName!,
                   ),
+                if (order.vendorId != null)
+                   _WarehousePill(
+                    icon: Icons.local_shipping_rounded,
+                    text: 'Asignado',
+                    color: Colors.blue.shade50,
+                  ),
               ],
             ),
             if ((order.notes ?? '').isNotEmpty) ...[
@@ -426,17 +438,19 @@ class _WarehousePill extends StatelessWidget {
   const _WarehousePill({
     required this.icon,
     required this.text,
+    this.color,
   });
 
   final IconData icon;
   final String text;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: color ?? const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -523,62 +537,6 @@ class _WarehouseConfirmSheet extends StatelessWidget {
   }
 }
 
-class _PickingSheet extends StatelessWidget {
-  const _PickingSheet({required this.order});
-
-  final WarehouseOrder order;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Picking list',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
-            const SizedBox(height: 12),
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: order.items.length,
-                separatorBuilder: (_, index) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final item = order.items[index];
-                  return ListTile(
-                    tileColor: const Color(0xFFF8FAFC),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    title: Text(
-                      item.productName,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    subtitle: Text(
-                      '${item.pickingBulks} bultos • ${item.pickingUnits} unidades sueltas',
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 14),
-            FilledButton.icon(
-              onPressed: () => Navigator.of(context).pop(true),
-              icon: const Icon(Icons.fact_check_rounded),
-              label: const Text('Marcar alistado'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _AssigneePickerSheet extends StatefulWidget {
   const _AssigneePickerSheet({

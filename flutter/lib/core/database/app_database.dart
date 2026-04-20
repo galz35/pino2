@@ -141,6 +141,14 @@ class SyncQueueEntries extends Table {
   DateTimeColumn get lastAttemptAt => dateTime().nullable()();
 }
 
+class VisitLogs extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get clientId => text()();
+  TextColumn get status => text()(); // 'visited', 'not_found', 'no_buy'
+  TextColumn get notes => text().nullable()();
+  DateTimeColumn get timestamp => dateTime()();
+}
+
 @DriftDatabase(
   tables: [
     CachedStores,
@@ -152,6 +160,7 @@ class SyncQueueEntries extends Table {
     CachedDeliveries,
     RealtimeEventLogs,
     SyncQueueEntries,
+    VisitLogs,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -160,7 +169,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -179,6 +188,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 4) {
         await migrator.createTable(cachedCollectionSummaries);
+      }
+      if (from < 5) {
+        await migrator.createTable(visitLogs);
       }
     },
   );

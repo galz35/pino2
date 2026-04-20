@@ -157,6 +157,44 @@ class AppApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> putMap(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    String? bearerToken,
+  }) async {
+    try {
+      final response = await _dio.put<dynamic>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: _options(bearerToken),
+      );
+      return Map<String, dynamic>.from(response.data as Map);
+    } on DioException catch (error) {
+      throw ApiFailure.fromDio(error);
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteMap(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    String? bearerToken,
+  }) async {
+    try {
+      final response = await _dio.delete<dynamic>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: _options(bearerToken),
+      );
+      return Map<String, dynamic>.from(response.data as Map);
+    } on DioException catch (error) {
+      throw ApiFailure.fromDio(error);
+    }
+  }
+
   Options _options(String? bearerToken) {
     if (bearerToken == null || bearerToken.isEmpty) {
       return Options();

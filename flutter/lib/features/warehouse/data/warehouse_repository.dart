@@ -92,6 +92,7 @@ class WarehouseRepository {
     required String accessToken,
     required String status,
     String? vendorId,
+    String? notes,
   }) {
     return _client.patchMap(
       '/orders/$orderId/status',
@@ -99,7 +100,35 @@ class WarehouseRepository {
       data: {
         'status': status,
         if (vendorId != null && vendorId.isNotEmpty) 'vendorId': vendorId,
+        if (notes != null) 'notes': notes,
       },
+    );
+  }
+
+  Future<List<CargaCamion>> getCargasCamion({
+    required String storeId,
+    required String accessToken,
+    String? fecha,
+  }) async {
+    final list = await _client.getList(
+      '/cargas-camion',
+      bearerToken: accessToken,
+      queryParameters: {
+        'storeId': storeId,
+        if (fecha != null) 'fecha': fecha,
+      },
+    );
+    return list.map((e) => CargaCamion.fromJson(Map<String, dynamic>.from(e))).toList();
+  }
+
+  Future<void> despacharCarga({
+    required String cargaId,
+    required String accessToken,
+  }) async {
+    await _client.putMap(
+      '/cargas-camion/$cargaId/salida',
+      bearerToken: accessToken,
+      data: {},
     );
   }
 }

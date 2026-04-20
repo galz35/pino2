@@ -13,6 +13,7 @@ import '../../../../core/utils/role_utils.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../data/home_repository.dart';
 import '../../domain/models/store_summary.dart';
+import '../../../../features/preventa/presentation/screens/preventa_home_screen.dart';
 
 final assignedStoresProvider = FutureProvider<List<StoreSummary>>((ref) async {
   ref.watch(networkStatusProvider);
@@ -121,6 +122,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     final role = normalizeRole(session.user.role);
+
+    if (role == AppRole.preventa) {
+      return const PreventaHomeScreen();
+    }
 
     if (!_realtimeBootstrapped) {
       _realtimeBootstrapped = true;
@@ -580,6 +585,27 @@ class _RoleActionGrid extends StatelessWidget {
             routeKey: _RouteKey.routeBoard,
           ),
         ];
+      case AppRole.preventa:
+        return const [
+          _ActionDescriptor(
+            title: 'Mis Clientes',
+            subtitle: 'Portafolio y visitas.',
+            icon: Icons.people_alt_rounded,
+            routeKey: _RouteKey.preventaClients,
+          ),
+          _ActionDescriptor(
+            title: 'Nueva Orden',
+            subtitle: 'Levantar pedido en campo.',
+            icon: Icons.add_shopping_cart_rounded,
+            routeKey: _RouteKey.preventaOrder,
+          ),
+          _ActionDescriptor(
+            title: 'Ruta de Hoy',
+            subtitle: 'Seguimiento de visitas.',
+            icon: Icons.directions_run_rounded,
+            routeKey: _RouteKey.preventaRoute,
+          ),
+        ];
       case AppRole.storeAdmin:
         return const [
           _ActionDescriptor(
@@ -815,6 +841,9 @@ class _RoleActionGrid extends StatelessWidget {
       _RouteKey.vendorInventory => '/vendor-inventory/$storeId',
       _RouteKey.salesHistory => '/sales-history/$storeId',
       _RouteKey.inventoryAdjustments => '/inventory-adjustments/$storeId',
+      _RouteKey.preventaClients => '/preventa-clients',
+      _RouteKey.preventaOrder => '/preventa-order',
+      _RouteKey.preventaRoute => '/preventa-route',
     };
 
     context.push(
@@ -1311,4 +1340,7 @@ enum _RouteKey {
   vendorInventory,
   salesHistory,
   inventoryAdjustments,
+  preventaClients,
+  preventaOrder,
+  preventaRoute,
 }

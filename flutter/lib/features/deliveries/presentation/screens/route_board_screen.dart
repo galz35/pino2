@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/database/local_cache_repository.dart';
 import '../../../../core/network/connectivity_service.dart';
@@ -124,7 +125,16 @@ class _RouteBoardScreenState extends ConsumerState<RouteBoardScreen> {
     final snapshotAsync = ref.watch(routeBoardProvider(args));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ruta y entregas')),
+      appBar: AppBar(
+        title: const Text('Ruta y entregas'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.assignment_return_rounded),
+            tooltip: 'Devoluciones',
+            onPressed: () => context.push('/route-returns'),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(routeBoardProvider(args));
@@ -414,76 +424,80 @@ class _DeliveryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      delivery.clientName?.isNotEmpty == true
-                          ? delivery.clientName!
-                          : 'Cliente sin nombre',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
+    return InkWell(
+      onTap: () => context.push('/delivery-detail', extra: delivery),
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        delivery.clientName?.isNotEmpty == true
+                            ? delivery.clientName!
+                            : 'Cliente sin nombre',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      delivery.clientAddress?.isNotEmpty == true
-                          ? delivery.clientAddress!
-                          : 'Sin dirección registrada',
-                      style: const TextStyle(color: Colors.black54),
-                    ),
-                  ],
+                      const SizedBox(height: 6),
+                      Text(
+                        delivery.clientAddress?.isNotEmpty == true
+                            ? delivery.clientAddress!
+                            : 'Sin dirección registrada',
+                        style: const TextStyle(color: Colors.black54),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              _StatusBadge(status: delivery.status),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _BoardPill(
-                icon: Icons.inventory_2_outlined,
-                text: '${delivery.totalItems} items',
-              ),
-              _BoardPill(
-                icon: Icons.payments_outlined,
-                text: 'C\$ ${delivery.total.toStringAsFixed(2)}',
-              ),
-              if ((delivery.paymentType ?? '').isNotEmpty)
-                _BoardPill(
-                  icon: Icons.receipt_long_outlined,
-                  text: delivery.paymentType!,
-                ),
-            ],
-          ),
-          if ((delivery.salesManagerName ?? '').isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              'Gestor: ${delivery.salesManagerName}',
-              style: const TextStyle(
-                color: Color(0xFF1D4ED8),
-                fontWeight: FontWeight.w700,
-              ),
+                _StatusBadge(status: delivery.status),
+              ],
             ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _BoardPill(
+                  icon: Icons.inventory_2_outlined,
+                  text: '${delivery.totalItems} items',
+                ),
+                _BoardPill(
+                  icon: Icons.payments_outlined,
+                  text: 'C\$ ${delivery.total.toStringAsFixed(2)}',
+                ),
+                if ((delivery.paymentType ?? '').isNotEmpty)
+                  _BoardPill(
+                    icon: Icons.receipt_long_outlined,
+                    text: delivery.paymentType!,
+                  ),
+              ],
+            ),
+            if ((delivery.salesManagerName ?? '').isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Gestor: ${delivery.salesManagerName}',
+                style: const TextStyle(
+                  color: Color(0xFF1D4ED8),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
