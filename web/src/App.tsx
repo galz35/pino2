@@ -77,6 +77,16 @@ const AgingReportPage = lazy(() => import('@/pages/store-admin/finance/aging-rep
 const MultiStoreComparisonPage = lazy(() => import('@/pages/master-admin/multi-store-comparison-page'));
 const InventoryEntryPage = lazy(() => import('@/pages/store-admin/inventory/inventory-entry-page'));
 
+// FASE 3: Nuevas Páginas
+const DispatchPage = lazy(() => import('@/pages/store-admin/dispatch/dispatch-page'));
+const DispatchCargasPage = lazy(() => import('@/pages/store-admin/dispatch/dispatch-cargas-page'));
+const PriceAuthPage = lazy(() => import('@/pages/store-admin/authorizations/price-auth-page'));
+const ClientGroupsPage = lazy(() => import('@/pages/store-admin/clients/client-groups-page'));
+const EconomicGroupsPage = lazy(() => import('@/pages/store-admin/clients/economic-groups-page'));
+const ClientReassignPage = lazy(() => import('@/pages/store-admin/clients/client-reassign-page'));
+const ArqueosPage = lazy(() => import('@/pages/store-admin/finance/arqueos-page'));
+const LiquidationRoutePage = lazy(() => import('@/pages/store-admin/finance/liquidation-route-page'));
+
 const LoadingFallback = () => (
   <div className="flex h-screen items-center justify-center bg-background">
     <div className="text-center">
@@ -201,6 +211,16 @@ function App() {
                   <Route path="/store/:storeId/daily-closing" element={<ProtectedRoute requireStoreAccess allowedRoles={DELIVERY_ROLES}><RuteroDailyClosingPage /></ProtectedRoute>} />
                   <Route path="/store/:storeId/daily-closings" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><AdminDailyClosingsPage /></ProtectedRoute>} />
                   <Route path="/store/:storeId/orders-pipeline" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><OrdersPipelinePage /></ProtectedRoute>} />
+
+                  {/* FASE 3 ROUTES */}
+                  <Route path="/store/:storeId/dispatch" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><DispatchPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/dispatch/cargas" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><DispatchCargasPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/authorizations/prices" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><PriceAuthPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/clients/groups" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><ClientGroupsPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/clients/economic-groups" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><EconomicGroupsPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/clients/reassign" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><ClientReassignPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/finance/arqueo" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><ArqueosPage /></ProtectedRoute>} />
+                  <Route path="/store/:storeId/finance/liquidation" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><LiquidationRoutePage /></ProtectedRoute>} />
 
                   <Route path="/store/:storeId/reports" element={<ProtectedRoute requireStoreAccess allowedRoles={STORE_ADMIN_ROLES}><ReportsPage /></ProtectedRoute>} />
 

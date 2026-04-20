@@ -210,19 +210,21 @@ const getStoreAdminNav = (storeId: string, lang: 'es' | 'en', settings: StoreSet
   }
   nav.push({ type: 'group', name: t.inventory, icon: Package, children: invChildren });
 
-  // 5. Finanzas (group) — CxC + Aging + CxP
+  // 5. Finanzas (group)
   nav.push({
     type: 'group',
     name: t.finances,
     icon: Wallet,
     children: [
       { type: 'link', name: t.accountsReceivable, href: `/store/${storeId}/finance/receivables`, icon: HandCoins },
+      { type: 'link', name: 'Arqueo de Ruteros', href: `/store/${storeId}/finance/arqueo`, icon: WalletCards },
+      { type: 'link', name: 'Liquidación de Ruta', href: `/store/${storeId}/finance/liquidation`, icon: ClipboardCheck },
       { type: 'link', name: 'Aging Cartera', href: `/store/${storeId}/finance/aging`, icon: History },
       { type: 'link', name: 'Cuentas por Pagar', href: `/store/${storeId}/finance/payables`, icon: Wallet },
     ],
   });
 
-  // 6. Comercial / Ventas en Calle (group, only if salesManagerMode)
+  // 6. Comercial / Ventas en Calle (group)
   nav.push({ type: 'link', name: t.reports, href: `/store/${storeId}/reports`, icon: AreaChart });
 
   if (settings.enableSalesManagerMode) {
@@ -233,25 +235,45 @@ const getStoreAdminNav = (storeId: string, lang: 'es' | 'en', settings: StoreSet
       children: [
         { type: 'link', name: t.vendors, href: `/store/${storeId}/vendors`, icon: UsersRound },
         { type: 'link', name: 'Rutas y Despacho', href: `/store/${storeId}/vendors/routes`, icon: MapPin },
-        { type: 'link', name: t.addClient, href: `/store/${storeId}/vendors/clients`, icon: Users },
-        { type: 'link', name: t.assignInventory, href: `/store/${storeId}/vendors/inventory`, icon: Truck },
         { type: 'link', name: 'Zonas y Barrios', href: `/store/${storeId}/vendors/zones`, icon: Map },
         { type: 'link', name: 'Flujo de Pedidos', href: `/store/${storeId}/orders-pipeline`, icon: ListOrdered },
-        { type: 'link', name: 'Cierres de Caja', href: `/store/${storeId}/daily-closings`, icon: Wallet },
       ],
+    });
+
+    nav.push({
+      type: 'group',
+      name: 'Clientes',
+      icon: Users,
+      children: [
+        { type: 'link', name: 'Listado de Clientes', href: `/store/${storeId}/vendors/clients`, icon: Users },
+        { type: 'link', name: 'Grupos de Clientes', href: `/store/${storeId}/clients/groups`, icon: UsersRound },
+        { type: 'link', name: 'Grupos Económicos', href: `/store/${storeId}/clients/economic-groups`, icon: Briefcase },
+        { type: 'link', name: 'Reasignación', href: `/store/${storeId}/clients/reassign`, icon: Undo2 },
+      ]
+    });
+
+    nav.push({
+      type: 'group',
+      name: 'Despacho',
+      icon: SendToBack,
+      children: [
+        { type: 'link', name: 'Panel de Despacho', href: `/store/${storeId}/dispatch`, icon: LayoutDashboard },
+        { type: 'link', name: 'Cargas del Día', href: `/store/${storeId}/dispatch/cargas`, icon: Truck },
+      ]
     });
   }
 
   nav.push({ type: 'separator' });
 
-  // 7. Equipo (group) — Usuarios + Autorizaciones
+  // 7. Equipo (group)
   nav.push({
     type: 'group',
     name: t.team,
     icon: Users,
     children: [
       { type: 'link', name: t.users, href: `/store/${storeId}/users`, icon: UsersRound },
-      { type: 'link', name: t.authorizations, href: `/store/${storeId}/authorizations`, icon: ShieldCheck },
+      { type: 'link', name: 'Autorizaciones', href: `/store/${storeId}/authorizations`, icon: ShieldCheck },
+      { type: 'link', name: 'Precios Pendientes', href: `/store/${storeId}/authorizations/prices`, icon: DollarSign },
     ],
   });
 

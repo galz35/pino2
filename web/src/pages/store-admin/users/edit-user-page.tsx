@@ -38,12 +38,25 @@ const userFormSchema = z.object({
   name: z.string().min(3, 'El nombre es requerido.'),
   email: z.string().email('Correo electrónico no válido.'),
   role: z.string().min(1, 'Debes seleccionar un rol.'),
+  permissions: z.array(z.string()).optional(),
 });
+
+const AVAILABLE_PERMISSIONS = [
+  { id: 'hacer_arqueo', label: 'Hacer arqueo de dinero' },
+  { id: 'asignar_rutas', label: 'Asignar rutas a ruteros' },
+  { id: 'autorizar_precios', label: 'Autorizar precios especiales' },
+  { id: 'ver_reportes', label: 'Ver reportes financieros' },
+  { id: 'liquidar_rutas', label: 'Liquidar rutas' },
+  { id: 'reasignar_clientes', label: 'Reasignar clientes' },
+  { id: 'ver_inventario', label: 'Ver inventario completo' },
+  { id: 'gestionar_usuarios', label: 'Gestionar usuarios' },
+];
 
 const STORE_ROLE_OPTIONS = [
   { value: 'Cashier', label: 'CAJERO' },
   { value: 'Bodeguero', label: 'BODEGUERO' },
   { value: 'Ayudante de Bodega', label: 'AYUDANTE DE BODEGA' },
+  { value: 'auxiliar', label: 'AUXILIAR ADMIN' },
   { value: 'store-admin', label: 'ADMINISTRADOR DE TIENDA' },
 ];
 
@@ -74,6 +87,7 @@ export default function EditUserPage() {
       name: '',
       email: '',
       role: 'Cashier',
+      permissions: [],
     },
   });
 
@@ -87,6 +101,7 @@ export default function EditUserPage() {
           name: data.name || '',
           email: data.email || '',
           role: data.role as any || 'Cashier',
+          permissions: data.permissions || [],
         });
         setAssignedStores(data.stores || []);
       } catch (error) {
@@ -109,6 +124,7 @@ export default function EditUserPage() {
       await apiClient.patch(`/users/${userId}`, {
         name: values.name,
         role: values.role,
+        permissions: values.permissions || [],
       });
       
       toast.success('Usuario Actualizado', 'La información ha sido guardada.');
@@ -233,6 +249,50 @@ export default function EditUserPage() {
                       {assignedStores.length > 0
                         ? assignedStores.map((store) => store.name).join(', ')
                         : 'Sin tienda asignada'}
+                    </div>
+                  </div>
+                )}
+
+                {form.watch('role') === 'auxiliar' && (
+                  <div className="md:col-span-2 mt-4">
+                    <h3 className="mb-4 flex items-center gap-2 text-xs font-black uppercase text-slate-500 tracking-widest ml-2">
+                      <ShieldAlert className="h-4 w-4 text-primary" /> Permisos Específicos
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-6 rounded-2xl shadow-[inset_4px_4px_8px_#ebeced,inset_-4px_-4px_8px_#ffffff]">
+                       {AVAILABLE_PERMISSIONS.map(permission => (
+                         <FormField
+                           key={permission.id}
+                           control={form.control}
+                           name="permissions"
+                           render={({ field }) => {
+                             const currentPerms = field.value || [];
+                             return (
+                               <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                 <FormControl>
+                                   <input
+                                     type="checkbox"
+                                     className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                                     checked={currentPerms.includes(permission.id)}
+                                     onChange={(e) => {
+                                       const checked = e.target.checked;
+                                       if (checked) {
+                                         field.onChange([...currentPerms, permission.id]);
+                                       } else {
+                                         field.onChange(currentPerms.filter((val) => val !== permission.id));
+                                       }
+                                     }}
+                                   />
+                                 </FormControl>
+                                 <div className="space-y-1 leading-none">
+                                   <FormLabel className="text-sm font-medium cursor-pointer">
+                                     {permission.label}
+                                   </FormLabel>
+                                 </div>
+                               </FormItem>
+                             );
+                           }}
+                         />
+                       ))}
                     </div>
                   </div>
                 )}
