@@ -61,18 +61,7 @@ export class ProductBarcodesService {
       );
     }
 
-    // 3. También verificar contra el campo products.barcode
-    const mainCheck = await this.db.query<{ id: string; description: string }>(
-      'SELECT id, description FROM products WHERE barcode = $1 AND store_id = $2 AND id != $3',
-      [dto.barcode, storeId, dto.productId],
-    );
-    if ((mainCheck.rowCount ?? 0) > 0) {
-      throw new ConflictException(
-        `Este código de barras ya es el código principal de: "${mainCheck.rows[0].description}"`,
-      );
-    }
-
-    // 4. Insertar
+    // 3. Insertar
     const res = await this.db.query<BarcodeRow>(
       `INSERT INTO product_barcodes (product_id, store_id, barcode, label, is_primary)
        VALUES ($1, $2, $3, $4, false)
@@ -144,7 +133,7 @@ export class ProductBarcodesService {
       throw new NotFoundException('Código de barras no encontrado para este producto');
     }
 
-    // 3. Sincronizar con products.barcode (el campo legacy)
+    // 3. Sincronizar campo legacy products.barcode (retrocompatibilidad temporal)
     await this.db.query(
       'UPDATE products SET barcode = $1, updated_at = NOW() WHERE id = $2',
       [res.rows[0].barcode, productId],

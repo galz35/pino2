@@ -173,7 +173,7 @@ export class ProductsService {
     let pIdx = 2;
 
     if (search) {
-      query += ` AND (p.description ILIKE $${pIdx} OR p.barcode = $${pIdx + 1}
+      query += ` AND (p.description ILIKE $${pIdx}
                  OR p.id IN (SELECT product_id FROM product_barcodes WHERE barcode = $${pIdx + 1} AND store_id = $1))`;
       params.push(`%${search}%`, search);
       pIdx += 2;
@@ -224,26 +224,17 @@ export class ProductsService {
   }
 
   async findByBarcode(storeId: string, barcode: string): Promise<Product> {
-    // Paso 1: Buscar en código principal (camino rápido - 95% de los casos)
-    let res = await this.db.query<ProductRow>(
+    // Búsqueda unificada: product_barcodes es la ÚNICA fuente de verdad.
+    // 1 sola consulta con JOIN — resuelve principal y alternativo al instante.
+    const res = await this.db.query<ProductRow>(
       `SELECT p.*, d.name as department_name 
-       FROM products p 
+       FROM product_barcodes pb
+       JOIN products p ON p.id = pb.product_id
        LEFT JOIN departments d ON p.department_id = d.id 
-       WHERE p.store_id = $1 AND p.barcode = $2 AND p.is_active = true`,
-      [storeId, barcode],
+       WHERE pb.barcode = $1 AND pb.store_id = $2 AND p.is_active = true
+       LIMIT 1`,
+      [barcode, storeId],
     );
-
-    // Paso 2: Si no encuentra, buscar en códigos alternativos
-    if (res.rowCount === 0) {
-      res = await this.db.query<ProductRow>(
-        `SELECT p.*, d.name as department_name 
-         FROM product_barcodes pb
-         JOIN products p ON p.id = pb.product_id
-         LEFT JOIN departments d ON p.department_id = d.id 
-         WHERE pb.store_id = $1 AND pb.barcode = $2 AND p.is_active = true`,
-        [storeId, barcode],
-      );
-    }
 
     if (res.rowCount === 0)
       throw new NotFoundException('Producto con este código no encontrado');
@@ -296,6 +287,30 @@ export class ProductsService {
       `UPDATE products SET ${sets.join(', ')} WHERE id = $${idx}`,
       params,
     );
+
+    // Sync primary barcode straight to product_barcodes (Single Source of Truth)
+    if (dto.barcode !== undefined) {
+      const pCheck = await this.db.query(
+        'SELECT store_id FROM products WHERE id = $1',
+        [id],
+      );
+      if (pCheck.rowCount && pCheck.rowCount > 0 && dto.barcode) {
+         const storeId = pCheck.rows[0].store_id;
+         // unset current primary
+         await this.db.query(
+           'UPDATE product_barcodes SET is_primary = false WHERE product_id = $1',
+           [id],
+         );
+         // insert or update new primary
+         await this.db.query(
+           `INSERT INTO product_barcodes (product_id, store_id, barcode, label, is_primary) 
+            VALUES ($1, $2, $3, $4, true)
+            ON CONFLICT (barcode, store_id) DO UPDATE SET is_primary = true`,
+           [id, storeId, dto.barcode, 'Código Principal']
+         );
+      }
+    }
+
     const product = await this.findOne(id);
 
     this.eventsGateway.emitSyncUpdate({

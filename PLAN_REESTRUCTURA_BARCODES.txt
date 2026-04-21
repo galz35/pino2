@@ -1,0 +1,218 @@
+================================================================================
+PLAN DE TRABAJO: REESTRUCTURACIÓN DE CÓDIGOS DE BARRAS (SKU)
+================================================================================
+Fecha: 2026-04-21
+Solicitante: Carboo
+Prioridad: ALTA (afecta el escaneo en tiempo real del POS y App Móvil)
+
+================================================================================
+1. DIAGNÓSTICO: ¿QUÉ HAY ACTUALMENTE?
+================================================================================
+
+PROBLEMA: El código de barras vive en DOS lugares distintos, generando:
+  - Duplicación de datos (riesgo de inconsistencia)
+  - Doble búsqueda cada vez que se escanea un producto
+  - Lógica innecesariamente compleja en el backend y el móvil
+
+ESTADO ACTUAL (Arquitectura Vieja):
+
+  Tabla "products":
+  ┌──────────┬─────────────┬───────────┬──────────┐
+  │ id       │ store_id    │ barcode   │ desc...  │ ◄── Barcode AQUÍ (principal)
+  └──────────┴─────────────┴───────────┴──────────┘
+
+  Tabla "product_barcodes":
+  ┌──────────┬────────────┬──────────┬───────────┬────────────┐
+  │ id       │ product_id │ store_id │ barcode   │ is_primary │ ◄── Y TAMBIÉN AQUÍ
+  └──────────┴────────────┴──────────┴───────────┴────────────┘
+
+FLUJO DE ESCANEO ACTUAL (Lento - 2 consultas):
+  1. Escanea código → Busca en products.barcode (Consulta 1)
+  2. Si NO encuentra → Busca en product_barcodes.barcode (Consulta 2)
+  3. Recién ahí obtiene el product_id y trae el item
+
+================================================================================
+2. NUEVA ARQUITECTURA PROPUESTA POR CARBOO
+================================================================================
+
+REGLA: EL CÓDIGO DE BARRAS NUNCA VIVE EN LA TABLA DE PRODUCTOS.
+       La tabla de códigos es la ÚNICA fuente de verdad.
+
+  Tabla "products" (Items):
+  ┌──────────┬─────────────┬────────────┬──────────┬─────────┐
+  │ id       │ store_id    │ dept_id    │ desc     │ precio  │ ◄── SIN barcode
+  └──────────┴─────────────┴────────────┴──────────┴─────────┘
+       ▲
+       │ (1:N) Un producto puede tener MUCHOS códigos
+       │
+  Tabla "product_barcodes" (SKU Codes):
+  ┌──────────┬────────────┬──────────┬───────────┬────────────┐
+  │ id       │ product_id │ store_id │ barcode   │ is_primary │
+  └──────────┴────────────┴──────────┴───────────┴────────────┘
+       │
+       └─── ÍNDICE ÚNICO en (barcode, store_id) → Búsqueda instantánea
+
+NUEVO FLUJO DE ESCANEO (Rápido - 1 sola consulta con JOIN):
+  1. App escanea código
+  2. SELECT p.* FROM product_barcodes pb
+     JOIN products p ON p.id = pb.product_id
+     WHERE pb.barcode = '7501234567890' AND pb.store_id = 'xxx'
+  3. Resultado inmediato. FIN.
+
+================================================================================
+3. PLAN DE TRABAJO (Fases)
+================================================================================
+
+─────────────────────────────────────────────────────────
+FASE 1: MIGRACIÓN DE DATOS EN POSTGRESQL (Backend)
+─────────────────────────────────────────────────────────
+Archivos afectados:
+  - backend/migrations/2026-04-21_barcode_refactor.sql (NUEVO)
+  - backend/src/database/schema.sql
+
+Tareas:
+  1.1. Crear migración SQL:
+       - Garantizar que TODOS los productos que tienen barcode en
+         products.barcode también tengan su registro en product_barcodes
+         (INSERT ... ON CONFLICT DO NOTHING).
+       - Crear índice UNIQUE en product_barcodes(barcode, store_id)
+         si no existe.
+       - Crear índice B-Tree en product_barcodes(barcode) para
+         búsquedas ultrarrápidas por escaneo.
+
+  1.2. DESPUÉS de verificar integridad: Marcar columna
+       products.barcode como DEPRECATED (NO borrarla aún).
+       Se elimina en una fase futura cuando todo esté probado.
+
+Estimación: 1 hora
+Riesgo: BAJO (solo agrega datos, no borra nada)
+
+─────────────────────────────────────────────────────────
+FASE 2: REFACTORIZAR BACKEND (NestJS)
+─────────────────────────────────────────────────────────
+Archivos afectados:
+  - backend/src/modules/products/products.service.ts
+  - backend/src/modules/product-barcodes/product-barcodes.service.ts
+  - backend/src/modules/sales/sales.service.ts
+  - backend/src/modules/sync/sync.service.ts
+
+Tareas:
+  2.1. products.service.ts → findByBarcode():
+       ANTES:
+         Consulta 1: SELECT FROM products WHERE barcode = $1
+         Consulta 2 (fallback): SELECT FROM product_barcodes WHERE barcode = $1
+       DESPUÉS:
+         1 SOLA consulta:
+         SELECT p.* FROM product_barcodes pb
+         JOIN products p ON p.id = pb.product_id
+         WHERE pb.barcode = $1 AND pb.store_id = $2
+
+  2.2. products.service.ts → create():
+       Ya NO se escribe en products.barcode.
+       Solo se inserta en product_barcodes con is_primary = true.
+
+  2.3. products.service.ts → update():
+       Si cambia el barcode, se actualiza product_barcodes, NO products.
+
+  2.4. product-barcodes.service.ts → setPrimary():
+       Ya NO necesita sincronizar con products.barcode (línea 148-151).
+
+  2.5. sales.service.ts → Sin cambios directos (usa findByBarcode).
+
+  2.6. sync.service.ts → getDeltaData():
+       Asegurar que sigue enviando productBarcodes al Flutter.
+
+Estimación: 2-3 horas
+Riesgo: MEDIO (validar que no rompa POS web ni ventas existentes)
+
+─────────────────────────────────────────────────────────
+FASE 3: REFACTORIZAR FLUTTER (App Móvil)
+─────────────────────────────────────────────────────────
+Archivos afectados:
+  - flutter/lib/core/database/app_database.dart
+  - flutter/lib/core/database/local_cache_repository.dart
+  - flutter/lib/features/catalog/domain/models/catalog_product.dart
+  - flutter/lib/features/catalog/data/catalog_repository.dart
+
+Tareas:
+  3.1. app_database.dart → CachedProductBarcodes:
+       Agregar índice en (barcode, storeId) para búsquedas offline
+       ultrarrápidas desde SQLite.
+
+  3.2. app_database.dart → Método nuevo findProductByBarcode():
+       SELECT cp.* FROM cached_product_barcodes cpb
+       INNER JOIN cached_products cp ON cp.id = cpb.product_id
+       WHERE cpb.barcode = ? AND cpb.store_id = ?
+
+  3.3. local_cache_repository.dart:
+       - Método nuevo: lookupByBarcode(storeId, barcode) → CatalogProduct?
+       - Usa el JOIN de SQLite sobre cached_product_barcodes.
+
+  3.4. catalog_product.dart:
+       - El campo barcode se mantiene como display (para mostrar en UI).
+       - Se remueve la dependencia de búsqueda por este campo.
+
+  3.5. catalog_repository.dart:
+       - La búsqueda offline ya NO itera sobre todos los productos.
+       - Usa lookupByBarcode() que es O(1) por el índice.
+
+Estimación: 2-3 horas
+Riesgo: MEDIO (requiere regenerar app_database.g.dart con build_runner)
+
+─────────────────────────────────────────────────────────
+FASE 4: REFACTORIZAR FRONTEND WEB (React POS)
+─────────────────────────────────────────────────────────
+Archivos afectados:
+  - web/src/ (páginas de POS, catálogo de productos)
+
+Tareas:
+  4.1. La pantalla del POS que escanea código de barras debe
+       llamar al endpoint /products/barcode/:code en vez de
+       buscar directamente en la tabla de productos.
+
+  4.2. El formulario de crear/editar productos debe tratar
+       los códigos de barras como entidades separadas (CRUD
+       de product_barcodes).
+
+Estimación: 1-2 horas
+Riesgo: BAJO (el endpoint ya existe, solo cambia la fuente)
+
+─────────────────────────────────────────────────────────
+FASE 5: TESTING Y VALIDACIÓN
+─────────────────────────────────────────────────────────
+Tareas:
+  5.1. Test de regresión: Crear/Editar producto con barcode.
+  5.2. Test de escaneo: Escanear código principal → producto.
+  5.3. Test de multi-código: Escanear código alternativo → mismo producto.
+  5.4. Test de conflicto: Intentar asignar código ya usado → error claro.
+  5.5. Test offline: Desconectar internet, escanear → resultado del caché.
+  5.6. Test de rendimiento: Medir milisegundos de la consulta nueva vs vieja.
+
+Estimación: 1-2 horas
+
+================================================================================
+4. RESUMEN EJECUTIVO
+================================================================================
+
+    ┌─────────────────────────┬─────────┬─────────┐
+    │ FASE                    │ TIEMPO  │ RIESGO  │
+    ├─────────────────────────┼─────────┼─────────┤
+    │ 1. Migración SQL        │ 1h      │ Bajo    │
+    │ 2. Backend NestJS       │ 2-3h    │ Medio   │
+    │ 3. Flutter Mobile       │ 2-3h    │ Medio   │
+    │ 4. Frontend Web React   │ 1-2h    │ Bajo    │
+    │ 5. Testing              │ 1-2h    │ Bajo    │
+    ├─────────────────────────┼─────────┼─────────┤
+    │ TOTAL ESTIMADO          │ 7-11h   │         │
+    └─────────────────────────┴─────────┴─────────┘
+
+BENEFICIOS DIRECTOS:
+  ✓ Búsqueda de producto por escaneo: 1 consulta en vez de 2
+  ✓ Fuente única de verdad para códigos (elimina inconsistencias)
+  ✓ Soporte ilimitado de códigos por producto (proveedores cambian empaque)
+  ✓ Búsqueda offline en Flutter a velocidad O(1) por índice SQLite
+  ✓ Arquitectura limpia y escalable
+
+================================================================================
+FIN DEL PLAN - Listo para ejecutar cuando apruebe Carboo
+================================================================================

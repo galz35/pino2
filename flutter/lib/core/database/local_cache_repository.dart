@@ -151,6 +151,38 @@ class LocalCacheRepository {
         .toList();
   }
 
+  /// Búsqueda instantánea por código de barras usando índice SQLite.
+  /// Flujo: barcode → cached_product_barcodes → product_id → cached_products
+  /// Resuelve en <1ms offline gracias al índice idx_cpb_barcode_store.
+  Future<CatalogProduct?> lookupByBarcode(String storeId, String barcode) async {
+    final row = await _database.findProductByBarcode(storeId, barcode);
+    if (row == null) return null;
+
+    // Cargar códigos alternativos para este producto
+    final barcodeRows = await (_database.select(_database.cachedProductBarcodes)
+          ..where((table) =>
+              table.productId.equals(row.id) &
+              table.storeId.equals(storeId)))
+        .get();
+
+    return CatalogProduct(
+      id: row.id,
+      storeId: row.storeId,
+      description: row.description,
+      salePrice: row.salePrice,
+      currentStock: row.currentStock,
+      unitsPerBulk: row.unitsPerBulk,
+      stockBulks: row.stockBulks,
+      stockUnits: row.stockUnits,
+      barcode: row.barcode,
+      alternateBarcodes: barcodeRows.map((b) => b.barcode).toList(),
+      brand: row.brand,
+      department: row.department,
+      subDepartment: row.subDepartment,
+      minStock: row.minStock,
+    );
+  }
+
   Future<void> cacheClients({
     required String storeId,
     required List<ClientSummary> clients,

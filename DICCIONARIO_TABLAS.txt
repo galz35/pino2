@@ -1,0 +1,78 @@
+================================================================================
+DICCIONARIO TÉCNICO DE TABLAS (MAESTRO) - PINO2
+================================================================================
+Total de Tablas Identificadas: 52 (Entidades de Negocio + Auditoría)
+
+1. MÓDULO: NÚCLEO Y ESTRUCTURA (Tiendas y Cadenas)
+- chains: Grupos corporativos. [id, name, logo_url, owner_name, status]
+- stores: Sucursales/Bodegas físicas. [id, chain_id, name, address, store_type]
+- config: Parámetros del sistema por clave-valor (JSONB).
+- licenses: Control de acceso por suscripción y límites de usuarios.
+- sync_status: Estado de salud de la sincronización por cada tienda física.
+
+2. MÓDULO: SEGURIDAD Y DISPOSITIVOS (Auth)
+- users: Maestro de empleados. [id, email, password_hash, name, role]
+- user_stores: Tabla relacional de sucursales permitidas por usuario.
+- authorizations: Registro de permisos especiales (ej. autorizar crédito).
+- device_tokens: Tokens FCM para notificaciones Push (Android/iOS).
+- refresh_tokens: Persistencia de sesiones JWT.
+
+3. MÓDULO: CATÁLOGO Y PRODUCTOS (Inventory Core)
+- products: Maestro de SKU. [barcode, description, prices 1-5, cost, stock]
+- product_barcodes: SOPORTE MULTI-BARCODE (Relación 1:N producto-codigos).
+- departments: Categorías de productos (Niveles jerárquicos).
+- sub_departments: (Relacionados en tabla departments por parent_id).
+- brand_catalog: Catálogo de marcas registradas.
+
+4. MÓDULO: KÁRDEX Y AUDITORÍA DE STOCK
+- movements: EL KÁRDEX. Auditoría total de cada unidad IN/OUT.
+- vendor_inventories: Stock móvil asignado a un camión o vendedor.
+- inventory_adjustments: Registro de mermas, robos o ajustes manuales.
+- warehouse_transfers: Traslados de mercadería entre sucursales.
+
+5. MÓDULO: VENTAS Y CAJA (POS - Front Store)
+- sales: Cabecera de facturación/tickets.
+- sale_items: Detalle de productos vendidos.
+- cash_shifts: Turnos de apertura y cierre de caja.
+- arqueos: Detalle físico de billetes/monedas en el cierre.
+- daily_closings: Resumen financiero al final del día (Consolidado).
+
+6. MÓDULO: CLIENTES Y CRM (Mora Cruzada)
+- clients: Directorio de clientes con saldo_pendiente y limite_credito.
+- grupos_clientes: Agrupación para marketing o rutas.
+- grupos_economicos: CONTROL DE MORA CRUZADA (Agrupa varias tiendas).
+- suppliers: Proveedores de mercadería a las bodegas.
+- client_contacts: Directorio adicional de personas en cada negocio.
+
+7. MÓDULO: LOGÍSTICA Y DESPACHO (Bodega)
+- orders: Pedidos generados (Pendientes de facturar).
+- order_items: Detalle del pedido con nivel de precio seleccionado.
+- pending_orders: Cola de trabajo para los bodegueros (Picking).
+- charges_camion (cargas_camion): Documentación de despacho a ruta.
+- pending_deliveries: Entregas confirmadas para subir al camión.
+
+8. MÓDULO: RUTA Y OPERATIVA (Ruteros)
+- routes: Planificación de visitas diarias asignadas a vendedores.
+- visit_logs: "Ponchado" GPS del rutero en cada cliente (Visita/No Venta).
+- collections: Cobros realizados en la calle (Efectivo/Cheque/Trans).
+- liquidaciones_ruta: Conciliación final de Efectivo vs Facturas en Ruta.
+- signature_assets: Almacén de firmas digitales de entrega.
+
+9. MÓDULO: FINANZAS Y CRÉDITO
+- accounts_receivable (CxC): Facturas pendientes de cobro a clientes.
+- account_payments: Historial de abonos a cuentas CxC.
+- accounts_payable (CxP): Deudas de la empresa con proveedores.
+- payable_payments: Pagos realizados a proveedores.
+- returns: Gestión de devoluciones (Devolución parcial/total).
+- return_items: Detalle de SKU devueltos (Se reintegra al Kárdex).
+
+10. MÓDULO: TRABAJO OFFLINE Y DESEMPEÑO
+- sync_logs: Registro de recepción de BATCH DATA del móvil Flutter.
+- sync_idempotency_log: Evita que un pedido se cobre 2 veces por error de red.
+- consultasql: Configuración de monitoreo de velocidad DB.
+- consultasql_historial: Logs de consultas lentas para optimización.
+- error_logs: Registro centralizado de fallos en el Backend (NestJS).
+
+================================================================================
+DICCIONARIO FINALIZADO - VERSIÓN 2.0 (Completa)
+================================================================================

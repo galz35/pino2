@@ -182,12 +182,13 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (migrator) async {
       await migrator.createAll();
+      await _createBarcodeIndex();
     },
     onUpgrade: (migrator, from, to) async {
       if (from < 2) {
@@ -208,8 +209,57 @@ class AppDatabase extends _$AppDatabase {
       if (from < 6) {
         await migrator.createTable(cachedProductBarcodes);
       }
+      if (from < 7) {
+        await _createBarcodeIndex();
+      }
     },
   );
+
+  /// Crea índice compuesto en (barcode, store_id) para búsqueda instantánea
+  /// al escanear un código de barras offline.
+  Future<void> _createBarcodeIndex() async {
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_cpb_barcode_store '
+      'ON cached_product_barcodes(barcode, store_id)',
+    );
+  }
+
+  /// Búsqueda directa por código de barras usando JOIN.
+  /// Flujo: barcode → product_barcodes → product_id → products
+  /// Resuelve en <1ms gracias al índice idx_cpb_barcode_store.
+  Future<CachedProduct?> findProductByBarcode(
+    String storeId,
+    String barcode,
+  ) async {
+    final results = await customSelect(
+      'SELECT cp.* FROM cached_product_barcodes cpb '
+      'INNER JOIN cached_products cp ON cp.id = cpb.product_id AND cp.store_id = cpb.store_id '
+      'WHERE cpb.barcode = ? AND cpb.store_id = ? '
+      'LIMIT 1',
+      variables: [Variable.withString(barcode), Variable.withString(storeId)],
+      readsFrom: {cachedProductBarcodes, cachedProducts},
+    ).get();
+
+    if (results.isEmpty) return null;
+
+    final row = results.first;
+    return CachedProduct(
+      id: row.read<String>('id'),
+      storeId: row.read<String>('store_id'),
+      description: row.read<String>('description'),
+      salePrice: row.read<double>('sale_price'),
+      currentStock: row.read<int>('current_stock'),
+      unitsPerBulk: row.read<int>('units_per_bulk'),
+      stockBulks: row.read<int>('stock_bulks'),
+      stockUnits: row.read<int>('stock_units'),
+      barcode: row.readNullable<String>('barcode'),
+      brand: row.readNullable<String>('brand'),
+      department: row.readNullable<String>('department'),
+      subDepartment: row.readNullable<String>('sub_department'),
+      minStock: row.read<int>('min_stock'),
+      cachedAt: row.read<DateTime>('cached_at'),
+    );
+  }
 
   Future<void> replaceAssignedStores(
     String userId,

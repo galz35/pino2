@@ -1,0 +1,60 @@
+================================================================================
+ESTRUCTURA INTEGRAL Y FLUJO OPERATIVO - SISTEMA PINO2 (V2.0)
+================================================================================
+
+1. ARQUITECTURA DE DATOS (Nivel Enterprise)
+--------------------------------------------------------------------------------
+El sistema utiliza un ecosistema híbrido Cloud-Edge:
+- Nube: NestJS + PostgreSQL (Base de datos relacional atómica).
+- Terminales: Flutter (Mobile) + SQLite (Drift) con sincronización Batch.
+- Seguridad: Niveles de precio dinámicos (1 al 5) y Mora Cruzada inteligente.
+
+2. EL FLUJO DE VIDA DEL DATO (Paso a Paso)
+--------------------------------------------------------------------------------
+
+PASO 1: MAESTROS (Central)
+- El catálogo se centraliza en la Nube. Cada producto define su "Conversión de 
+  Unidades" (ej. 1 caja = 12 unidades).
+- Se establecen los Grupos Económicos: Si una cadena de tiendas (ej. Tienda A y B) 
+  pertenece a un Grupo, y la Tienda A debe dinero, el sistema bloquea crédito en 
+  la Tienda B automáticamente.
+
+PASO 2: PRE-VENTA (Campo / Offline)
+- El vendedor captura pedidos en el App móvil. El sistema calcula el total
+  según el "Nivel de Precio" asignado al cliente.
+- Los datos se guardan en la "Outbox" local del móvil hasta que haya señal.
+
+PASO 3: SINCRONIZACIÓN IDEMPOTENTE
+- Al sincronizar, el móvil envía un "Batch" (lote). Cada registro tiene un UUID.
+- El servidor valida el UUID contra `sync_idempotency_log`. Si el paquete ya 
+  llegó antes, lo ignora para evitar duplicar cobros o ventas.
+
+PASO 4: ALISTADO Y DESPACHO (Bodega)
+- Los pedidos aprobados pasan a `pending_orders`. El bodeguero hace el "Picking".
+- Se genera una `cargas_camion`. La mercadería sale del stock general y entra
+  al `vendor_inventories` (Inventario del Camión). El rutero es ahora responsable 
+  legal del stock.
+
+PASO 5: RUTA Y ENTREGAS (Logística)
+- El rutero visita según las `routes` asignadas.
+- En cada parada registra un `visit_log` con GPS.
+- Si entrega, genera la factura. Si hay devolución, se registra en `returns`
+  y el producto vuelve automáticamente al stock del camión.
+
+PASO 6: LIQUIDACIÓN COMPLETA (Audit)
+- Al final del día, el rutero entrega el dinero.
+- El sistema cruza: Efectivo Inicial + Cobros Contado + Cobros Crédito - Gasolina/Gastos.
+- La `liquidaciones_ruta` detecta diferencias de centavos.
+- El stock no vendido en el camión se reintegra a bodega o se queda para el día siguiente.
+
+3. PUNTOS CLAVE DE CONTROL
+--------------------------------------------------------------------------------
+- KÁRDEX: Cada movimiento queda sellado en la tabla `movements`. Nada se borra.
+- MULTI-CÓDIGO: Permite que el mismo producto (ej. Coca-Cola) tenga códigos de 
+  distintos proveedores y el sistema los reconozca como el mismo SKU.
+- MONITOREO SQL: El sistema auto-registra consultas lentas para que el 
+  desarrollador optimice los índices de la base de datos proactivamente.
+
+================================================================================
+DOCUMENTO FINALIZADO - VERSIÓN 2.0 (Completa)
+================================================================================
