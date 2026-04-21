@@ -108,6 +108,29 @@ export class ProductsService {
 
     if (res.rowCount === 0) throw new Error('Failed to create product');
     const productId = res.rows[0].id;
+
+    // Registrar barcode como principal
+    if (dto.barcode) {
+      await this.db.query(
+        `INSERT INTO product_barcodes (product_id, store_id, barcode, label, is_primary) 
+         VALUES ($1, $2, $3, $4, true)
+         ON CONFLICT (barcode, store_id) DO NOTHING`,
+        [productId, dto.storeId, dto.barcode, 'Código Principal']
+      );
+    }
+
+    if (dto.alternateBarcodes && dto.alternateBarcodes.length > 0) {
+      for (const alt of dto.alternateBarcodes) {
+        if (!alt || alt === dto.barcode) continue;
+        await this.db.query(
+          `INSERT INTO product_barcodes (product_id, store_id, barcode, label, is_primary) 
+           VALUES ($1, $2, $3, $4, false)
+           ON CONFLICT (barcode, store_id) DO NOTHING`,
+          [productId, dto.storeId, alt, 'Código Alternativo']
+        );
+      }
+    }
+
     const product = await this.findOne(productId);
 
     // Registrar movimiento inicial si hay stock
@@ -150,7 +173,8 @@ export class ProductsService {
     let pIdx = 2;
 
     if (search) {
-      query += ` AND (p.description ILIKE $${pIdx} OR p.barcode = $${pIdx + 1})`;
+      query += ` AND (p.description ILIKE $${pIdx} OR p.barcode = $${pIdx + 1}
+                 OR p.id IN (SELECT product_id FROM product_barcodes WHERE barcode = $${pIdx + 1} AND store_id = $1))`;
       params.push(`%${search}%`, search);
       pIdx += 2;
     }
@@ -182,17 +206,45 @@ export class ProductsService {
     );
     if (res.rowCount === 0)
       throw new NotFoundException('Producto no encontrado');
-    return this.mapRow(res.rows[0]);
+    const product = this.mapRow(res.rows[0]);
+
+    // Cargar códigos alternativos
+    const barcodesRes = await this.db.query(
+      `SELECT id, barcode, label, is_primary FROM product_barcodes WHERE product_id = $1 ORDER BY is_primary DESC, created_at ASC`,
+      [id],
+    );
+    (product as any).alternateBarcodes = barcodesRes.rows.map((r: any) => ({
+      id: r.id,
+      barcode: r.barcode,
+      label: r.label,
+      isPrimary: r.is_primary,
+    }));
+
+    return product;
   }
 
   async findByBarcode(storeId: string, barcode: string): Promise<Product> {
-    const res = await this.db.query<ProductRow>(
+    // Paso 1: Buscar en código principal (camino rápido - 95% de los casos)
+    let res = await this.db.query<ProductRow>(
       `SELECT p.*, d.name as department_name 
        FROM products p 
        LEFT JOIN departments d ON p.department_id = d.id 
        WHERE p.store_id = $1 AND p.barcode = $2 AND p.is_active = true`,
       [storeId, barcode],
     );
+
+    // Paso 2: Si no encuentra, buscar en códigos alternativos
+    if (res.rowCount === 0) {
+      res = await this.db.query<ProductRow>(
+        `SELECT p.*, d.name as department_name 
+         FROM product_barcodes pb
+         JOIN products p ON p.id = pb.product_id
+         LEFT JOIN departments d ON p.department_id = d.id 
+         WHERE pb.store_id = $1 AND pb.barcode = $2 AND p.is_active = true`,
+        [storeId, barcode],
+      );
+    }
+
     if (res.rowCount === 0)
       throw new NotFoundException('Producto con este código no encontrado');
     return this.mapRow(res.rows[0]);
@@ -330,6 +382,28 @@ export class ProductsService {
           ],
         );
         const productId = prodRes.rows[0].id;
+
+        // Register main barcode
+        if (product.barcode) {
+          await client.query(
+            `INSERT INTO product_barcodes (product_id, store_id, barcode, label, is_primary) 
+             VALUES ($1, $2, $3, $4, true)
+             ON CONFLICT (barcode, store_id) DO NOTHING`,
+            [productId, dto.storeId, product.barcode, 'Código Principal']
+          );
+        }
+
+        if (product.alternateBarcodes && product.alternateBarcodes.length > 0) {
+          for (const alt of product.alternateBarcodes) {
+            if (!alt || alt === product.barcode) continue;
+            await client.query(
+              `INSERT INTO product_barcodes (product_id, store_id, barcode, label, is_primary) 
+               VALUES ($1, $2, $3, $4, false)
+               ON CONFLICT (barcode, store_id) DO NOTHING`,
+              [productId, dto.storeId, alt, 'Código Alternativo']
+            );
+          }
+        }
 
         // Log initial inventory movement if applicable
         const stock = product.currentStock || 0;

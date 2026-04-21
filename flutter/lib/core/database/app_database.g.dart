@@ -1285,6 +1285,418 @@ class CachedProductsCompanion extends UpdateCompanion<CachedProduct> {
   }
 }
 
+class $CachedProductBarcodesTable extends CachedProductBarcodes
+    with TableInfo<$CachedProductBarcodesTable, CachedProductBarcode> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedProductBarcodesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _productIdMeta = const VerificationMeta(
+    'productId',
+  );
+  @override
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
+    'product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _storeIdMeta = const VerificationMeta(
+    'storeId',
+  );
+  @override
+  late final GeneratedColumn<String> storeId = GeneratedColumn<String>(
+    'store_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _barcodeMeta = const VerificationMeta(
+    'barcode',
+  );
+  @override
+  late final GeneratedColumn<String> barcode = GeneratedColumn<String>(
+    'barcode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isPrimaryMeta = const VerificationMeta(
+    'isPrimary',
+  );
+  @override
+  late final GeneratedColumn<bool> isPrimary = GeneratedColumn<bool>(
+    'is_primary',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_primary" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    productId,
+    storeId,
+    barcode,
+    label,
+    isPrimary,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_product_barcodes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedProductBarcode> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('product_id')) {
+      context.handle(
+        _productIdMeta,
+        productId.isAcceptableOrUnknown(data['product_id']!, _productIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_productIdMeta);
+    }
+    if (data.containsKey('store_id')) {
+      context.handle(
+        _storeIdMeta,
+        storeId.isAcceptableOrUnknown(data['store_id']!, _storeIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_storeIdMeta);
+    }
+    if (data.containsKey('barcode')) {
+      context.handle(
+        _barcodeMeta,
+        barcode.isAcceptableOrUnknown(data['barcode']!, _barcodeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_barcodeMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    }
+    if (data.containsKey('is_primary')) {
+      context.handle(
+        _isPrimaryMeta,
+        isPrimary.isAcceptableOrUnknown(data['is_primary']!, _isPrimaryMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CachedProductBarcode map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedProductBarcode(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      productId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}product_id'],
+      )!,
+      storeId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}store_id'],
+      )!,
+      barcode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}barcode'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      ),
+      isPrimary: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_primary'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedProductBarcodesTable createAlias(String alias) {
+    return $CachedProductBarcodesTable(attachedDatabase, alias);
+  }
+}
+
+class CachedProductBarcode extends DataClass
+    implements Insertable<CachedProductBarcode> {
+  final String id;
+  final String productId;
+  final String storeId;
+  final String barcode;
+  final String? label;
+  final bool isPrimary;
+  const CachedProductBarcode({
+    required this.id,
+    required this.productId,
+    required this.storeId,
+    required this.barcode,
+    this.label,
+    required this.isPrimary,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['product_id'] = Variable<String>(productId);
+    map['store_id'] = Variable<String>(storeId);
+    map['barcode'] = Variable<String>(barcode);
+    if (!nullToAbsent || label != null) {
+      map['label'] = Variable<String>(label);
+    }
+    map['is_primary'] = Variable<bool>(isPrimary);
+    return map;
+  }
+
+  CachedProductBarcodesCompanion toCompanion(bool nullToAbsent) {
+    return CachedProductBarcodesCompanion(
+      id: Value(id),
+      productId: Value(productId),
+      storeId: Value(storeId),
+      barcode: Value(barcode),
+      label: label == null && nullToAbsent
+          ? const Value.absent()
+          : Value(label),
+      isPrimary: Value(isPrimary),
+    );
+  }
+
+  factory CachedProductBarcode.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedProductBarcode(
+      id: serializer.fromJson<String>(json['id']),
+      productId: serializer.fromJson<String>(json['productId']),
+      storeId: serializer.fromJson<String>(json['storeId']),
+      barcode: serializer.fromJson<String>(json['barcode']),
+      label: serializer.fromJson<String?>(json['label']),
+      isPrimary: serializer.fromJson<bool>(json['isPrimary']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'productId': serializer.toJson<String>(productId),
+      'storeId': serializer.toJson<String>(storeId),
+      'barcode': serializer.toJson<String>(barcode),
+      'label': serializer.toJson<String?>(label),
+      'isPrimary': serializer.toJson<bool>(isPrimary),
+    };
+  }
+
+  CachedProductBarcode copyWith({
+    String? id,
+    String? productId,
+    String? storeId,
+    String? barcode,
+    Value<String?> label = const Value.absent(),
+    bool? isPrimary,
+  }) => CachedProductBarcode(
+    id: id ?? this.id,
+    productId: productId ?? this.productId,
+    storeId: storeId ?? this.storeId,
+    barcode: barcode ?? this.barcode,
+    label: label.present ? label.value : this.label,
+    isPrimary: isPrimary ?? this.isPrimary,
+  );
+  CachedProductBarcode copyWithCompanion(CachedProductBarcodesCompanion data) {
+    return CachedProductBarcode(
+      id: data.id.present ? data.id.value : this.id,
+      productId: data.productId.present ? data.productId.value : this.productId,
+      storeId: data.storeId.present ? data.storeId.value : this.storeId,
+      barcode: data.barcode.present ? data.barcode.value : this.barcode,
+      label: data.label.present ? data.label.value : this.label,
+      isPrimary: data.isPrimary.present ? data.isPrimary.value : this.isPrimary,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedProductBarcode(')
+          ..write('id: $id, ')
+          ..write('productId: $productId, ')
+          ..write('storeId: $storeId, ')
+          ..write('barcode: $barcode, ')
+          ..write('label: $label, ')
+          ..write('isPrimary: $isPrimary')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, productId, storeId, barcode, label, isPrimary);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedProductBarcode &&
+          other.id == this.id &&
+          other.productId == this.productId &&
+          other.storeId == this.storeId &&
+          other.barcode == this.barcode &&
+          other.label == this.label &&
+          other.isPrimary == this.isPrimary);
+}
+
+class CachedProductBarcodesCompanion
+    extends UpdateCompanion<CachedProductBarcode> {
+  final Value<String> id;
+  final Value<String> productId;
+  final Value<String> storeId;
+  final Value<String> barcode;
+  final Value<String?> label;
+  final Value<bool> isPrimary;
+  final Value<int> rowid;
+  const CachedProductBarcodesCompanion({
+    this.id = const Value.absent(),
+    this.productId = const Value.absent(),
+    this.storeId = const Value.absent(),
+    this.barcode = const Value.absent(),
+    this.label = const Value.absent(),
+    this.isPrimary = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedProductBarcodesCompanion.insert({
+    required String id,
+    required String productId,
+    required String storeId,
+    required String barcode,
+    this.label = const Value.absent(),
+    this.isPrimary = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       productId = Value(productId),
+       storeId = Value(storeId),
+       barcode = Value(barcode);
+  static Insertable<CachedProductBarcode> custom({
+    Expression<String>? id,
+    Expression<String>? productId,
+    Expression<String>? storeId,
+    Expression<String>? barcode,
+    Expression<String>? label,
+    Expression<bool>? isPrimary,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (productId != null) 'product_id': productId,
+      if (storeId != null) 'store_id': storeId,
+      if (barcode != null) 'barcode': barcode,
+      if (label != null) 'label': label,
+      if (isPrimary != null) 'is_primary': isPrimary,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedProductBarcodesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? productId,
+    Value<String>? storeId,
+    Value<String>? barcode,
+    Value<String?>? label,
+    Value<bool>? isPrimary,
+    Value<int>? rowid,
+  }) {
+    return CachedProductBarcodesCompanion(
+      id: id ?? this.id,
+      productId: productId ?? this.productId,
+      storeId: storeId ?? this.storeId,
+      barcode: barcode ?? this.barcode,
+      label: label ?? this.label,
+      isPrimary: isPrimary ?? this.isPrimary,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (productId.present) {
+      map['product_id'] = Variable<String>(productId.value);
+    }
+    if (storeId.present) {
+      map['store_id'] = Variable<String>(storeId.value);
+    }
+    if (barcode.present) {
+      map['barcode'] = Variable<String>(barcode.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (isPrimary.present) {
+      map['is_primary'] = Variable<bool>(isPrimary.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedProductBarcodesCompanion(')
+          ..write('id: $id, ')
+          ..write('productId: $productId, ')
+          ..write('storeId: $storeId, ')
+          ..write('barcode: $barcode, ')
+          ..write('label: $label, ')
+          ..write('isPrimary: $isPrimary, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $CachedClientsTable extends CachedClients
     with TableInfo<$CachedClientsTable, CachedClient> {
   @override
@@ -5682,6 +6094,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $CachedStoresTable cachedStores = $CachedStoresTable(this);
   late final $CachedProductsTable cachedProducts = $CachedProductsTable(this);
+  late final $CachedProductBarcodesTable cachedProductBarcodes =
+      $CachedProductBarcodesTable(this);
   late final $CachedClientsTable cachedClients = $CachedClientsTable(this);
   late final $CachedReceivableAccountsTable cachedReceivableAccounts =
       $CachedReceivableAccountsTable(this);
@@ -5704,6 +6118,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     cachedStores,
     cachedProducts,
+    cachedProductBarcodes,
     cachedClients,
     cachedReceivableAccounts,
     cachedCollectionSummaries,
@@ -6338,6 +6753,244 @@ typedef $$CachedProductsTableProcessedTableManager =
         BaseReferences<_$AppDatabase, $CachedProductsTable, CachedProduct>,
       ),
       CachedProduct,
+      PrefetchHooks Function()
+    >;
+typedef $$CachedProductBarcodesTableCreateCompanionBuilder =
+    CachedProductBarcodesCompanion Function({
+      required String id,
+      required String productId,
+      required String storeId,
+      required String barcode,
+      Value<String?> label,
+      Value<bool> isPrimary,
+      Value<int> rowid,
+    });
+typedef $$CachedProductBarcodesTableUpdateCompanionBuilder =
+    CachedProductBarcodesCompanion Function({
+      Value<String> id,
+      Value<String> productId,
+      Value<String> storeId,
+      Value<String> barcode,
+      Value<String?> label,
+      Value<bool> isPrimary,
+      Value<int> rowid,
+    });
+
+class $$CachedProductBarcodesTableFilterComposer
+    extends Composer<_$AppDatabase, $CachedProductBarcodesTable> {
+  $$CachedProductBarcodesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get storeId => $composableBuilder(
+    column: $table.storeId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get barcode => $composableBuilder(
+    column: $table.barcode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isPrimary => $composableBuilder(
+    column: $table.isPrimary,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedProductBarcodesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CachedProductBarcodesTable> {
+  $$CachedProductBarcodesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get storeId => $composableBuilder(
+    column: $table.storeId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get barcode => $composableBuilder(
+    column: $table.barcode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isPrimary => $composableBuilder(
+    column: $table.isPrimary,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedProductBarcodesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CachedProductBarcodesTable> {
+  $$CachedProductBarcodesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<String> get storeId =>
+      $composableBuilder(column: $table.storeId, builder: (column) => column);
+
+  GeneratedColumn<String> get barcode =>
+      $composableBuilder(column: $table.barcode, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<bool> get isPrimary =>
+      $composableBuilder(column: $table.isPrimary, builder: (column) => column);
+}
+
+class $$CachedProductBarcodesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CachedProductBarcodesTable,
+          CachedProductBarcode,
+          $$CachedProductBarcodesTableFilterComposer,
+          $$CachedProductBarcodesTableOrderingComposer,
+          $$CachedProductBarcodesTableAnnotationComposer,
+          $$CachedProductBarcodesTableCreateCompanionBuilder,
+          $$CachedProductBarcodesTableUpdateCompanionBuilder,
+          (
+            CachedProductBarcode,
+            BaseReferences<
+              _$AppDatabase,
+              $CachedProductBarcodesTable,
+              CachedProductBarcode
+            >,
+          ),
+          CachedProductBarcode,
+          PrefetchHooks Function()
+        > {
+  $$CachedProductBarcodesTableTableManager(
+    _$AppDatabase db,
+    $CachedProductBarcodesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedProductBarcodesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$CachedProductBarcodesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedProductBarcodesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> productId = const Value.absent(),
+                Value<String> storeId = const Value.absent(),
+                Value<String> barcode = const Value.absent(),
+                Value<String?> label = const Value.absent(),
+                Value<bool> isPrimary = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedProductBarcodesCompanion(
+                id: id,
+                productId: productId,
+                storeId: storeId,
+                barcode: barcode,
+                label: label,
+                isPrimary: isPrimary,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String productId,
+                required String storeId,
+                required String barcode,
+                Value<String?> label = const Value.absent(),
+                Value<bool> isPrimary = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedProductBarcodesCompanion.insert(
+                id: id,
+                productId: productId,
+                storeId: storeId,
+                barcode: barcode,
+                label: label,
+                isPrimary: isPrimary,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedProductBarcodesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CachedProductBarcodesTable,
+      CachedProductBarcode,
+      $$CachedProductBarcodesTableFilterComposer,
+      $$CachedProductBarcodesTableOrderingComposer,
+      $$CachedProductBarcodesTableAnnotationComposer,
+      $$CachedProductBarcodesTableCreateCompanionBuilder,
+      $$CachedProductBarcodesTableUpdateCompanionBuilder,
+      (
+        CachedProductBarcode,
+        BaseReferences<
+          _$AppDatabase,
+          $CachedProductBarcodesTable,
+          CachedProductBarcode
+        >,
+      ),
+      CachedProductBarcode,
       PrefetchHooks Function()
     >;
 typedef $$CachedClientsTableCreateCompanionBuilder =
@@ -8578,6 +9231,8 @@ class $AppDatabaseManager {
       $$CachedStoresTableTableManager(_db, _db.cachedStores);
   $$CachedProductsTableTableManager get cachedProducts =>
       $$CachedProductsTableTableManager(_db, _db.cachedProducts);
+  $$CachedProductBarcodesTableTableManager get cachedProductBarcodes =>
+      $$CachedProductBarcodesTableTableManager(_db, _db.cachedProductBarcodes);
   $$CachedClientsTableTableManager get cachedClients =>
       $$CachedClientsTableTableManager(_db, _db.cachedClients);
   $$CachedReceivableAccountsTableTableManager get cachedReceivableAccounts =>

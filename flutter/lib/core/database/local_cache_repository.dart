@@ -88,10 +88,47 @@ class LocalCacheRepository {
         .toList();
 
     await _database.replaceCatalogProducts(storeId, rows);
+
+    final barcodeRows = <CachedProductBarcodesCompanion>[];
+    for (final product in products) {
+      for (final barcode in product.alternateBarcodes) {
+        barcodeRows.add(CachedProductBarcodesCompanion.insert(
+          id: '${product.id}_$barcode',
+          productId: product.id,
+          storeId: storeId,
+          barcode: barcode,
+        ));
+      }
+    }
+
+    await _database.transaction(() async {
+      await (_database.delete(_database.cachedProductBarcodes)
+            ..where((table) => table.storeId.equals(storeId)))
+          .go();
+      if (barcodeRows.isNotEmpty) {
+        await _database.batch((b) {
+          b.insertAll(
+            _database.cachedProductBarcodes,
+            barcodeRows,
+            mode: InsertMode.insertOrReplace,
+          );
+        });
+      }
+    });
   }
 
   Future<List<CatalogProduct>> getCatalogProducts(String storeId) async {
     final rows = await _database.getCatalogProducts(storeId);
+    
+    final barcodeRows = await (_database.select(_database.cachedProductBarcodes)
+          ..where((table) => table.storeId.equals(storeId)))
+        .get();
+        
+    final alternateBarcodesMap = <String, List<String>>{};
+    for (final row in barcodeRows) {
+      alternateBarcodesMap.putIfAbsent(row.productId, () => []).add(row.barcode);
+    }
+    
     return rows
         .map(
           (row) => CatalogProduct(
@@ -104,6 +141,7 @@ class LocalCacheRepository {
             stockBulks: row.stockBulks,
             stockUnits: row.stockUnits,
             barcode: row.barcode,
+            alternateBarcodes: alternateBarcodesMap[row.id] ?? [],
             brand: row.brand,
             department: row.department,
             subDepartment: row.subDepartment,
@@ -487,6 +525,28 @@ class LocalCacheRepository {
         mode: InsertMode.insertOrReplace,
       );
     });
+
+    final barcodeRows = <CachedProductBarcodesCompanion>[];
+    for (final product in products) {
+      for (final barcode in product.alternateBarcodes) {
+        barcodeRows.add(CachedProductBarcodesCompanion.insert(
+          id: '${product.id}_$barcode',
+          productId: product.id,
+          storeId: product.storeId,
+          barcode: barcode,
+        ));
+      }
+    }
+
+    if (barcodeRows.isNotEmpty) {
+      await _database.batch((batch) {
+        batch.insertAll(
+          _database.cachedProductBarcodes,
+          barcodeRows,
+          mode: InsertMode.insertOrReplace,
+        );
+      });
+    }
   }
 
   Future<void> upsertClients(String storeId, List<ClientSummary> clients) async {

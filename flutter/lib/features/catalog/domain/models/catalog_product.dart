@@ -9,6 +9,7 @@ class CatalogProduct {
     required this.stockBulks,
     required this.stockUnits,
     this.barcode,
+    this.alternateBarcodes = const [],
     this.brand,
     this.department,
     this.subDepartment,
@@ -30,6 +31,7 @@ class CatalogProduct {
   final int stockBulks;
   final int stockUnits;
   final String? barcode;
+  final List<String> alternateBarcodes;
   final String? brand;
   final String? department;
   final String? subDepartment;
@@ -72,6 +74,11 @@ class CatalogProduct {
       stockBulks: int.tryParse('${json['stockBulks'] ?? 0}') ?? 0,
       stockUnits: int.tryParse('${json['stockUnits'] ?? 0}') ?? 0,
       barcode: json['barcode']?.toString(),
+      alternateBarcodes: (json['alternateBarcodes'] as List<dynamic>?)
+              ?.map((e) => e['barcode']?.toString() as String)
+              .where((b) => b != null)
+              .toList() ??
+          [],
       brand: json['brand']?.toString(),
       department: json['departmentName']?.toString() ?? json['department']?.toString(),
       subDepartment: json['subDepartment']?.toString(),

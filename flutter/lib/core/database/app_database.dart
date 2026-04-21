@@ -41,6 +41,18 @@ class CachedProducts extends Table {
   Set<Column<Object>> get primaryKey => {id, storeId};
 }
 
+class CachedProductBarcodes extends Table {
+  TextColumn get id => text()();
+  TextColumn get productId => text()();
+  TextColumn get storeId => text()();
+  TextColumn get barcode => text()();
+  TextColumn get label => text().nullable()();
+  BoolColumn get isPrimary => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 class CachedClients extends Table {
   TextColumn get id => text()();
   TextColumn get storeId => text()();
@@ -153,6 +165,7 @@ class VisitLogs extends Table {
   tables: [
     CachedStores,
     CachedProducts,
+    CachedProductBarcodes,
     CachedClients,
     CachedReceivableAccounts,
     CachedCollectionSummaries,
@@ -169,7 +182,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -191,6 +204,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 5) {
         await migrator.createTable(visitLogs);
+      }
+      if (from < 6) {
+        await migrator.createTable(cachedProductBarcodes);
       }
     },
   );

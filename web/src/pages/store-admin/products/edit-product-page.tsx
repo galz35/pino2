@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/lib/swalert';
 import apiClient from '@/services/api-client';
+import { AlternativeBarcodes } from './alternative-barcodes';
 
 interface Department {
   id: string;
@@ -274,12 +275,16 @@ export default function EditProductPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="barcode">Código de barras</Label>
+                <Label htmlFor="barcode">Código de barras (Principal)</Label>
                 <Input
                   id="barcode"
                   value={formData.barcode}
                   onChange={(event) => updateField('barcode', event.target.value)}
+                  disabled
                 />
+                <p className="text-[10px] text-muted-foreground mt-1 leading-tight">
+                  Para cambiar o agregar códigos, use la sección de Códigos Alternativos abajo.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="brand">Marca</Label>
@@ -413,6 +418,10 @@ export default function EditProductPage() {
           </form>
         </CardContent>
       </Card>
+      
+      {productId && storeId && (
+        <AlternativeBarcodes productId={productId} storeId={storeId} />
+      )}
     </div>
   );
 }

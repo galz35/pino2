@@ -42,6 +42,7 @@ const HEADER_MAPPING: Record<string, string> = {
   'Usa Inventario': 'usesInventory',
   'Stock Actual': 'currentStock',
   'Stock Mínimo': 'minStock',
+  'Códigos Alternativos': 'alternateBarcodes',
   // Fuzzy variants for Excel/truncated headers
   'Precio de Co': 'costPrice',
   'Precio de Ve': 'salePrice',
@@ -73,6 +74,7 @@ const TEMPLATE_ROWS = [
     'Usa Inventario': 'SI',
     'Stock Actual': 100,
     'Stock Mínimo': 10,
+    'Códigos Alternativos': '101234, 101235',
   },
   {
     'Código de Barras': '',
@@ -91,6 +93,7 @@ const TEMPLATE_ROWS = [
     'Usa Inventario': 'SI',
     'Stock Actual': 50,
     'Stock Mínimo': 5,
+    'Códigos Alternativos': '',
   },
 ];
 
@@ -112,6 +115,7 @@ interface ProductDataRow {
   usesInventory?: boolean;
   currentStock?: number;
   minStock?: number;
+  alternateBarcodes?: string | string[];
 }
 
 
@@ -200,6 +204,9 @@ export function ImportProductsDialog({ storeId }: ImportProductsDialogProps) {
         const price3 = Number(productData.price3 || productData.wholesalePrice || 0);
         return {
           barcode: productData.barcode || '',
+          alternateBarcodes: typeof productData.alternateBarcodes === 'string'
+            ? productData.alternateBarcodes.split(/[;,]/).map(s => s.trim()).filter(Boolean)
+            : [],
           description: productData.description,
           brand: productData.brand || '',
           costPrice: Number(productData.costPrice || 0),

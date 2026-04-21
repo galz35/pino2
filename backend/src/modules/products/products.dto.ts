@@ -24,6 +24,11 @@ export class CreateProductDto {
   @IsOptional()
   barcode?: string | null;
 
+  @IsArray()
+  @IsOptional()
+  @IsString({ each: true })
+  alternateBarcodes?: string[];
+
   @IsString()
   @IsNotEmpty()
   description!: string;

@@ -54,6 +54,7 @@ class CatalogRepository {
             product.description,
             product.brand ?? '',
             product.barcode ?? '',
+            product.alternateBarcodes.join(' '),
             product.department ?? '',
             product.subDepartment ?? '',
           ].join(' ').toLowerCase();

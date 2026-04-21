@@ -169,6 +169,7 @@ export class SyncService {
     }
 
     const { rows: products } = await this.db.query(`SELECT * FROM products WHERE store_id = $1 AND is_active = true ${timeCondition}`, params);
+    const { rows: productBarcodes } = await this.db.query(`SELECT * FROM product_barcodes WHERE store_id = $1 ${timeCondition}`, params);
     const { rows: clients } = await this.db.query(`SELECT * FROM clients WHERE store_id = $1 AND is_active = true ${timeCondition}`, params);
     const { rows: orders } = await this.db.query(`SELECT * FROM orders WHERE store_id = $1 ${timeCondition}`, params);
     const { rows: routes } = await this.db.query(`SELECT * FROM routes WHERE store_id = $1 ${timeCondition}`, params);
@@ -176,6 +177,7 @@ export class SyncService {
     return {
       serverTimestamp: new Date().toISOString(),
       products,
+      productBarcodes,
       clients,
       orders,
       routes,
