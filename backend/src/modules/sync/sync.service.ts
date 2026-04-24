@@ -61,13 +61,18 @@ export class SyncService {
 
       for (const op of operations) {
         try {
-          const opData = { ...op.data, storeId, externalId: op.id };
+          const opId = op.id || op.localId || op.externalId;
+          const opData = {
+            ...op.data,
+            storeId,
+            externalId: op.data?.externalId || opId,
+          };
 
           switch (op.type) {
             case 'SALE': {
               const res = await this.salesService.processSale(opData, client);
               results.push({
-                opId: op.id,
+                opId,
                 serverId: res.id,
                 status: 'SUCCESS',
                 isDuplicate: !!res.isDuplicate,
@@ -79,7 +84,7 @@ export class SyncService {
             case 'ORDER': {
               const res = await this.ordersService.create(opData, client);
               results.push({
-                opId: op.id,
+                opId,
                 serverId: res.id,
                 status: 'SUCCESS',
                 isDuplicate: !!res.isDuplicate,
@@ -91,7 +96,7 @@ export class SyncService {
             case 'COLLECTION': {
               const res = await this.collectionsService.create(opData, client);
               results.push({
-                opId: op.id,
+                opId,
                 serverId: res.id,
                 status: 'SUCCESS',
                 isDuplicate: !!res.isDuplicate,
@@ -103,7 +108,7 @@ export class SyncService {
             case 'RETURN': {
               const res = await this.returnsService.create(opData, client);
               results.push({
-                opId: op.id,
+                opId,
                 serverId: res.id,
                 status: 'SUCCESS',
                 isDuplicate: !!res.isDuplicate,
@@ -115,16 +120,20 @@ export class SyncService {
             default:
               this.logger.warn(`Tipo de operación no soportado: ${op.type}`);
               results.push({
-                opId: op.id,
+                opId,
                 status: 'SKIPPED',
                 error: 'Unsupported type',
               });
           }
         } catch (error) {
           this.logger.error(
-            `Error procesando operación ${op.id} (${op.type}): ${error.message}`,
+            `Error procesando operación ${op.id || op.localId || op.externalId} (${op.type}): ${error.message}`,
           );
-          results.push({ opId: op.id, status: 'FAILED', error: error.message });
+          results.push({
+            opId: op.id || op.localId || op.externalId,
+            status: 'FAILED',
+            error: error.message,
+          });
           // Importante: No lanzamos error aquí para permitir que otras operaciones del lote se procesen,
           // pero como estamos en una transacción, si quisiéramos que todo falle o nada, deberíamos relanzar.
           // En sincronización offline-first, usualmente queremos que lo que es válido pase.

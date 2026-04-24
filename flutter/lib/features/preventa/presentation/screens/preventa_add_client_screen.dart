@@ -45,13 +45,19 @@ class _PreventaAddClientScreenState extends ConsumerState<PreventaAddClientScree
 
     final authState = ref.read(authControllerProvider);
     final storeId = authState.session?.user.primaryStoreId;
+    if (storeId == null || storeId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay tienda activa para guardar cliente.')),
+      );
+      return;
+    }
 
     final payload = {
       'name': _nameCtrl.text,
       'phone': _phoneCtrl.text,
       'address': _addressCtrl.text,
-      'latitude': _currentPosition?.latitude,
-      'longitude': _currentPosition?.longitude,
+      'lat': _currentPosition?.latitude,
+      'lng': _currentPosition?.longitude,
       'storeId': storeId,
       'createdAt': DateTime.now().toIso8601String(),
     };

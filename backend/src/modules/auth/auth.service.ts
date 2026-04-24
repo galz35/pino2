@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   ConflictException,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -98,7 +99,11 @@ export class AuthService {
     }
   }
 
-  async refreshToken(userId: string) {
+  async refreshToken(userId: string, refreshToken?: string) {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token requerido');
+    }
+
     const resUser = await this.db.query(
       'SELECT * FROM users WHERE id = $1 AND is_active = true',
       [userId],
@@ -107,6 +112,10 @@ export class AuthService {
       throw new UnauthorizedException('Usuario no encontrado');
 
     const user = resUser.rows[0];
+    if (!user.refresh_token || user.refresh_token !== refreshToken) {
+      throw new UnauthorizedException('Refresh token inválido');
+    }
+
     const resStores = await this.db.query(
       'SELECT store_id FROM user_stores WHERE user_id = $1',
       [user.id],
@@ -173,6 +182,30 @@ export class AuthService {
         role: user.role,
         storeIds,
       },
+    };
+  }
+
+  async requestPasswordReset(email: string) {
+    if (!email || !email.includes('@')) {
+      throw new BadRequestException('Correo inválido');
+    }
+
+    const resUser = await this.db.query(
+      'SELECT id FROM users WHERE email = $1 AND is_active = true',
+      [email],
+    );
+
+    if ((resUser.rowCount ?? 0) > 0) {
+      this.logger.warn(
+        `Password reset requested for ${email}. Email delivery is not configured.`,
+      );
+    }
+
+    return {
+      accepted: true,
+      deliveryConfigured: false,
+      message:
+        'Solicitud registrada. La entrega de correo aún no está configurada; contacte al administrador.',
     };
   }
 }

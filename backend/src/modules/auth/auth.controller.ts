@@ -5,11 +5,14 @@ import {
   Get,
   UseGuards,
   Request,
+  HttpCode,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import {
   IsEmail,
   IsNotEmpty,
@@ -52,8 +55,10 @@ class LoginDto {
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Public()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('master-admin', 'store-admin')
   @Post('register')
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Registrar un nuevo usuario' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
@@ -71,7 +76,18 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Renovar token de acceso' })
   refresh(@Request() req: any) {
-    return this.authService.refreshToken(req.user.sub);
+    const token = this.extractBearerToken(req);
+    return this.authService.refreshToken(req.user.sub, token);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(202)
+  @ApiOperation({
+    summary: 'Solicitud de recuperación de contraseña',
+  })
+  requestPasswordReset(@Body() dto: { email: string }) {
+    return this.authService.requestPasswordReset(dto.email);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -90,5 +106,11 @@ export class AuthController {
   })
   getProfileAlias(@Request() req: any) {
     return this.authService.getProfile(req.user.sub);
+  }
+
+  private extractBearerToken(req: any): string | undefined {
+    const authorization = req.headers?.authorization || '';
+    const [type, token] = authorization.split(' ');
+    return type?.toLowerCase() === 'bearer' ? token : undefined;
   }
 }

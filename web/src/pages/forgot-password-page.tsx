@@ -27,16 +27,17 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      // Intentamos llamar a un endpoint generico de reset account.
-      // Si el backend aun no lo soporta completamente, enviamos un log y mostramos mensaje visual
-      await apiClient.post('/auth/forgot-password', { email }).catch((err) => {
-          // If the endpoint does not exist yet, we silently catch the 404
-          // to provide a UX feedback anyway as requested by requirements
-          if (err.response?.status !== 404) throw err;
-      });
+      const response = await apiClient.post('/auth/forgot-password', { email });
       
       setSuccess(true);
-      toast.success('Solicitud enviada', 'Si el correo existe, recibirás instrucciones para restablecer tu contraseña.');
+      if (response.data?.deliveryConfigured === false) {
+        toast.info(
+          'Solicitud registrada',
+          response.data.message || 'Contacta al administrador para completar el restablecimiento.',
+        );
+      } else {
+        toast.success('Solicitud enviada', 'Si el correo existe, recibirás instrucciones para restablecer tu contraseña.');
+      }
     } catch (err: any) {
       toast.error('Error', err.response?.data?.message || 'No pudimos procesar tu solicitud.');
     } finally {
@@ -62,8 +63,8 @@ export default function ForgotPasswordPage() {
           <CardContent>
             {success ? (
               <div className="text-center space-y-4">
-                <p className="text-sm text-emerald-600 font-medium">¡Correo enviado con éxito!</p>
-                <p className="text-xs text-muted-foreground">Revisa tu bandeja de entrada o la carpeta de spam.</p>
+                <p className="text-sm text-emerald-600 font-medium">Solicitud registrada</p>
+                <p className="text-xs text-muted-foreground">Si el correo está configurado recibirás instrucciones; si no, contacta al administrador.</p>
                 <Button className="w-full mt-4" onClick={() => navigate('/login')}>
                   Volver al login
                 </Button>

@@ -100,6 +100,7 @@ class SyncService {
                     await apiClient.post('/sync/batch', {
                         storeId,
                         operations: storeOps.map(op => ({
+                            id: op.id,
                             type: op.type,
                             data: op.operation,
                             localId: op.id

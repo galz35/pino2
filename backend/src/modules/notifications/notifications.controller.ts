@@ -60,7 +60,7 @@ export class NotificationsController {
     @Body() dto: { token: string; platform: string },
     @Req() req: any,
   ) {
-    const userId = req.user.id;
+    const userId = req.user.sub;
     return this.service.registerToken(userId, dto.token, dto.platform);
   }
 

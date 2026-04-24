@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/database/local_cache_repository.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
+import '../../../clients/domain/models/client_summary.dart';
 
 class PreventaRouteScreen extends ConsumerStatefulWidget {
   const PreventaRouteScreen({super.key});
@@ -11,45 +13,73 @@ class PreventaRouteScreen extends ConsumerStatefulWidget {
 }
 
 class _PreventaRouteScreenState extends ConsumerState<PreventaRouteScreen> {
-  // Datos simulados para prototipo visual
-  final clientsRoute = [
-    {
-      'id': '1',
-      'name': 'Pulp. Doña María',
-      'address': 'De la iglesia 1/2c al sur',
-      'status': 'Al día',
-      'lastOrder': 'Ayer (C\$ 450)',
-      'visited': true
-    },
-    {
-      'id': '2',
-      'name': 'Mini Súper El Sol',
-      'address': 'Frente al parque central',
-      'status': 'Mora',
-      'lastOrder': 'Hace 5 días (C\$ 1200)',
-      'visited': true
-    },
-    {
-      'id': '3',
-      'name': 'Abarrotería Los Pinos',
-      'address': 'Barrio San Luis',
-      'status': 'Al día',
-      'lastOrder': 'Hace 1 semana (C\$ 3000)',
-      'visited': false
-    },
-    {
-      'id': '4',
-      'name': 'Pulpería La Bendición',
-      'address': 'Empalme carretera norte',
-      'status': 'Por vencer',
-      'lastOrder': 'Hace 3 días (C\$ 850)',
-      'visited': false
-    },
-  ];
+  List<ClientSummary> _clientsRoute = [];
+  Set<String> _visitedClientIds = {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoute();
+  }
+
+  Future<void> _loadRoute() async {
+    final storeId = ref.read(authControllerProvider).session?.user.primaryStoreId;
+    if (storeId == null || storeId.isEmpty) {
+      setState(() => _loading = false);
+      return;
+    }
+
+    final repository = ref.read(localCacheRepositoryProvider);
+    final clients = await repository.getClients(storeId);
+    final routes = await repository.getRoutes(storeId);
+    final visits = await repository.getVisits();
+
+    final now = DateTime.now();
+    final todaysRoutes = routes.where((route) {
+      final routeDate = route.routeDate;
+      if (routeDate == null) return false;
+      return routeDate.year == now.year &&
+          routeDate.month == now.month &&
+          routeDate.day == now.day;
+    }).toList();
+
+    final routeClientIds = todaysRoutes
+        .expand((route) => route.clientIds)
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    final selectedClients = routeClientIds.isEmpty
+        ? clients
+        : clients.where((client) => routeClientIds.contains(client.id)).toList();
+
+    if (!mounted) return;
+    setState(() {
+      _clientsRoute = selectedClients;
+      _visitedClientIds = visits.map((visit) => visit.clientId).toSet();
+      _loading = false;
+    });
+  }
+
+  Future<void> _markNoBuy(String clientId) async {
+    await ref.read(localCacheRepositoryProvider).signVisit(
+          clientId: clientId,
+          status: 'no_buy',
+        );
+    if (!mounted) return;
+    setState(() => _visitedClientIds = {..._visitedClientIds, clientId});
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Visita sin compra registrada.')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final visitedCount = _clientsRoute
+        .where((client) => _visitedClientIds.contains(client.id))
+        .length;
+    final totalCount = _clientsRoute.length;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -71,11 +101,11 @@ class _PreventaRouteScreenState extends ConsumerState<PreventaRouteScreen> {
                    children: [
                      const Text('Progreso de Visitas', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)),
                      const SizedBox(height: 4),
-                     Text('2 / ${clientsRoute.length} Clientes', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                     Text('$visitedCount / $totalCount Clientes', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
                    ],
                  ),
                  CircularProgressIndicator(
-                   value: 2 / clientsRoute.length,
+                   value: totalCount == 0 ? 0 : visitedCount / totalCount,
                    backgroundColor: Colors.grey.shade200,
                    color: const Color(0xFF047857),
                    strokeWidth: 6,
@@ -85,17 +115,21 @@ class _PreventaRouteScreenState extends ConsumerState<PreventaRouteScreen> {
            ),
            const Divider(height: 1),
            Expanded(
-             child: ListView.builder(
+             child: _loading
+                 ? const Center(child: CircularProgressIndicator())
+                 : _clientsRoute.isEmpty
+                     ? const Center(child: Text('No hay ruta local sincronizada.'))
+                     : ListView.builder(
                padding: const EdgeInsets.all(16),
-               itemCount: clientsRoute.length,
+               itemCount: _clientsRoute.length,
                itemBuilder: (context, index) {
-                 final c = clientsRoute[index];
-                 final bool visited = c['visited'] as bool;
+                 final client = _clientsRoute[index];
+                 final visited = _visitedClientIds.contains(client.id);
                  
                  return GestureDetector(
                    onTap: () {
-                     final paramId = c['id'];
-                     final paramName = Uri.encodeComponent(c['name'] as String);
+                     final paramId = client.id;
+                     final paramName = Uri.encodeComponent(client.name);
                      context.push('/preventa-order?clientId=$paramId&clientName=$paramName');
                    },
                    child: Container(
@@ -134,7 +168,7 @@ class _PreventaRouteScreenState extends ConsumerState<PreventaRouteScreen> {
                              crossAxisAlignment: CrossAxisAlignment.start,
                              children: [
                                Text(
-                                 c['name'] as String,
+                                 client.name,
                                  style: theme.textTheme.titleMedium?.copyWith(
                                    fontWeight: FontWeight.bold,
                                    decoration: visited ? TextDecoration.lineThrough : null,
@@ -146,30 +180,22 @@ class _PreventaRouteScreenState extends ConsumerState<PreventaRouteScreen> {
                                  children: [
                                    Icon(Icons.location_on_rounded, size: 14, color: Colors.grey.shade500),
                                    const SizedBox(width: 4),
-                                   Expanded(child: Text(c['address'] as String, style: TextStyle(color: Colors.grey.shade600, fontSize: 13), overflow: TextOverflow.ellipsis)),
+                                   Expanded(child: Text(client.address ?? 'Sin dirección', style: TextStyle(color: Colors.grey.shade600, fontSize: 13), overflow: TextOverflow.ellipsis)),
                                  ],
                                ),
                                const SizedBox(height: 10),
                                Row(
                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                  children: [
-                                    _buildStatusBadge(c['status'] as String),
+                                    _buildStatusBadge(visited ? 'Visitado' : 'Pendiente'),
                                     Row(
                                       children: [
                                          IconButton(
                                            icon: const Icon(Icons.not_interested_rounded, color: Colors.red, size: 20),
                                            tooltip: 'No compra',
-                                           onPressed: () async {
-                                              await ref.read(localCacheRepositoryProvider).signVisit(
-                                                clientId: c['id'] as String,
-                                                status: 'no_buy',
-                                              );
-                                              if (context.mounted) {
-                                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Visita (Sin compra) registrada.')));
-                                              }
-                                           },
+                                           onPressed: visited ? null : () => _markNoBuy(client.id),
                                          ),
-                                         Text('Último: ${c['lastOrder']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black54)),
+                                         Text(client.phone ?? 'Sin teléfono', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black54)),
                                       ],
                                     ),
                                  ],
@@ -192,9 +218,8 @@ class _PreventaRouteScreenState extends ConsumerState<PreventaRouteScreen> {
   Widget _buildStatusBadge(String status) {
     Color bg;
     Color fg;
-    if (status == 'Al día') { bg = Colors.green.shade100; fg = Colors.green.shade800; }
-    else if (status == 'Por vencer') { bg = Colors.amber.shade100; fg = Colors.amber.shade800; }
-    else { bg = Colors.red.shade100; fg = Colors.red.shade800; }
+    if (status == 'Visitado') { bg = Colors.green.shade100; fg = Colors.green.shade800; }
+    else { bg = Colors.amber.shade100; fg = Colors.amber.shade800; }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

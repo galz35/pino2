@@ -2,12 +2,27 @@ const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
+const envPath = path.join(__dirname, '..', '.env');
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, 'utf-8').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const match = trimmed.match(/^([^=]+)=(.*)$/);
+    if (!match) continue;
+    const [, key, rawValue] = match;
+    process.env[key] = process.env[key] || rawValue.replace(/^["']|["']$/g, '');
+  }
+}
+
+const migrationFile = process.argv[2] || '2026-04-21_barcode_refactor.sql';
+const migrationPath = path.resolve(__dirname, migrationFile);
+
 const client = new Client({
-  host: '190.56.16.85',
-  port: 5432,
-  user: 'alacaja',
-  password: 'TuClaveFuerte',
-  database: 'multitienda_db'
+  host: process.env.DATABASE_HOST,
+  port: Number(process.env.DATABASE_PORT || 5432),
+  user: process.env.DATABASE_USER,
+  password: process.env.DATABASE_PASSWORD,
+  database: process.env.DATABASE_NAME,
 });
 
 async function run() {
@@ -15,11 +30,23 @@ async function run() {
     await client.connect();
     console.log('✅ Conectado a la BD');
 
-    const sqlFile = path.join(__dirname, '2026-04-20_distribucion.sql');
-    const sql = fs.readFileSync(sqlFile, 'utf-8');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        filename TEXT PRIMARY KEY,
+        applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+      )
+    `);
 
-    console.log('🔄 Ejecutando migración...');
+    const sql = fs.readFileSync(migrationPath, 'utf-8');
+
+    console.log(`🔄 Ejecutando migración: ${path.basename(migrationPath)}`);
     await client.query(sql);
+    await client.query(
+      `INSERT INTO schema_migrations (filename)
+       VALUES ($1)
+       ON CONFLICT (filename) DO UPDATE SET applied_at = NOW()`,
+      [path.basename(migrationPath)],
+    );
     console.log('✅ Migración ejecutada exitosamente');
 
     // Validar tablas creadas

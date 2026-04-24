@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../core/database/local_cache_repository.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 
@@ -18,15 +19,37 @@ class _PreventaOrderScreenState extends ConsumerState<PreventaOrderScreen> {
   final List<Map<String, dynamic>> _cart = [];
   bool _isCredit = false;
   final double _creditLimit = 2000.0;
-  
-  // Fake catalog
-  final List<Map<String, dynamic>> _catalog = [
-    {'id': 'p1', 'name': 'Coca Cola 600ml', 'price': 60.0, 'stock': 100},
-    {'id': 'p2', 'name': 'Galleta María', 'price': 25.0, 'stock': 50},
-    {'id': 'p3', 'name': 'Aceite 1L', 'price': 50.0, 'stock': 20},
-    {'id': 'p4', 'name': 'Arroz Faisán 1lb', 'price': 22.0, 'stock': 200},
-    {'id': 'p5', 'name': 'Frijoles 1lb', 'price': 35.0, 'stock': 150},
-  ];
+  List<Map<String, dynamic>> _catalog = [];
+  bool _loadingCatalog = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCatalog();
+  }
+
+  Future<void> _loadCatalog() async {
+    final storeId = ref.read(authControllerProvider).session?.user.primaryStoreId;
+    if (storeId == null || storeId.isEmpty) {
+      setState(() => _loadingCatalog = false);
+      return;
+    }
+
+    final products = await ref.read(localCacheRepositoryProvider).getCatalogProducts(storeId);
+    if (!mounted) return;
+
+    setState(() {
+      _catalog = products
+          .map((product) => {
+                'id': product.id,
+                'name': product.description,
+                'price': product.salePrice,
+                'stock': product.currentStock,
+              })
+          .toList();
+      _loadingCatalog = false;
+    });
+  }
 
   /*
    * Add to cart helper
@@ -38,10 +61,10 @@ class _PreventaOrderScreenState extends ConsumerState<PreventaOrderScreen> {
         _cart[existing]['quantity']++;
       } else {
         _cart.add({
-           ...product,
-           'quantity': 1,
-           'presentation': 'UNIDAD',
-           'priceLevel': 1,
+          ...product,
+          'quantity': 1,
+          'presentation': 'UNIT',
+          'priceLevel': 1,
         });
       }
     });
@@ -58,59 +81,82 @@ class _PreventaOrderScreenState extends ConsumerState<PreventaOrderScreen> {
   }
 
   double get _subtotal {
-    return _cart.fold(0, (sum, item) => sum + (item['price'] as double) * (item['quantity'] as int));
+    return _cart.fold(
+      0,
+      (sum, item) => sum + (item['price'] as double) * (item['quantity'] as int),
+    );
   }
 
   void _submitOrder() async {
-     final authState = ref.read(authControllerProvider);
-     final userId = authState.session?.user.id;
-     final storeId = authState.session?.user.primaryStoreId;
+    final authState = ref.read(authControllerProvider);
+    final userId = authState.session?.user.id;
+    final storeId = authState.session?.user.primaryStoreId;
+    if (storeId == null ||
+        storeId.isEmpty ||
+        userId == null ||
+        userId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No hay sesión o tienda activa para guardar el pedido.'),
+        ),
+      );
+      return;
+    }
 
-     final payload = {
-       'clientId': widget.clientId,
-       'userId': userId,
-       'storeId': storeId,
-       'paymentType': _isCredit ? 'CREDIT' : 'CASH',
-       'items': _cart.map((item) => {
-         'productId': item['id'],
-         'quantity': item['quantity'],
-         'price': item['price'],
-         'presentation': item['presentation'],
-         'priceLevel': item['priceLevel'],
-       }).toList(),
-       'subtotal': _subtotal,
-       'notes': 'Pedido offline preventa',
-     };
+    final payload = {
+      'externalId': const Uuid().v4(),
+      'clientId': widget.clientId,
+      'userId': userId,
+      'storeId': storeId,
+      'paymentType': _isCredit ? 'CREDITO' : 'CONTADO',
+      'items': _cart
+          .map((item) => {
+                'productId': item['id'],
+                'quantity': item['quantity'],
+                'price': item['price'],
+                'unitPrice': item['price'],
+                'presentation': item['presentation'],
+                'priceLevel': item['priceLevel'],
+              })
+          .toList(),
+      'subtotal': _subtotal,
+      'notes': 'Pedido offline preventa',
+    };
 
-     // Enqueue action
-     await ref.read(localCacheRepositoryProvider).enqueueSyncAction(
-       method: 'POST',
-       endpoint: '/orders',
-       storeId: storeId,
-       operationType: 'CREATE_ORDER',
-       payload: payload,
-     );
+    await ref.read(localCacheRepositoryProvider).enqueueSyncAction(
+          method: 'POST',
+          endpoint: '/orders',
+          storeId: storeId,
+          operationType: 'CREATE_ORDER',
+          payload: payload,
+        );
 
-     if (!mounted) return;
-     
-     showDialog(
-       context: context, 
-       barrierDismissible: false,
-       builder: (ctx) => AlertDialog(
-         icon: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 48),
-         title: const Text('Pedido Guardado'),
-         content: const Text('El pedido ha sido guardado exitosamente y será sincronizado automáticamente cuando haya conexión.'),
-         actions: [
-           TextButton(
-             onPressed: () {
-               Navigator.of(ctx).pop();
-               context.pop();
-             },
-             child: const Text('Entendido')
-           )
-         ],
-       )
-     );
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(
+          Icons.check_circle_rounded,
+          color: Colors.green,
+          size: 48,
+        ),
+        title: const Text('Pedido Guardado'),
+        content: const Text(
+          'El pedido ha sido guardado exitosamente y será sincronizado automáticamente cuando haya conexión.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.pop();
+            },
+            child: const Text('Entendido'),
+          )
+        ],
+      ),
+    );
   }
 
   @override
@@ -149,7 +195,11 @@ class _PreventaOrderScreenState extends ConsumerState<PreventaOrderScreen> {
                   ),
                 ),
                 Expanded(
-                  child: ListView.builder(
+                  child: _loadingCatalog
+                        ? const Center(child: CircularProgressIndicator())
+                        : _catalog.isEmpty
+                          ? const Center(child: Text('No hay catálogo local sincronizado.'))
+                          : ListView.builder(
                     itemCount: _catalog.length,
                     itemBuilder: (context, index) {
                       final p = _catalog[index];

@@ -116,28 +116,32 @@ export class ProductBarcodesService {
     productId: string,
     barcodeId: string,
   ): Promise<ProductBarcode[]> {
-    // 1. Desmarcar todos los del producto
-    await this.db.query(
-      'UPDATE product_barcodes SET is_primary = false WHERE product_id = $1',
-      [productId],
-    );
+    await this.db.withTransaction(async (client) => {
+      const check = await client.query<BarcodeRow>(
+        'SELECT * FROM product_barcodes WHERE id = $1 AND product_id = $2 FOR UPDATE',
+        [barcodeId, productId],
+      );
+      if (check.rowCount === 0) {
+        throw new NotFoundException(
+          'Código de barras no encontrado para este producto',
+        );
+      }
 
-    // 2. Marcar el nuevo como principal
-    const res = await this.db.query<BarcodeRow>(
-      `UPDATE product_barcodes SET is_primary = true, updated_at = NOW()
-       WHERE id = $1 AND product_id = $2
-       RETURNING *`,
-      [barcodeId, productId],
-    );
-    if (res.rowCount === 0) {
-      throw new NotFoundException('Código de barras no encontrado para este producto');
-    }
+      await client.query(
+        'UPDATE product_barcodes SET is_primary = false, updated_at = NOW() WHERE product_id = $1',
+        [productId],
+      );
 
-    // 3. Sincronizar campo legacy products.barcode (retrocompatibilidad temporal)
-    await this.db.query(
-      'UPDATE products SET barcode = $1, updated_at = NOW() WHERE id = $2',
-      [res.rows[0].barcode, productId],
-    );
+      await client.query(
+        'UPDATE product_barcodes SET is_primary = true, updated_at = NOW() WHERE id = $1',
+        [barcodeId],
+      );
+
+      await client.query(
+        'UPDATE products SET barcode = $1, updated_at = NOW() WHERE id = $2',
+        [check.rows[0].barcode, productId],
+      );
+    });
 
     return this.listBarcodes(productId);
   }

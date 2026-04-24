@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { EventsGateway } from '../../common/gateways/events.gateway';
 import { CreateProductDto, UpdateProductDto, Product } from './products.dto';
@@ -242,6 +242,26 @@ export class ProductsService {
   }
 
   async update(id: string, dto: UpdateProductDto): Promise<Product> {
+    if (dto.barcode) {
+      const productRes = await this.db.query<{ store_id: string }>(
+        'SELECT store_id FROM products WHERE id = $1',
+        [id],
+      );
+      if (productRes.rowCount === 0) {
+        throw new NotFoundException('Producto no encontrado');
+      }
+
+      const conflict = await this.db.query<{ product_id: string }>(
+        'SELECT product_id FROM product_barcodes WHERE barcode = $1 AND store_id = $2 AND product_id <> $3 LIMIT 1',
+        [dto.barcode, productRes.rows[0].store_id, id],
+      );
+      if ((conflict.rowCount ?? 0) > 0) {
+        throw new ConflictException(
+          'Este código de barras ya está asignado a otro producto',
+        );
+      }
+    }
+
     const fieldMap: Record<string, string> = {
       description: 'description',
       barcode: 'barcode',
@@ -305,9 +325,18 @@ export class ProductsService {
          await this.db.query(
            `INSERT INTO product_barcodes (product_id, store_id, barcode, label, is_primary) 
             VALUES ($1, $2, $3, $4, true)
-            ON CONFLICT (barcode, store_id) DO UPDATE SET is_primary = true`,
+            ON CONFLICT (barcode, store_id) DO UPDATE SET
+              product_id = EXCLUDED.product_id,
+              label = EXCLUDED.label,
+              is_primary = true,
+              updated_at = NOW()`,
            [id, storeId, dto.barcode, 'Código Principal']
          );
+      } else if (dto.barcode === null || dto.barcode === '') {
+        await this.db.query(
+          'UPDATE product_barcodes SET is_primary = false, updated_at = NOW() WHERE product_id = $1',
+          [id],
+        );
       }
     }
 

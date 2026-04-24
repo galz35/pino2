@@ -356,6 +356,15 @@ export class InventoryService {
         );
         destProductId = copyRes.rows[0].id;
         destCurrentStock = 0;
+
+        await client.query(
+          `INSERT INTO product_barcodes (product_id, store_id, barcode, label, is_primary)
+           SELECT $1, $2, pb.barcode, pb.label, pb.is_primary
+           FROM product_barcodes pb
+           WHERE pb.product_id = $3
+           ON CONFLICT (barcode, store_id) DO NOTHING`,
+          [destProductId, dto.toStoreId, dto.productId],
+        );
       } else {
         destProductId = destProdRes.rows[0].id;
         destCurrentStock = this.parseInteger(

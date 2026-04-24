@@ -23,6 +23,10 @@ apiClient.interceptors.request.use((config) => {
 // Interceptor para manejar errores globales y CACHÉ
 apiClient.interceptors.response.use(
   (response) => {
+    if (response.config.method && response.config.method !== 'get') {
+      memoryCache.clear();
+    }
+
     // Solo cacheamos peticiones GET exitosas
     if (response.config.method === 'get') {
       const cacheKey = `${response.config.url}${JSON.stringify(response.config.params || {})}`;

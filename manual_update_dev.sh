@@ -46,6 +46,10 @@ deploy_backend() {
   log "Instalando dependencias backend"
   install_node_deps "$BACKEND_DIR"
 
+  log "Aplicando migraciones de base de datos"
+  node "$BACKEND_DIR/migrations/run_migration.js" 2026-04-20_distribucion.sql
+  node "$BACKEND_DIR/migrations/run_migration.js" 2026-04-21_barcode_refactor.sql
+
   log "Compilando backend"
   npm --prefix "$BACKEND_DIR" run build
 

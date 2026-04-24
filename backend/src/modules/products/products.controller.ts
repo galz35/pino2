@@ -72,12 +72,6 @@ export class ProductsController {
     );
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Obtener detalle de un producto' })
-  findOne(@Param('id') id: string) {
-    return this.productsService.findOne(id);
-  }
-
   @Get('barcode/:barcode')
   @ApiOperation({ summary: 'Buscar producto por código de barras' })
   findByBarcode(
@@ -85,6 +79,12 @@ export class ProductsController {
     @Param('barcode') barcode: string,
   ) {
     return this.productsService.findByBarcode(storeId, barcode);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Obtener detalle de un producto' })
+  findOne(@Param('id') id: string) {
+    return this.productsService.findOne(id);
   }
 
   @Patch(':id')
