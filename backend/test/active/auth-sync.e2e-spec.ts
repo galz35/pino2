@@ -12,6 +12,8 @@ describe('Auth & Sync Flow (e2e)', () => {
   let app: INestApplication;
   let db: DatabaseService;
   let createdEmail: string | null = null;
+  let adminEmail: string;
+  let adminToken: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -34,11 +36,25 @@ describe('Auth & Sync Flow (e2e)', () => {
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
     db = app.get<DatabaseService>(DatabaseService);
+    
+    // Create admin user to authorize register endpoint
+    const bcrypt = require('bcryptjs');
+    adminEmail = `admin_${Date.now()}@example.com`;
+    const hash = await bcrypt.hash('password123', 10);
+    await db.query(`INSERT INTO users (email, name, password_hash, role, is_active) VALUES ($1, $2, $3, $4, true)`, [adminEmail, 'Admin', hash, 'master-admin']);
+    
+    const loginRes = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: adminEmail, password: 'password123' });
+    adminToken = loginRes.body.access_token;
   });
 
   afterAll(async () => {
     if (createdEmail) {
       await db.query('DELETE FROM users WHERE email = $1', [createdEmail]);
+    }
+    if (adminEmail) {
+      await db.query('DELETE FROM users WHERE email = $1', [adminEmail]);
     }
     await app.close();
   });
@@ -56,6 +72,7 @@ describe('Auth & Sync Flow (e2e)', () => {
     it('/api/auth/register (POST) - Success', () => {
       return request(app.getHttpServer())
         .post('/api/auth/register')
+        .set('Authorization', `Bearer ${adminToken}`)
         .send(testUser)
         .expect(201)
         .then((res) => {

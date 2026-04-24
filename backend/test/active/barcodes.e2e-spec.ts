@@ -41,17 +41,11 @@ describe('Multi-Barcode Product Flow (e2e)', () => {
     await app.getHttpAdapter().getInstance().ready();
     db = app.get<DatabaseService>(DatabaseService);
 
-    // Setup Test User
+    // Setup Test User directly in DB
+    const bcrypt = require('bcryptjs');
     testEmail = `test_barcodes_${Date.now()}@example.com`;
-    await request(app.getHttpServer())
-      .post('/api/auth/register')
-      .send({
-        email: testEmail,
-        password: 'password123',
-        name: 'Barcode Tester',
-        role: 'master-admin',
-      })
-      .expect(201);
+    const hash = await bcrypt.hash('password123', 10);
+    await db.query(`INSERT INTO users (email, name, password_hash, role, is_active) VALUES ($1, $2, $3, $4, true)`, [testEmail, 'Barcode Tester', hash, 'master-admin']);
 
     const loginRes = await request(app.getHttpServer())
       .post('/api/auth/login')
