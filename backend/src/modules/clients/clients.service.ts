@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { CreateClientDto, UpdateClientDto } from './clients.dto';
 
 @Injectable()
 export class ClientsService {
   constructor(private readonly db: DatabaseService) {}
 
-  async create(dto: any) {
+  async create(dto: CreateClientDto) {
     const res = await this.db.query(
       `INSERT INTO clients (
         store_id, name, email, phone, address, 
@@ -70,7 +71,7 @@ export class ClientsService {
     return this.mapRow(res.rows[0]);
   }
 
-  async update(id: string, dto: any) {
+  async update(id: string, dto: UpdateClientDto) {
     const fieldMap: Record<string, string> = {
       name: 'name',
       email: 'email',

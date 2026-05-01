@@ -15,11 +15,15 @@ class SyncQueueState {
     required this.status,
     this.lastError,
     this.lastSyncAt,
+    this.pendingCount = 0,
+    this.failedCount = 0,
   });
 
   final SyncQueueStatus status;
   final String? lastError;
   final DateTime? lastSyncAt;
+  final int pendingCount;
+  final int failedCount;
 
   factory SyncQueueState.initial() {
     return const SyncQueueState(status: SyncQueueStatus.idle);
@@ -29,18 +33,24 @@ class SyncQueueState {
     SyncQueueStatus? status,
     String? lastError,
     DateTime? lastSyncAt,
+    int? pendingCount,
+    int? failedCount,
     bool clearError = false,
   }) {
     return SyncQueueState(
       status: status ?? this.status,
       lastError: clearError ? null : lastError ?? this.lastError,
       lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+      pendingCount: pendingCount ?? this.pendingCount,
+      failedCount: failedCount ?? this.failedCount,
     );
   }
 }
 
 class SyncQueueProcessor extends Notifier<SyncQueueState> {
   bool _isProcessing = false;
+  int _backoffAttempt = 0;
+  Timer? _backoffTimer;
   StreamSubscription<NetworkStatus>? _connectivitySub;
 
   late final AppApiClient _client;
@@ -55,6 +65,8 @@ class SyncQueueProcessor extends Notifier<SyncQueueState> {
 
     _connectivitySub ??= _connectivityService.statuses.listen((status) {
       if (status == NetworkStatus.online) {
+        _backoffAttempt = 0; // Reset backoff on reconnect
+        _backoffTimer?.cancel();
         unawaited(processPendingQueue());
       } else {
         state = state.copyWith(status: SyncQueueStatus.offline);
@@ -71,6 +83,7 @@ class SyncQueueProcessor extends Notifier<SyncQueueState> {
 
     ref.onDispose(() async {
       await _connectivitySub?.cancel();
+      _backoffTimer?.cancel();
     });
 
     unawaited(processPendingQueue());
@@ -148,6 +161,8 @@ class SyncQueueProcessor extends Notifier<SyncQueueState> {
           );
 
           if (error.isConnectivityIssue) {
+            // Schedule retry with exponential backoff
+            _scheduleBackoffRetry();
             state = state.copyWith(
               status: SyncQueueStatus.offline,
               lastError: error.message,
@@ -192,7 +207,29 @@ class SyncQueueProcessor extends Notifier<SyncQueueState> {
       );
     } finally {
       _isProcessing = false;
+      // Update pending count
+      await _refreshPendingCount();
     }
+  }
+
+  void _scheduleBackoffRetry() {
+    _backoffTimer?.cancel();
+    final delay = Duration(seconds: (2 << _backoffAttempt.clamp(0, 5)));
+    _backoffAttempt++;
+    _backoffTimer = Timer(delay, () {
+      unawaited(processPendingQueue());
+    });
+  }
+
+  Future<void> _refreshPendingCount() async {
+    try {
+      final pending = await _localCache.getPendingSyncEntries(limit: 100);
+      final failed = pending.where((e) => (e.attemptCount ?? 0) > 0).length;
+      state = state.copyWith(
+        pendingCount: pending.length,
+        failedCount: failed,
+      );
+    } catch (_) {}
   }
 
   Future<void> retryFailedQueue() async {

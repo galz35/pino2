@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { InvoicesService } from './invoices.service';
+import { CreateInvoiceDto } from './invoices.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Invoices')
@@ -26,7 +27,7 @@ export class InvoicesController {
     summary:
       'Crear factura de proveedor (transaccional con stock y movimientos)',
   })
-  create(@Body() dto: any, @Req() req: any) {
+  create(@Body() dto: CreateInvoiceDto, @Req() req: any) {
     return this.service.create({ ...dto, userId: dto.userId || req.user?.sub });
   }
 

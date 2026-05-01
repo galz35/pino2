@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowRight,
@@ -9,7 +9,7 @@ import {
   Truck,
 } from 'lucide-react';
 
-import apiClient from '@/services/api-client';
+import { useStore } from '@/hooks/use-api';
 import { StoreAdminDashboardMetrics } from '@/components/dashboard/store-admin-dashboard-metrics';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,26 +24,9 @@ import {
 import { QuickOperationalPulse } from '@/components/dashboard/quick-operational-pulse';
 
 export default function DashboardPage() {
-  const [storeName, setStoreName] = useState('');
-  const [loading, setLoading] = useState(true);
   const { storeId = '' } = useParams();
-
-  useEffect(() => {
-    if (!storeId) return;
-
-    const fetchStoreName = async () => {
-      try {
-        const res = await apiClient.get(`/stores/${storeId}`);
-        setStoreName(res.data?.name || 'Tienda');
-      } catch {
-        setStoreName('Tienda');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void fetchStoreName();
-  }, [storeId]);
+  const { data: storeData, isLoading: loading } = useStore(storeId);
+  const storeName = (storeData as any)?.name || 'Tienda';
 
   const quickActions = useMemo(
     () => [

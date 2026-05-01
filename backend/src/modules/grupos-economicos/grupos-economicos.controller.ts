@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { GruposEconomicosService } from './grupos-economicos.service';
+import { CreateGrupoEconomicoDto, UpdateGrupoEconomicoDto } from './grupos-economicos.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Controller('grupos-economicos')
@@ -8,7 +9,7 @@ export class GruposEconomicosController {
   constructor(private readonly service: GruposEconomicosService) {}
 
   @Post()
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateGrupoEconomicoDto) {
     return this.service.create(dto);
   }
 
@@ -23,7 +24,7 @@ export class GruposEconomicosController {
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() dto: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateGrupoEconomicoDto) {
     return this.service.update(id, dto);
   }
 

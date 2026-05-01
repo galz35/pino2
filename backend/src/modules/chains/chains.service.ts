@@ -1,16 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { CreateChainDto, UpdateChainDto } from './chains.dto';
 
 @Injectable()
 export class ChainsService {
   constructor(private readonly db: DatabaseService) {}
 
-  async create(dto: {
-    name: string;
-    logoUrl?: string;
-    ownerName?: string;
-    ownerEmail?: string;
-  }) {
+  async create(dto: CreateChainDto) {
     const res = await this.db.query(
       `INSERT INTO chains (name, logo_url, owner_name, owner_email) 
        VALUES ($1, $2, $3, $4) RETURNING *`,
@@ -53,7 +49,7 @@ export class ChainsService {
     return chain;
   }
 
-  async update(id: string, dto: any) {
+  async update(id: string, dto: UpdateChainDto) {
     const fieldMap: Record<string, string> = {
       name: 'name',
       logoUrl: 'logo_url',

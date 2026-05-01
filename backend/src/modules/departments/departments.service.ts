@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { CreateDepartmentDto, UpdateDepartmentDto } from './departments.dto';
 
 @Injectable()
 export class DepartmentsService {
   constructor(private readonly db: DatabaseService) {}
 
-  async create(dto: any) {
+  async create(dto: CreateDepartmentDto) {
     const res = await this.db.query(
       `INSERT INTO departments (store_id, name, description) 
        VALUES ($1, $2, $3) RETURNING *`,
@@ -59,7 +60,7 @@ export class DepartmentsService {
     return { success: true };
   }
 
-  async update(id: string, dto: any) {
+  async update(id: string, dto: UpdateDepartmentDto) {
     const res = await this.db.query(
       'UPDATE departments SET name = $1 WHERE id = $2 RETURNING *',
       [dto.name, id],

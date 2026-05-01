@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { ArqueoStatus } from '../../common/constants/enums';
 
 @Injectable()
 export class ArqueosService {
@@ -40,7 +41,7 @@ export class ArqueosService {
     }
 
     const dif = dto.efectivoContado - efectivoDeclarado;
-    const status = dif === 0 ? 'CUADRADO' : 'CON_DIFERENCIA';
+    const status = dif === 0 ? ArqueoStatus.CUADRADO : ArqueoStatus.CON_DIFERENCIA;
 
     const res = await this.db.query(
       `INSERT INTO arqueos (store_id, rutero_id, realizado_por, fecha, efectivo_declarado, efectivo_contado, cheques, depositos, notas, status)

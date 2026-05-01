@@ -4,12 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { CreateSupplierDto, UpdateSupplierDto } from './suppliers.dto';
 
 @Injectable()
 export class SuppliersService {
   constructor(private readonly db: DatabaseService) {}
 
-  async create(dto: any) {
+  async create(dto: CreateSupplierDto) {
     if (!dto.name) {
       throw new BadRequestException('El nombre del proveedor es requerido');
     }
@@ -71,7 +72,7 @@ export class SuppliersService {
     return this.mapRow(res.rows[0]);
   }
 
-  async update(id: string, dto: any) {
+  async update(id: string, dto: UpdateSupplierDto) {
     const fieldMap: Record<string, string> = {
       name: 'name',
       contactName: 'contact_name',

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { LiquidacionStatus, OrderStatus } from '../../common/constants/enums';
 
 @Injectable()
 export class LiquidacionesRutaService {
@@ -51,7 +52,7 @@ export class LiquidacionesRutaService {
       if (aRes.rowCount > 0) {
         entregado = parseFloat(aRes.rows[0].efectivo_contado);
         diferencia = entregado - esperado;
-        status = diferencia >= 0 ? 'LIQUIDADO' : 'CON_OBSERVACION';
+        status = diferencia >= 0 ? LiquidacionStatus.LIQUIDADO : LiquidacionStatus.CON_OBSERVACION;
         arqueo = dto.arqueoId;
       }
     } else {
@@ -64,7 +65,7 @@ export class LiquidacionesRutaService {
         arqueo = aRes.rows[0].id;
         entregado = parseFloat(aRes.rows[0].efectivo_contado);
         diferencia = entregado - esperado;
-        status = diferencia >= 0 ? 'LIQUIDADO' : 'CON_OBSERVACION';
+        status = diferencia >= 0 ? LiquidacionStatus.LIQUIDADO : LiquidacionStatus.CON_OBSERVACION;
       }
     }
 
@@ -83,9 +84,9 @@ export class LiquidacionesRutaService {
     );
 
     // Marcar pedidos como LIQUIDADOs
-    if (status === 'LIQUIDADO' || status === 'CON_OBSERVACION') {
+    if (status === LiquidacionStatus.LIQUIDADO || status === LiquidacionStatus.CON_OBSERVACION) {
       await this.db.query(
-        `UPDATE orders SET status = 'LIQUIDADO', updated_at = NOW() 
+        `UPDATE orders SET status = '${OrderStatus.LIQUIDADO}', updated_at = NOW() 
          WHERE store_id = $1 AND rutero_id = $2 AND status = 'ENTREGADO' AND DATE(updated_at) = $3`,
         params
       );

@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { CashShiftStatus } from '../../common/constants/enums';
 
 @Injectable()
 export class CashShiftsService {

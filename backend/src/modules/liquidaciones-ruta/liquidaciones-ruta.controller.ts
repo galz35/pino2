@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Param, Body, Query, UseGuards, Req } from '@nestjs/common';
 import { LiquidacionesRutaService } from './liquidaciones-ruta.service';
+import { CreateLiquidacionDto } from './liquidaciones-ruta.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Controller('liquidaciones-ruta')
@@ -8,7 +9,7 @@ export class LiquidacionesRutaController {
   constructor(private readonly service: LiquidacionesRutaService) {}
 
   @Post()
-  create(@Body() dto: any, @Req() req: any) {
+  create(@Body() dto: CreateLiquidacionDto, @Req() req: any) {
     return this.service.create({ ...dto, liquidadoPor: req.user.sub });
   }
 

@@ -8,6 +8,7 @@ import { DatabaseService } from '../../database/database.service';
 import { EventsGateway } from '../../common/gateways/events.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { GruposEconomicosService } from '../grupos-economicos/grupos-economicos.service';
+import { OrderStatus } from '../../common/constants/enums';
 
 @Injectable()
 export class OrdersService {
@@ -84,11 +85,11 @@ export class OrdersService {
       }
 
       // 2. Status determination
-      let initialStatus = 'RECIBIDO';
+      let initialStatus: string = OrderStatus.RECIBIDO;
       if (requiereAsignacionDirecta) {
-        initialStatus = 'ENTREGADO';
+        initialStatus = OrderStatus.ENTREGADO;
       } else if (requiereAutorizacion) {
-        initialStatus = 'PENDIENTE_AUTORIZACION';
+        initialStatus = OrderStatus.PENDIENTE_AUTORIZACION;
       }
 
       const res = await client.query(
@@ -301,13 +302,13 @@ export class OrdersService {
     vendorId?: string,
   ) {
     const validTransitions: Record<string, string[]> = {
-      PENDIENTE_AUTORIZACION: ['RECIBIDO', 'CANCELADO'],
-      RECIBIDO: ['EN_PREPARACION', 'CANCELADO'],
-      EN_PREPARACION: ['ALISTADO', 'CANCELADO'],
-      ALISTADO: ['CARGADO_CAMION'],
-      CARGADO_CAMION: ['EN_ENTREGA'],
-      EN_ENTREGA: ['ENTREGADO', 'DEVUELTO', 'RECHAZADO', 'RECHAZO_TOTAL'],
-      PENDING: ['RECIBIDO', 'CANCELADO'],
+      [OrderStatus.PENDIENTE_AUTORIZACION]: [OrderStatus.RECIBIDO, OrderStatus.CANCELADO],
+      [OrderStatus.RECIBIDO]: ['EN_PREPARACION', OrderStatus.CANCELADO],
+      EN_PREPARACION: [OrderStatus.ALISTADO, OrderStatus.CANCELADO],
+      [OrderStatus.ALISTADO]: [OrderStatus.CARGADO_CAMION],
+      [OrderStatus.CARGADO_CAMION]: [OrderStatus.EN_ENTREGA],
+      [OrderStatus.EN_ENTREGA]: [OrderStatus.ENTREGADO, 'DEVUELTO', 'RECHAZADO', 'RECHAZO_TOTAL'],
+      PENDING: [OrderStatus.RECIBIDO, OrderStatus.CANCELADO],
     };
 
     return this.db.withTransaction(async (client) => {
@@ -539,11 +540,11 @@ export class OrdersService {
       if (res.rowCount === 0) throw new NotFoundException('Pedido no encontrado');
       
       const currentStatus = res.rows[0].status;
-      if (currentStatus !== 'PENDIENTE_AUTORIZACION') {
+      if (currentStatus !== OrderStatus.PENDIENTE_AUTORIZACION) {
         throw new BadRequestException('El pedido no está pendiente de autorización');
       }
 
-      const newStatus = decision === 'aprobar' ? 'RECIBIDO' : 'CANCELADO';
+      const newStatus = decision === 'aprobar' ? OrderStatus.RECIBIDO : OrderStatus.CANCELADO;
       
       const updateRes = await client.query(
         `UPDATE orders SET status = $1, autorizado_por = $2, fecha_autorizacion = NOW(), updated_by = $2, updated_at = NOW() WHERE id = $3 RETURNING *`,

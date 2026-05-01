@@ -406,22 +406,78 @@ export class SalesService {
       today.getMonth(),
       today.getDate(),
     ).toISOString();
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const startOfYesterday = new Date(
+      yesterday.getFullYear(),
+      yesterday.getMonth(),
+      yesterday.getDate(),
+    ).toISOString();
+    const endOfYesterday = new Date(
+      yesterday.getFullYear(),
+      yesterday.getMonth(),
+      yesterday.getDate(),
+      23, 59, 59, 999,
+    ).toISOString();
+
     const startOfMonth = new Date(
       today.getFullYear(),
       today.getMonth(),
       1,
     ).toISOString();
+    const startOfLastMonth = new Date(
+      today.getFullYear(),
+      today.getMonth() - 1,
+      1,
+    ).toISOString();
+    const endOfLastMonth = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      0,
+      23, 59, 59, 999,
+    ).toISOString();
     const startOfYear = new Date(today.getFullYear(), 0, 1).toISOString();
 
+    // Single query: all aggregated stats
     const statsRes = await this.db.query(
       `SELECT 
         COALESCE(SUM(CASE WHEN created_at >= $2 THEN total ELSE 0 END), 0) as daily,
-        COALESCE(SUM(CASE WHEN created_at >= $3 THEN total ELSE 0 END), 0) as monthly,
-        COALESCE(SUM(CASE WHEN created_at >= $4 THEN total ELSE 0 END), 0) as yearly
+        COALESCE(SUM(CASE WHEN created_at >= $3 AND created_at <= $4 THEN total ELSE 0 END), 0) as yesterday,
+        COALESCE(SUM(CASE WHEN created_at >= $5 THEN total ELSE 0 END), 0) as monthly,
+        COALESCE(COUNT(CASE WHEN created_at >= $5 THEN 1 END), 0) as monthly_count,
+        COALESCE(SUM(CASE WHEN created_at >= $6 AND created_at <= $7 THEN total ELSE 0 END), 0) as last_month,
+        COALESCE(COUNT(CASE WHEN created_at >= $6 AND created_at <= $7 THEN 1 END), 0) as last_month_count,
+        COALESCE(SUM(CASE WHEN created_at >= $8 THEN total ELSE 0 END), 0) as yearly
        FROM sales 
        WHERE store_id = $1`,
-      [storeId, startOfToday, startOfMonth, startOfYear],
+      [storeId, startOfToday, startOfYesterday, endOfYesterday, startOfMonth, startOfLastMonth, endOfLastMonth, startOfYear],
     );
+
+    // Monthly chart data for the year (single query)
+    const chartRes = await this.db.query(
+      `SELECT 
+        EXTRACT(MONTH FROM created_at)::int as month_num,
+        COALESCE(SUM(total), 0) as total
+       FROM sales 
+       WHERE store_id = $1 AND created_at >= $2
+       GROUP BY month_num
+       ORDER BY month_num`,
+      [storeId, startOfYear],
+    );
+
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const chartMap = new Map(chartRes.rows.map(r => [r.month_num, parseFloat(r.total)]));
+    const annualChartData = monthNames.map((name, i) => ({
+      month: name,
+      sales: chartMap.get(i + 1) || 0,
+    }));
+
+    const s = statsRes.rows[0];
+    const monthlyCount = parseInt(s.monthly_count) || 0;
+    const lastMonthCount = parseInt(s.last_month_count) || 0;
+    const monthlySales = parseFloat(s.monthly);
+    const lastMonthSales = parseFloat(s.last_month);
 
     const report = await this.getSalesReport(
       storeId,
@@ -430,9 +486,14 @@ export class SalesService {
     );
 
     return {
-      dailySales: parseFloat(statsRes.rows[0].daily),
-      monthlySales: parseFloat(statsRes.rows[0].monthly),
-      yearlySales: parseFloat(statsRes.rows[0].yearly),
+      dailySales: parseFloat(s.daily),
+      yesterdaySales: parseFloat(s.yesterday),
+      monthlySales,
+      lastMonthSales,
+      avgInvoice: monthlyCount > 0 ? monthlySales / monthlyCount : 0,
+      lastMonthAvgInvoice: lastMonthCount > 0 ? lastMonthSales / lastMonthCount : 0,
+      annualSales: parseFloat(s.yearly),
+      annualChartData,
       topProducts: report.topProducts,
       salesByMethod: report.byMethod,
     };

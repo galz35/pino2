@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { GruposClientesService } from './grupos-clientes.service';
+import { CreateGrupoClienteDto, UpdateGrupoClienteDto } from './grupos-clientes.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Controller('grupos-clientes')
@@ -8,7 +9,7 @@ export class GruposClientesController {
   constructor(private readonly service: GruposClientesService) {}
 
   @Post()
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateGrupoClienteDto) {
     return this.service.create(dto);
   }
 
@@ -23,7 +24,7 @@ export class GruposClientesController {
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() dto: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateGrupoClienteDto) {
     return this.service.update(id, dto);
   }
 

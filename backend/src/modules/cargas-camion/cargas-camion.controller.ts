@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Put, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { CargasCamionService } from './cargas-camion.service';
+import { CreateCargaCamionDto } from './cargas-camion.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Controller('cargas-camion')
@@ -8,7 +9,7 @@ export class CargasCamionController {
   constructor(private readonly service: CargasCamionService) {}
 
   @Post()
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateCargaCamionDto) {
     return this.service.create(dto);
   }
 

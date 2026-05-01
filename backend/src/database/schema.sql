@@ -75,6 +75,21 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE INDEX IF NOT EXISTS idx_products_store_barcode ON products(store_id, barcode);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
+-- Códigos de barra multi-barcode (fuente única de verdad)
+CREATE TABLE IF NOT EXISTS product_barcodes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    barcode VARCHAR(100) NOT NULL,
+    label VARCHAR(100),
+    is_primary BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_product_barcodes_unique_code ON product_barcodes(barcode, store_id);
+CREATE INDEX IF NOT EXISTS idx_product_barcodes_barcode_lookup ON product_barcodes(barcode);
+CREATE INDEX IF NOT EXISTS idx_product_barcodes_product ON product_barcodes(product_id);
+
 -- Ventas y Caja
 CREATE TABLE IF NOT EXISTS cash_shifts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -134,6 +149,18 @@ CREATE TABLE IF NOT EXISTS sync_logs (
     status VARCHAR(20) DEFAULT 'PENDING',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Log de idempotencia para sync offline (evita duplicados)
+CREATE TABLE IF NOT EXISTS sync_idempotency_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    external_id UUID NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT uq_sync_idempotency_store_ext_entity UNIQUE (store_id, external_id, entity_type)
+);
+CREATE INDEX IF NOT EXISTS idx_sync_idempotency_store ON sync_idempotency_log(store_id);
+CREATE INDEX IF NOT EXISTS idx_sync_idempotency_created ON sync_idempotency_log(created_at DESC);
 
 -- Clientes
 CREATE TABLE IF NOT EXISTS clients (

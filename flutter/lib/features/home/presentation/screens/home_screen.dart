@@ -14,6 +14,7 @@ import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../data/home_repository.dart';
 import '../../domain/models/store_summary.dart';
 import '../../../../features/preventa/presentation/screens/preventa_home_screen.dart';
+import '../../widgets/sync_status_banner.dart';
 
 final assignedStoresProvider = FutureProvider<List<StoreSummary>>((ref) async {
   ref.watch(networkStatusProvider);
@@ -157,8 +158,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           await ref.read(assignedStoresProvider.future);
         },
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
           children: [
+            const SyncStatusBanner(),
+            const SizedBox(height: 8),
             _HeroSessionCard(
               name: session.user.name,
               email: session.user.email,

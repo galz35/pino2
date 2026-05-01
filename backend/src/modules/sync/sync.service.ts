@@ -5,6 +5,7 @@ import { SalesService } from '../sales/sales.service';
 import { OrdersService } from '../orders/orders.service';
 import { CollectionsService } from '../collections/collections.service';
 import { ReturnsService } from '../returns/returns.service';
+import { SyncStatus } from '../../common/constants/enums';
 
 @Injectable()
 export class SyncService {
@@ -59,87 +60,63 @@ export class SyncService {
       let successCount = 0;
       let duplicateCount = 0;
 
-      for (const op of operations) {
+      for (let i = 0; i < operations.length; i++) {
+        const op = operations[i];
+        const opId = op.id || op.localId || op.externalId;
+        const savepointName = `sp_op_${i}`;
+
         try {
-          const opId = op.id || op.localId || op.externalId;
+          // SAVEPOINT por operación: permite rollback individual sin afectar el batch
+          await client.query(`SAVEPOINT ${savepointName}`);
+
           const opData = {
             ...op.data,
             storeId,
             externalId: op.data?.externalId || opId,
           };
 
+          let res: any;
           switch (op.type) {
-            case 'SALE': {
-              const res = await this.salesService.processSale(opData, client);
-              results.push({
-                opId,
-                serverId: res.id,
-                status: 'SUCCESS',
-                isDuplicate: !!res.isDuplicate,
-              });
-              if (res.isDuplicate) duplicateCount++;
-              else successCount++;
+            case 'SALE':
+              res = await this.salesService.processSale(opData, client);
               break;
-            }
-            case 'ORDER': {
-              const res = await this.ordersService.create(opData, client);
-              results.push({
-                opId,
-                serverId: res.id,
-                status: 'SUCCESS',
-                isDuplicate: !!res.isDuplicate,
-              });
-              if (res.isDuplicate) duplicateCount++;
-              else successCount++;
+            case 'ORDER':
+              res = await this.ordersService.create(opData, client);
               break;
-            }
-            case 'COLLECTION': {
-              const res = await this.collectionsService.create(opData, client);
-              results.push({
-                opId,
-                serverId: res.id,
-                status: 'SUCCESS',
-                isDuplicate: !!res.isDuplicate,
-              });
-              if (res.isDuplicate) duplicateCount++;
-              else successCount++;
+            case 'COLLECTION':
+              res = await this.collectionsService.create(opData, client);
               break;
-            }
-            case 'RETURN': {
-              const res = await this.returnsService.create(opData, client);
-              results.push({
-                opId,
-                serverId: res.id,
-                status: 'SUCCESS',
-                isDuplicate: !!res.isDuplicate,
-              });
-              if (res.isDuplicate) duplicateCount++;
-              else successCount++;
+            case 'RETURN':
+              res = await this.returnsService.create(opData, client);
               break;
-            }
             default:
               this.logger.warn(`Tipo de operación no soportado: ${op.type}`);
-              results.push({
-                opId,
-                status: 'SKIPPED',
-                error: 'Unsupported type',
-              });
+              results.push({ opId, status: 'SKIPPED', error: 'Unsupported type' });
+              await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+              continue;
           }
+
+          // Operación exitosa: liberar savepoint
+          await client.query(`RELEASE SAVEPOINT ${savepointName}`);
+          results.push({
+            opId,
+            serverId: res.id,
+            status: 'SUCCESS',
+            isDuplicate: !!res.isDuplicate,
+          });
+          if (res.isDuplicate) duplicateCount++;
+          else successCount++;
         } catch (error) {
+          // Rollback solo esta operación, el resto del batch continúa
+          await client.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
           this.logger.error(
-            `Error procesando operación ${op.id || op.localId || op.externalId} (${op.type}): ${error.message}`,
+            `Error procesando operación ${opId} (${op.type}): ${error.message}`,
           );
           results.push({
-            opId: op.id || op.localId || op.externalId,
+            opId,
             status: 'FAILED',
             error: error.message,
           });
-          // Importante: No lanzamos error aquí para permitir que otras operaciones del lote se procesen,
-          // pero como estamos en una transacción, si quisiéramos que todo falle o nada, deberíamos relanzar.
-          // En sincronización offline-first, usualmente queremos que lo que es válido pase.
-          // SIN EMBARGO, withTransaction hará ROLLBACK si algo falla.
-          // Para permitir fallos individuales, deberíamos manejar SAVEPOINTS o procesar fuera de una transacción global
-          // (aunque la transacción global es mejor para integridad).
         }
       }
 

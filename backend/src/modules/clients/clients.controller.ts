@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ClientsService } from './clients.service';
+import { CreateClientDto, UpdateClientDto } from './clients.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Clients')
@@ -23,7 +24,7 @@ export class ClientsController {
 
   @Post()
   @ApiOperation({ summary: 'Crear un nuevo cliente' })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateClientDto) {
     return this.service.create(dto);
   }
 
@@ -52,7 +53,7 @@ export class ClientsController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar un cliente' })
-  update(@Param('id') id: string, @Body() dto: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateClientDto) {
     return this.service.update(id, dto);
   }
 

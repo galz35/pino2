@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import React, { Suspense, lazy } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider, useAuth } from '@/contexts/auth-context';
 import { PosProvider } from '@/contexts/pos-context';
@@ -10,6 +11,16 @@ import AppLayout from '@/components/app-layout';
 import { APP_BASENAME } from '@/lib/runtime-config';
 import { getRedirectPath } from '@/lib/redirect-logic';
 import { isGlobalAdminRole, normalizeUserRole, type NormalizedUserRole } from '@/lib/user-role';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // LAZY LOADED PAGES
 const LoginPage = lazy(() => import('@/pages/login-page'));
@@ -141,6 +152,7 @@ const ProtectedRoute = ({
 
 function App() {
   return (
+    <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <BrowserRouter basename={APP_BASENAME}>
         <AuthProvider>
@@ -254,6 +266,7 @@ function App() {
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 

@@ -16,6 +16,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { StoresService } from './stores.service';
+import { CreateStoreDto, UpdateStoreDto } from './stores.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -32,7 +33,7 @@ export class StoresController {
   @ApiOperation({
     summary: 'Requisitar creación de tienda (Master/Chain Admin)',
   })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateStoreDto) {
     return this.storesService.create(dto);
   }
 
@@ -52,7 +53,7 @@ export class StoresController {
   @Patch(':id')
   @Roles('master-admin', 'chain-admin', 'store-admin')
   @ApiOperation({ summary: 'Actualizar datos de una tienda' })
-  update(@Param('id') id: string, @Body() dto: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateStoreDto) {
     return this.storesService.update(id, dto);
   }
 

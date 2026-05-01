@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ChainsService } from './chains.service';
+import { CreateChainDto, UpdateChainDto } from './chains.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -26,15 +27,7 @@ export class ChainsController {
   @ApiOperation({
     summary: 'Crear una nueva cadena de tiendas (Solo Master Admin)',
   })
-  create(
-    @Body()
-    dto: {
-      name: string;
-      logoUrl?: string;
-      ownerName?: string;
-      ownerEmail?: string;
-    },
-  ) {
+  create(@Body() dto: CreateChainDto) {
     return this.chainsService.create(dto);
   }
 
@@ -53,7 +46,7 @@ export class ChainsController {
   @Patch(':id')
   @Roles('master-admin', 'chain-admin')
   @ApiOperation({ summary: 'Actualizar datos de una cadena' })
-  update(@Param('id') id: string, @Body() dto: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateChainDto) {
     return this.chainsService.update(id, dto);
   }
 

@@ -4,6 +4,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { UpdateUserDto } from './users.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -115,7 +116,7 @@ export class UsersService {
     return res.rowCount > 0 ? res.rows[0] : null;
   }
 
-  async update(id: string, dto: any) {
+  async update(id: string, dto: UpdateUserDto) {
     const fieldMap: Record<string, string> = {
       name: 'name',
       email: 'email',

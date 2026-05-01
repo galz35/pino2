@@ -18,7 +18,8 @@ import {
 import { Package, Shapes, Library, ChevronRight, Wrench, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import apiClient from '@/services/api-client';
 import { logError } from '@/lib/error-logger';
 import { Link } from 'react-router-dom';
@@ -62,56 +63,35 @@ export default function ProductsPage() {
     const storeId = params.storeId as string;
     const navigate = useNavigate();
 
-    const [products, setProducts] = useState<Product[]>([]);
-    const [departments, setDepartments] = useState<Department[]>([]);
-    const [subDepartments, setSubDepartments] = useState<SubDepartment[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
     const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
     const [selectedSubDepartment, setSelectedSubDepartment] = useState<SubDepartment | null>(null);
     const [reorganizationMode, setReorganizationMode] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-    useEffect(() => {
-        if (!storeId) return;
+    const { data: pageData, isLoading: loading, error } = useQuery({
+        queryKey: ['products-page', storeId],
+        queryFn: async () => {
+            const [prodsRes, deptsRes, subDeptsRes] = await Promise.all([
+                apiClient.get('/products', { params: { storeId } }),
+                apiClient.get('/departments', { params: { storeId, type: 'main' } }),
+                apiClient.get('/sub-departments', { params: { storeId } }).catch(() => ({ data: [] })),
+            ]);
+            return {
+                products: prodsRes.data as Product[],
+                departments: deptsRes.data.map((d: any) => ({ ...d, name: d.name || d.nombre })) as Department[],
+                subDepartments: (subDeptsRes.data || []).map((subDept: any) => ({
+                    id: subDept.id,
+                    name: subDept.name || subDept.nombre,
+                    departmentId: subDept.departmentId || subDept.parentId || subDept.parent_id || '',
+                })) as SubDepartment[],
+            };
+        },
+        enabled: !!storeId,
+    });
 
-        let isMounted = true;
-        setLoading(true);
-
-        const fetchData = async () => {
-            try {
-                const [prodsRes, deptsRes, subDeptsRes] = await Promise.all([
-                    apiClient.get('/products', { params: { storeId } }),
-                    apiClient.get('/departments', { params: { storeId, type: 'main' } }),
-                    apiClient.get('/sub-departments', { params: { storeId } }).catch(() => ({ data: [] })),
-                ]);
-
-                if (isMounted) {
-                    setProducts(prodsRes.data as Product[]);
-                    setDepartments(deptsRes.data.map((d: any) => ({ ...d, name: d.name || d.nombre })));
-                    setSubDepartments((subDeptsRes.data || []).map((subDept: any) => ({
-                        id: subDept.id,
-                        name: subDept.name || subDept.nombre,
-                        departmentId: subDept.departmentId || subDept.parentId || subDept.parent_id || '',
-                    })));
-                    setLoading(false);
-                }
-            } catch (err: any) {
-                if (isMounted) {
-                    logError(err, { location: 'products-page-fetch-api' });
-                    setError('No se pudieron cargar los datos.');
-                    setLoading(false);
-                }
-            }
-        };
-
-        fetchData();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [storeId]);
+    const products = pageData?.products || [];
+    const departments = pageData?.departments || [];
+    const subDepartments = pageData?.subDepartments || [];
 
     const unorganizedProducts = useMemo(() => {
         return products.filter(p => !p.department || p.department === '');

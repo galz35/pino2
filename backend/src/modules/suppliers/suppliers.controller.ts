@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SuppliersService } from './suppliers.service';
+import { CreateSupplierDto, UpdateSupplierDto } from './suppliers.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Suppliers')
@@ -22,7 +23,7 @@ export class SuppliersController {
 
   @Post()
   @ApiOperation({ summary: 'Crear un nuevo proveedor' })
-  create(@Body() dto: any) {
+  create(@Body() dto: CreateSupplierDto) {
     return this.service.create(dto);
   }
 
@@ -43,7 +44,7 @@ export class SuppliersController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar un proveedor' })
-  update(@Param('id') id: string, @Body() dto: any) {
+  update(@Param('id') id: string, @Body() dto: UpdateSupplierDto) {
     return this.service.update(id, dto);
   }
 

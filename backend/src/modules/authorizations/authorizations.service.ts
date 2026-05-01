@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { CreateAuthorizationDto } from './authorizations.dto';
 
 @Injectable()
 export class AuthorizationsService {
   constructor(private readonly db: DatabaseService) {}
 
-  async create(dto: any) {
+  async create(dto: CreateAuthorizationDto) {
     const res = await this.db.query(
       `INSERT INTO authorizations (store_id, requester_id, type, details, status)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
