@@ -6,8 +6,9 @@ import {
 } from '@/components/ui/accordion';
 import { FloatingActionButton } from '@/components/floating-action-button';
 import { Button } from '@/components/ui/button';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import apiClient from '@/services/api-client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link, useParams } from 'react-router-dom';
 import { Edit, Trash2, FileText } from 'lucide-react';
@@ -35,29 +36,20 @@ interface Supplier {
 }
 
 export default function SuppliersPage() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const params = useParams();
   const storeId = params.storeId as string;
+  const queryClient = useQueryClient();
 
-  const loadSuppliers = async () => {
-    try {
+  const { data: suppliers = [], isLoading: loading, error } = useQuery({
+    queryKey: ['suppliers', storeId],
+    queryFn: async () => {
       const response = await apiClient.get('/suppliers', { params: { storeId } });
-      setSuppliers(response.data);
-      setError(null);
-    } catch (err: any) {
-      console.error(err);
-      setError('No tienes permiso para ver los proveedores o ocurrió un error interno.');
-    } finally {
-      setLoading(false);
-    }
-  };
+      return response.data as Supplier[];
+    },
+    enabled: !!storeId,
+  });
 
-  useEffect(() => {
-    if (!storeId) return;
-    loadSuppliers();
-  }, [storeId]);
+  const refetchSuppliers = () => queryClient.invalidateQueries({ queryKey: ['suppliers', storeId] });
 
   const handleDeleteSupplier = async (supplierId: string, supplierName: string) => {
     try {
@@ -66,7 +58,7 @@ export default function SuppliersPage() {
         'Proveedor Eliminado',
         `El proveedor "${supplierName}" ha sido eliminado.`
       );
-      loadSuppliers();
+      refetchSuppliers();
     } catch (error) {
       console.error(error);
       toast.error(

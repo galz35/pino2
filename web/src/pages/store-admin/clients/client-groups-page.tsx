@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import apiClient from '@/services/api-client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { UsersRound, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,26 +11,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 export default function ClientGroupsPage() {
   const { storeId } = useParams();
   const { toast } = useToast();
-  const [groups, setGroups] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState({ name: '', description: '' });
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
+  const { data: groups = [], isLoading: loading } = useQuery({
+    queryKey: ['grupos-clientes', storeId],
+    queryFn: async () => {
       const res = await apiClient.get(`/grupos-clientes?storeId=${storeId}`);
-      setGroups(res.data);
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
+      return res.data;
+    },
+    enabled: !!storeId,
+  });
 
-  useEffect(() => {
-    loadData();
-  }, [storeId]);
+  const refetch = () => queryClient.invalidateQueries({ queryKey: ['grupos-clientes', storeId] });
 
   const handleSubmit = async () => {
     try {
@@ -37,7 +32,7 @@ export default function ClientGroupsPage() {
       toast({ title: 'Grupo creado exitosamente' });
       setIsOpen(false);
       setFormData({ name: '', description: '' });
-      loadData();
+      refetch();
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }

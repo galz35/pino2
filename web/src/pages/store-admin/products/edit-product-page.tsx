@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from '@/lib/swalert';
 import apiClient from '@/services/api-client';
 import { AlternativeBarcodes } from './alternative-barcodes';
+import { useQuery } from '@tanstack/react-query';
+import { useApiMutation } from '@/hooks/use-api';
 
 interface Department {
   id: string;
@@ -118,59 +120,66 @@ export default function EditProductPage() {
   const { storeId, productId } = useParams<{ storeId: string; productId: string }>();
   const navigate = useNavigate();
 
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [subDepartments, setSubDepartments] = useState<SubDepartment[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const { data: productData, isLoading: loadingProduct } = useQuery({
+    queryKey: ['product', productId],
+    queryFn: async () => {
+      const res = await apiClient.get(`/products/${productId}`);
+      return res.data as ProductResponse;
+    },
+    enabled: !!productId,
+  });
+
+  const { data: departments = [], isLoading: loadingDepts } = useQuery({
+    queryKey: ['departments', storeId],
+    queryFn: async () => {
+      const res = await apiClient.get('/departments', { params: { storeId, type: 'main' } });
+      return (res.data || []).map((department: any) => ({
+        id: department.id,
+        name: department.name || department.nombre,
+      }));
+    },
+    enabled: !!storeId,
+  });
+
+  const { data: subDepartments = [], isLoading: loadingSubDepts } = useQuery({
+    queryKey: ['sub-departments', storeId],
+    queryFn: async () => {
+      const res = await apiClient.get('/sub-departments', { params: { storeId } });
+      return (res.data || []).map((subDepartment: any) => ({
+        id: subDepartment.id,
+        name: subDepartment.name || subDepartment.nombre,
+        departmentId: subDepartment.departmentId || subDepartment.parentId || subDepartment.parent_id || '',
+      }));
+    },
+    enabled: !!storeId,
+  });
+
+  const { data: suppliers = [], isLoading: loadingSuppliers } = useQuery({
+    queryKey: ['suppliers', storeId],
+    queryFn: async () => {
+      const res = await apiClient.get('/suppliers', { params: { storeId } });
+      return (res.data || []).map((supplier: any) => ({
+        id: supplier.id,
+        name: supplier.name || supplier.nombre,
+      }));
+    },
+    enabled: !!storeId,
+  });
+
   const [formData, setFormData] = useState<ProductFormState>(emptyForm);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!storeId || !productId) return;
+    if (productData) {
+      setFormData(toFormData(productData));
+    }
+  }, [productData]);
 
-    let isMounted = true;
-    const loadData = async () => {
-      try {
-        const [productRes, departmentsRes, subDepartmentsRes, suppliersRes] = await Promise.all([
-          apiClient.get(`/products/${productId}`),
-          apiClient.get('/departments', { params: { storeId, type: 'main' } }),
-          apiClient.get('/sub-departments', { params: { storeId } }).catch(() => ({ data: [] })),
-          apiClient.get('/suppliers', { params: { storeId } }).catch(() => ({ data: [] })),
-        ]);
+  const updateProductMutation = useApiMutation(
+    (data: any) => apiClient.patch(`/products/${productId}`, data),
+    [['products', storeId], ['product', productId]]
+  );
 
-        if (!isMounted) return;
-
-        setFormData(toFormData(productRes.data));
-        setDepartments((departmentsRes.data || []).map((department: any) => ({
-          id: department.id,
-          name: department.name || department.nombre,
-        })));
-        setSubDepartments((subDepartmentsRes.data || []).map((subDepartment: any) => ({
-          id: subDepartment.id,
-          name: subDepartment.name || subDepartment.nombre,
-          departmentId: subDepartment.departmentId || subDepartment.parentId || subDepartment.parent_id || '',
-        })));
-        setSuppliers((suppliersRes.data || []).map((supplier: any) => ({
-          id: supplier.id,
-          name: supplier.name || supplier.nombre,
-        })));
-      } catch (error) {
-        console.error(error);
-        toast.error('Error', 'No se pudo cargar la información del producto.');
-        navigate(`/store/${storeId}/products`);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [storeId, productId, navigate]);
+  const loading = loadingProduct || loadingDepts || loadingSubDepts || loadingSuppliers;
 
   const updateField = (field: keyof ProductFormState, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -203,9 +212,8 @@ export default function EditProductPage() {
       return;
     }
 
-    setSaving(true);
     try {
-      await apiClient.patch(`/products/${productId}`, {
+      await updateProductMutation.mutateAsync({
         barcode: formData.barcode || null,
         brand: formData.brand || null,
         description: formData.description.trim(),
@@ -232,8 +240,6 @@ export default function EditProductPage() {
     } catch (error: any) {
       console.error(error);
       toast.error('Error', error?.response?.data?.message || 'No se pudo actualizar el producto.');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -410,8 +416,8 @@ export default function EditProductPage() {
             </div>
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={saving}>
-                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              <Button type="submit" disabled={updateProductMutation.isPending}>
+                {updateProductMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 Guardar cambios
               </Button>
             </div>

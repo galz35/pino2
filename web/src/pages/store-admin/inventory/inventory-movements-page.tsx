@@ -31,8 +31,9 @@ import { CalendarIcon, History, Printer, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import apiClient from '@/services/api-client';
+import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { PrintableTicket, generatePlainTextTicket } from '@/components/printable-ticket';
 import { toast } from '@/lib/swalert';
@@ -51,68 +52,32 @@ interface Movement {
 export default function InventoryMovementsPage() {
   const params = useParams();
   const storeId = params.storeId as string;
-  const [movements, setMovements] = useState<Movement[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [isShareSupported, setIsShareSupported] = useState(false);
+  const [isShareSupported] = useState(() => typeof navigator !== 'undefined' && 'share' in navigator);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
 
-  useEffect(() => {
-    if (typeof navigator !== 'undefined' && 'share' in navigator) {
-      setIsShareSupported(true);
-    }
-  }, []);
+  const dateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
 
-  useEffect(() => {
-    if (!storeId || !selectedDate) {
-      setMovements([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-
-    let isMounted = true;
-    setLoading(true);
-
-    const fetchMovements = async () => {
-      try {
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
-        const response = await apiClient.get('/inventory/movements', {
-          params: { storeId, date: dateStr, type: selectedType }
-        });
-
-        if (isMounted) {
-          const movementsData = response.data.map((m: any) => ({
-            id: m.id || Math.random().toString(),
-            timestamp: m.createdAt || m.created_at || new Date(),
-            productDescription: m.productDescription || m.product_description || 'Producto no especificado',
-            movement: m.reference || m.movement || 'Ajuste',
-            type: m.type,
-            quantity: m.quantity || 0,
-            had: Math.max(0, (m.balance || 0) - (m.quantity || 0)),
-            has: m.balance || 0
-          })) as Movement[];
-          
-          setMovements(movementsData);
-          setError(null);
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          console.error('Error fetching movements:', err);
-          setError(`Error al cargar movimientos: ${err.message}.`);
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    fetchMovements();
-
-    return () => { isMounted = false; };
-  }, [storeId, selectedDate, selectedType]);
+  const { data: movements = [], isLoading: loading, error } = useQuery({
+    queryKey: ['inventory-movements', storeId, dateStr, selectedType],
+    queryFn: async () => {
+      const response = await apiClient.get('/inventory/movements', {
+        params: { storeId, date: dateStr, type: selectedType }
+      });
+      return response.data.map((m: any) => ({
+        id: m.id || Math.random().toString(),
+        timestamp: m.createdAt || m.created_at || new Date(),
+        productDescription: m.productDescription || m.product_description || 'Producto no especificado',
+        movement: m.reference || m.movement || 'Ajuste',
+        type: m.type,
+        quantity: m.quantity || 0,
+        had: Math.max(0, (m.balance || 0) - (m.quantity || 0)),
+        has: m.balance || 0
+      })) as Movement[];
+    },
+    enabled: !!storeId && !!selectedDate,
+  });
 
   const filteredMovements = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();

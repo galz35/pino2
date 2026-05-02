@@ -24,6 +24,8 @@ import { useEffect, useState, useMemo } from 'react';
 import apiClient from '@/services/api-client';
 import { useAuth } from '@/contexts/auth-context';
 import { logError } from '@/lib/error-logger';
+import { useQuery } from '@tanstack/react-query';
+import { useApiMutation } from '@/hooks/use-api';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Wrench } from 'lucide-react';
@@ -47,11 +49,23 @@ export default function InventoryAdjustmentsPage() {
   const storeId = params.storeId as string;
   const { user } = useAuth();
 
-  const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [loadingProducts, setLoadingProducts] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const { data: products = [], isLoading: loadingProducts, refetch } = useQuery({
+    queryKey: ['products', storeId],
+    queryFn: async () => {
+      const response = await apiClient.get('/products', { params: { storeId } });
+      return response.data as Product[];
+    },
+    enabled: !!storeId,
+  });
+
+  const adjustMutation = useApiMutation(
+    (data: any) => apiClient.post('/inventory/adjust', data),
+    [['products', storeId], ['inventory-movements']]
+  );
 
   const form = useForm<AdjustmentFormValues>({
     resolver: zodResolver(adjustmentFormSchema) as any,
@@ -59,33 +73,6 @@ export default function InventoryAdjustmentsPage() {
       newStock: 0,
     }
   });
-
-  useEffect(() => {
-    if (!storeId) return;
-
-    let isMounted = true;
-    setLoadingProducts(true);
-
-    const fetchProducts = async () => {
-      try {
-        const response = await apiClient.get('/products', { params: { storeId } });
-        if (isMounted) {
-          setProducts(response.data);
-          setLoadingProducts(false);
-        }
-      } catch (error) {
-        if (isMounted) {
-          logError(error, { location: 'adjustments-page-fetch-products' });
-          toast.error('Error', 'No se pudieron cargar los productos.');
-          setLoadingProducts(false);
-        }
-      }
-    };
-    
-    fetchProducts();
-
-    return () => { isMounted = false; };
-  }, [storeId]);
 
   useEffect(() => {
     if (selectedProduct) {
@@ -121,7 +108,7 @@ export default function InventoryAdjustmentsPage() {
         return;
       }
 
-      await apiClient.post('/inventory/adjust', {
+      await adjustMutation.mutateAsync({
         storeId,
         productId: selectedProduct.id,
         userId: user.id,
@@ -132,10 +119,6 @@ export default function InventoryAdjustmentsPage() {
 
       toast.success('Inventario Ajustado', `El stock de "${selectedProduct.description}" ha sido actualizado.`);
       setSelectedProduct(null); // Deselect product after adjustment
-      
-      // Refresh products to get updated stock
-      const response = await apiClient.get('/products', { params: { storeId } });
-      setProducts(response.data);
     } catch (error) {
       logError(error, {
         location: 'adjustments-page-submit',

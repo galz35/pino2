@@ -40,6 +40,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import apiClient from '@/services/api-client';
 import { useAuth } from '@/contexts/auth-context';
 import { logError } from '@/lib/error-logger';
+import { useQuery } from '@tanstack/react-query';
+import { useApiMutation } from '@/hooks/use-api';
 
 const productFormSchema = z.object({
   barcode: z.string().optional(),
@@ -94,10 +96,43 @@ export default function AddProductPage() {
   const storeId = params.storeId as string;
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [subDepartments, setSubDepartments] = useState<SubDepartment[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments', storeId],
+    queryFn: async () => {
+      const res = await apiClient.get('/departments', { params: { storeId, type: 'main' } });
+      return res.data.map((d: any) => ({ ...d, name: d.name || d.nombre }));
+    },
+    enabled: !!storeId,
+  });
+
+  const { data: subDepartments = [] } = useQuery({
+    queryKey: ['sub-departments', storeId],
+    queryFn: async () => {
+      const res = await apiClient.get('/sub-departments', { params: { storeId } });
+      return (res.data || []).map((sd: any) => ({
+        id: sd.id,
+        name: sd.name || sd.nombre,
+        departmentId: sd.departmentId || sd.parentId || sd.parent_id || '',
+      }));
+    },
+    enabled: !!storeId,
+  });
+
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers', storeId],
+    queryFn: async () => {
+      const res = await apiClient.get('/suppliers', { params: { storeId } });
+      return res.data.map((s: any) => ({ ...s, name: s.name || s.nombre }));
+    },
+    enabled: !!storeId,
+  });
+
+  const createProductMutation = useApiMutation(
+    (productData: any) => apiClient.post('/products', productData),
+    [['products', storeId]]
+  );
 
   const form = useForm<z.infer<typeof productFormSchema>>({
     resolver: zodResolver(productFormSchema),
@@ -127,37 +162,8 @@ export default function AddProductPage() {
   const selectedDepartment = form.watch('department');
 
   useEffect(() => {
-    if (!storeId) return;
-    let isMounted = true;
-    const loadData = async () => {
-      try {
-        const [deptsRes, subDeptsRes, supRes] = await Promise.all([
-          apiClient.get('/departments', { params: { storeId, type: 'main' } }),
-          apiClient.get('/sub-departments', { params: { storeId } }).catch(() => ({ data: [] })),
-          apiClient.get('/suppliers', { params: { storeId } }).catch(() => ({ data: [] }))
-        ]);
-        
-        if (isMounted) {
-          setDepartments(deptsRes.data.map((d: any) => ({ ...d, name: d.name || d.nombre })));
-          setSubDepartments((subDeptsRes.data || []).map((sd: any) => ({
-            id: sd.id,
-            name: sd.name || sd.nombre,
-            departmentId: sd.departmentId || sd.parentId || sd.parent_id || '',
-          })));
-          setSuppliers(supRes.data.map((s: any) => ({ ...s, name: s.name || s.nombre })));
-        }
-      } catch (err: any) {
-        logError(err, { location: 'add-product-page-fetch-data' });
-        toast.error('Error', 'No se pudieron cargar los datos iniciales.');
-      }
-    };
-    
-    loadData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [storeId]);
+    form.setValue('subDepartment', '');
+  }, [selectedDepartment, form]);
 
   useEffect(() => {
     form.setValue('subDepartment', '');
@@ -192,7 +198,7 @@ export default function AddProductPage() {
       if (productData.subDepartmentId === 'none') productData.subDepartmentId = '';
       if (productData.supplierId === 'none') productData.supplierId = '';
 
-      await apiClient.post('/products', productData);
+      await createProductMutation.mutateAsync(productData);
 
       toast.success('Producto Guardado', `El producto "${values.description}" ha sido agregado al inventario.`);
       navigate(`/store/${storeId}/products`);

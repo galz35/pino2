@@ -1,43 +1,125 @@
-# Sistema MultiTienda (v2.0)
+# Pino2 — Sistema MultiTienda
 
-Este repositorio contiene la migración completa del Sistema MultiTienda y Los Pinos Mobile, pasando de una arquitectura Serverless (Firebase/Next.js) a una infraestructura relacional robusta (PostgreSQL/NestJS/React Vite).
+> Sistema de gestión para distribuidoras y cadenas de tiendas con POS, inventario, logística y facturación.
+
+## Arquitectura
+
+```
+┌─────────────┐      ┌───────────────┐      ┌──────────────┐
+│  Flutter     │◄────►│  NestJS API   │◄────►│  PostgreSQL  │
+│  (Mobile)    │      │  (Fastify)    │      │  (190.56...)  │
+└─────────────┘      └───────┬───────┘      └──────────────┘
+                             │
+                     ┌───────▼───────┐
+                     │   React Web   │
+                     │   (Vite PWA)  │
+                     └───────────────┘
+```
+
+## Stack Tecnológico
+
+| Capa | Tecnología | Estado |
+|------|-----------|--------|
+| **Backend** | NestJS + Fastify + pg (raw SQL) | ✅ Producción |
+| **Web** | React 18 + Vite + TanStack Query + ShadcnUI | ✅ Producción |
+| **Mobile** | Flutter + Riverpod + Drift (SQLite) + Dio | ✅ Producción |
+| **Base de Datos** | PostgreSQL 16 | ✅ Producción |
+| **Hosting Web** | Firebase Hosting | ✅ Desplegado |
+| **Push** | Firebase Cloud Messaging | ✅ Activo |
 
 ## Estructura del Proyecto
 
-El proyecto sigue una estructura de monorepo lógico dividido en 3 pilares principales:
+```
+sistema_final/
+├── backend/          # NestJS API (33 controladores, ~140 endpoints)
+│   ├── src/modules/  # Módulos de negocio
+│   ├── migrations/   # SQL migrations
+│   └── test/active/  # E2E tests (Jest + Supertest)
+├── web/              # React SPA + PWA
+│   ├── src/pages/    # ~60 páginas (store-admin, master-admin, chain-admin)
+│   ├── src/hooks/    # TanStack Query hooks (use-api.ts)
+│   └── src/components/
+├── flutter/          # App móvil (14 features)
+│   ├── lib/features/ # Feature-based architecture
+│   ├── lib/core/     # Network, DB, Config
+│   └── lib/shared/   # Widgets compartidos
+└── docs/             # Documentación técnica (25+ archivos)
+```
 
-- `/backend`: API REST, Lógica de Negocio y WebSockets (NestJS + TypeORM + PostgreSQL).
-- `/web`: Aplicación de Punto de Venta PWA SPA (Vite + React + Tailwind + Radix UI).
-- `/flutter`: Aplicación móvil conectada a esta API (Flutter + Riverpod + Drift).
-- `/docs`: Documentación consolidada para humanos y para IA local.
-- `/plan`: Bitácora histórica de análisis, decisiones y avances.
+## Inicio Rápido
 
-## Punto de entrada recomendado
+### Backend
+```bash
+cd sistema_final/backend
+npm ci
+npm run build
+node dist/main.js        # http://localhost:3010
+```
 
-Si vas a retomar el proyecto o darselo a una IA local:
+### Web
+```bash
+cd sistema_final/web
+npm ci
+npm run dev              # http://localhost:5173
+npm run build            # Producción
+```
 
-1. leer [docs/00_INDEX.md](./docs/00_INDEX.md)
-2. leer [docs/01_GEMINI_HANDOFF.md](./docs/01_GEMINI_HANDOFF.md)
-3. leer [docs/06_BASE_DE_DATOS_ESTADO_ACTUAL.md](./docs/06_BASE_DE_DATOS_ESTADO_ACTUAL.md)
-4. usar `plan/2026-04-01/` como historial detallado del corte actual
+### Flutter
+```bash
+cd sistema_final/flutter
+flutter pub get
+flutter run              # Debug
+flutter build apk --release  # APK release
+```
 
-## Actualización manual en este VPS
+## Patrones Clave
 
-Para actualizar backend y republicar React en este mismo servidor:
+### Backend — Raw SQL con Pool de pg
+```typescript
+// Los services usan @Inject('PG_POOL') para queries directas
+const result = await this.pool.query('SELECT * FROM products WHERE store_id = $1', [storeId]);
+```
 
-1. revisar `docs/00_INDEX.md`
-2. usar `./manual_update.sh`
+### Web — TanStack Query
+```typescript
+// Las páginas usan useQuery para caché automático y deduplicación
+const { data, isLoading } = useQuery({
+  queryKey: ['products', storeId],
+  queryFn: () => apiClient.get('/products', { params: { storeId } }).then(r => r.data),
+});
+```
 
-Modos útiles:
+### Flutter — Riverpod + Repository Pattern
+```dart
+// Features usan appApiClientProvider para llamadas API
+final repo = ref.read(catalogRepositoryProvider);
+final products = await repo.getProducts(storeId);
+```
 
-- `./manual_update.sh all`
-- `./manual_update.sh backend`
-- `./manual_update.sh web`
-- `./manual_update.sh local-all`
+## Testing
 
-## Decisiones Técnicas
+```bash
+# Backend E2E (33 módulos verificados)
+cd backend && npx jest --config test/jest-e2e.json
 
-- **Base de datos:** PostgreSQL para asegurar integridad referencial y cumplir requisitos financieros de Kárdex y Caja.
-- **Frontend SPA:** Cambio de Next.js (SSR) a React + Vite (SPA) para maximizar la velocidad y aprovechar `IndexedDB` en transacciones POS offline rápidas.
-- **Sincronización:** Uso de un patrón Last-Write-Wins junto con el API Batch de NestJS para solventar transacciones locales generadas por fallos de red.
-- **Micro UI Components:** Reutilización del 100% de la capa gráfica original mediante `@radix-ui` y `Tailwind CSS`.
+# Web type-check
+cd web && npx tsc --noEmit
+```
+
+## Documentación
+
+| Documento | Descripción |
+|-----------|-------------|
+| [API_REFERENCE.md](docs/API_REFERENCE.md) | Referencia completa de ~140 endpoints |
+| [06_BASE_DE_DATOS_ESTADO_ACTUAL.md](docs/06_BASE_DE_DATOS_ESTADO_ACTUAL.md) | Esquema de base de datos |
+| [04_FLUJOS_DE_TRABAJO.md](docs/04_FLUJOS_DE_TRABAJO.md) | Flujos operativos del sistema |
+| [19_USUARIOS_ROLES_Y_PERMISOS.md](docs/19_USUARIOS_ROLES_Y_PERMISOS.md) | Sistema de roles y permisos |
+
+## Deploy
+
+- **Web:** `firebase deploy --only hosting` (proyecto: pino-5fe44)
+- **Backend:** VPS con `node dist/main.js` (puerto 3010)
+- **Mobile:** `flutter build apk --release` → distribución manual
+
+## Licencia
+Propietario. Todos los derechos reservados.

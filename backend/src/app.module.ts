@@ -42,6 +42,7 @@ import { ArqueosModule } from './modules/arqueos/arqueos.module';
 import { CargasCamionModule } from './modules/cargas-camion/cargas-camion.module';
 import { LiquidacionesRutaModule } from './modules/liquidaciones-ruta/liquidaciones-ruta.module';
 import { ProductBarcodesModule } from './modules/product-barcodes/product-barcodes.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { ProductBarcodesModule } from './modules/product-barcodes/product-barcod
     CargasCamionModule,
     LiquidacionesRutaModule,
     ProductBarcodesModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
+import { useApiMutation } from '@/hooks/use-api';
 import { 
   Banknote, 
   DoorOpen, 
@@ -41,52 +43,51 @@ interface CashShift {
 export default function CashRegisterPage() {
   const { storeId } = useParams();
   const { user } = useAuth();
-  const [activeShift, setActiveShift] = useState<CashShift | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ cashSales: 0, cardSales: 0, totalSales: 0 });
+  const queryClient = useQueryClient();
   const [isOpeningShift, setIsOpeningShift] = useState(false);
   const [isClosingShift, setIsClosingShift] = useState(false);
   const [startingCash, setStartingCash] = useState('0');
   const [actualCashInput, setActualCashInput] = useState('0');
 
-  useEffect(() => {
-    fetchActiveShift();
-  }, [storeId]);
-
-  const fetchActiveShift = async () => {
-    if (!storeId) return;
-    setLoading(true);
-    try {
+  const { data: activeShift = null, isLoading: loadingShift } = useQuery({
+    queryKey: ['cash-shifts', 'active', storeId],
+    queryFn: async () => {
       const response = await apiClient.get(`/cash-shifts/active?storeId=${storeId}`);
-      setActiveShift(response.data);
-      if (response.data) {
-        fetchShiftStats(response.data.id);
-      }
-    } catch (error) {
-      console.error('Error fetching shift:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return response.data as CashShift | null;
+    },
+    enabled: !!storeId,
+  });
 
-  const fetchShiftStats = async (shiftId: string) => {
-    try {
-      const response = await apiClient.get(`/cash-shifts/stats/${shiftId}`);
-      setStats(response.data);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
+  const { data: stats = { cashSales: 0, cardSales: 0, totalSales: 0 } } = useQuery({
+    queryKey: ['cash-shifts', 'stats', activeShift?.id],
+    queryFn: async () => {
+      const response = await apiClient.get(`/cash-shifts/stats/${activeShift!.id}`);
+      return response.data;
+    },
+    enabled: !!activeShift?.id,
+  });
+
+  const openShiftMutation = useApiMutation(
+    (data: any) => apiClient.post('/cash-shifts', data),
+    [['cash-shifts']]
+  );
+
+  const closeShiftMutation = useApiMutation(
+    (data: any) => apiClient.post('/cash-shifts/close', data),
+    [['cash-shifts']]
+  );
+
+  const loading = loadingShift;
+  const refetch = () => queryClient.invalidateQueries({ queryKey: ['cash-shifts'] });
 
   const handleOpenShift = async () => {
     if (!user || !storeId) return;
     try {
-      const response = await apiClient.post('/cash-shifts', {
+      await openShiftMutation.mutateAsync({
         storeId,
         userId: user.id,
         startingCash: parseFloat(startingCash)
       });
-      setActiveShift(response.data);
       setIsOpeningShift(false);
       toast.success('Caja Abierta', 'Turno de caja iniciado correctamente.');
     } catch (error) {
@@ -101,7 +102,7 @@ export default function CashRegisterPage() {
     const difference = actualCash - expectedCash;
 
     try {
-      await apiClient.post('/cash-shifts/close', {
+      await closeShiftMutation.mutateAsync({
         shiftId: activeShift.id,
         storeId,
         expectedCash,
@@ -110,7 +111,6 @@ export default function CashRegisterPage() {
         userId: user.id
       });
       toast.success('Caja Cerrada', 'Turno finalizado y reporte generado.');
-      setActiveShift(null);
       setIsClosingShift(false);
     } catch (error) {
       toast.error('Error', 'No se pudo cerrar el turno de caja.');

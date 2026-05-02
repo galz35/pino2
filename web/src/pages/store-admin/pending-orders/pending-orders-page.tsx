@@ -7,7 +7,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ClipboardCheck, Hourglass } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import apiClient from '@/services/api-client';
 import { useRealTimeEvents } from '@/hooks/use-real-time-events';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface OrderItem {
     id: string;
@@ -44,36 +45,20 @@ export default function PendingOrdersPage() {
     const { storeId } = useParams<{ storeId: string }>();
     const { toast } = useToast();
     const { lastEvent } = useRealTimeEvents(storeId);
+    const queryClient = useQueryClient();
 
-    const [orders, setOrders] = useState<PendingOrder[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    const fetchOrders = async () => {
-        try {
+    const { data: orders = [], isLoading: loading, error } = useQuery({
+        queryKey: ['pending-orders', storeId],
+        queryFn: async () => {
             const res = await apiClient.get('/pending-orders', { params: { storeId, status: 'Pendiente' } });
-            setOrders(res.data);
-            setError(null);
-        } catch (err: any) {
-            console.error('Error fetching pending orders:', err);
-            setError('No se pudieron cargar las comandas pendientes.');
-        } finally {
-            setLoading(false);
-        }
-    };
+            return res.data as PendingOrder[];
+        },
+        enabled: !!storeId,
+        refetchInterval: 15000,
+    });
 
-    useEffect(() => {
-        if (!storeId) return;
-        fetchOrders();
-        const interval = setInterval(fetchOrders, 15000);
-        return () => clearInterval(interval);
-    }, [storeId]);
-
-    useEffect(() => {
-        if (lastEvent && lastEvent.type !== 'PING') {
-            fetchOrders();
-        }
-    }, [lastEvent]);
+    // React to real-time events
+    const refetchOrders = () => queryClient.invalidateQueries({ queryKey: ['pending-orders', storeId] });
 
     const handleProcessOrder = async (order: PendingOrder) => {
         try {
@@ -82,7 +67,7 @@ export default function PendingOrdersPage() {
                 title: 'Comanda Procesada',
                 description: `La comanda para ${order.clientName} ha sido marcada para cobro.`,
             });
-            fetchOrders();
+            refetchOrders();
         } catch (err) {
             console.error(err);
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo procesar la comanda.' });

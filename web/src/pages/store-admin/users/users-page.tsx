@@ -3,8 +3,9 @@ import { FloatingActionButton } from "@/components/floating-action-button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import apiClient from '@/services/api-client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Accordion,
@@ -27,26 +28,18 @@ interface User {
 export default function StoreUsersPage() {
   const params = useParams();
   const storeId = params.storeId as string;
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const fetchUsers = async () => {
-    try {
+  const { data: users = [], isLoading: loading, error } = useQuery({
+    queryKey: ['users', storeId],
+    queryFn: async () => {
       const response = await apiClient.get('/users', { params: { storeId } });
-      setUsers(response.data);
-      setLoading(false);
-    } catch (err) {
-      console.error("Error fetching store users:", err);
-      setError("No se pudieron cargar los usuarios de la tienda.");
-      setLoading(false);
-    }
-  };
+      return response.data as User[];
+    },
+    enabled: !!storeId,
+  });
 
-  useEffect(() => {
-    if (!storeId) return;
-    fetchUsers();
-  }, [storeId]);
+  const refetchUsers = () => queryClient.invalidateQueries({ queryKey: ['users', storeId] });
 
   const renderContent = () => {
     if (loading) {
@@ -116,7 +109,7 @@ export default function StoreUsersPage() {
                             try {
                               await apiClient.delete(`/users/${userId}`);
                               toast.success("Usuario eliminado", "El usuario ha sido removido de la tienda.");
-                              fetchUsers();
+                              refetchUsers();
                             } catch (error) {
                               console.error("Error deleting user:", error);
                               toast.error("Error", "No se pudo eliminar al usuario.");
